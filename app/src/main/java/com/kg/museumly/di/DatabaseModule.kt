@@ -29,10 +29,11 @@ object DatabaseModule {
     fun provideDatabase(@ApplicationContext context: Context) : MuseumDatabase
     {
         return Room.databaseBuilder(
-            context,
-            MuseumDatabase::class.java,
-            "museum_db"
-        ).build()
+                context,
+                MuseumDatabase::class.java,
+                "museum_db"
+            ).fallbackToDestructiveMigration(true)
+            .build()
     }
 
     @Provides
