@@ -1,4 +1,6 @@
-package com.kg.museumly
+package com.kg.museumly.data
+
+import com.kg.museumly.model.Artwork
 
 /**
  * Phase 0 spike data: hardcoded, no network layer, no Room, no repository.
@@ -17,14 +19,7 @@ package com.kg.museumly
  * is used instead of `primaryImage` (original, several MB — too heavy to
  * decode smoothly while flinging through a pager).
  */
-data class Artwork(
-    val id: String,
-    val title: String,
-    val artist: String,
-    val year: String,
-    val imageUrl: String,
-    val aspectRatio: Float,
-)
+
 
 val sampleArtworks: List<Artwork> = listOf(
     Artwork(

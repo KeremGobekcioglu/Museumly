@@ -29,8 +29,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import coil3.compose.AsyncImagePainter
+import com.kg.museumly.feature.scroll.presentation.ScrollViewModel
+import com.kg.museumly.model.Artwork
 
 private const val TAG = "MuseumlyImages"
 
@@ -40,14 +44,24 @@ private const val TAG = "MuseumlyImages"
  * screen-sized page (Reels-style vertical snap via VerticalPager's real fling/snap).
  */
 @Composable
-fun ArtworkReelsScreen(artworks: List<Artwork>, modifier: Modifier = Modifier) {
+fun ArtworkReelsScreen(viewModel: ScrollViewModel = hiltViewModel()) {
+    val artworks: List<Artwork> by viewModel.artworks.collectAsStateWithLifecycle()
     val pagerState = rememberPagerState(pageCount = { artworks.size })
 
-    Box(modifier = modifier.fillMaxSize().background(Color.Black)) {
+    Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+        if (artworks.isEmpty()) {
+            return@Box
+        }
         VerticalPager(
             state = pagerState,
             modifier = Modifier.fillMaxSize(),
         ) { page ->
+            /**
+             * val artwork = artworks.getOrNull(page)
+             *     if (artwork != null) {
+             *         ArtworkPage(artwork = artwork)
+             *     }
+             */
             ArtworkPage(artwork = artworks[page])
         }
 
