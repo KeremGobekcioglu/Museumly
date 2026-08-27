@@ -11,8 +11,5 @@ interface ArtworkRepository {
 
     //suspend fun insert(items: List<Artwork>)
 
-    // debug only.
-    suspend fun appendBatch(items: List<Artwork>)
-
     suspend fun seedIfEmpty()
 }

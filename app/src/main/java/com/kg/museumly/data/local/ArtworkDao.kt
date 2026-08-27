@@ -20,11 +20,15 @@ interface ArtworkDao
 
     /**
      * COALESCE(MAX(position), -1) returns -1 on an empty table,
-     * so the first ++position lands on 0. Without it you'd get a null and a crash on first run.
+     * so the first ++position lands on 0. Without it we would get a null and a crash on first run.
      */
     @Query("SELECT COALESCE(MAX(position) , -1) FROM artworks")
     suspend fun maxPosition() : Int
 
+    /**
+     * replace : deletes than inserts. duplicate artworks
+     * will go to end.
+     */
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(items: List<ArtworkEntity>)
 

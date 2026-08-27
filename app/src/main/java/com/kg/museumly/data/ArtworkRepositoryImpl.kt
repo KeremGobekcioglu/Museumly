@@ -18,7 +18,23 @@ class ArtworkRepositoryImpl @Inject constructor(
     private val seedSource: SeedSource
 ) : ArtworkRepository
 {
+    /**
+     * Only one writer at a time.
+     *
+     * insert() reads maxPosition(), then writes. Without this lock, two
+     * writers can both read 19, and both write positions 20..39. Duplicate
+     * positions break ORDER BY, so the feed order becomes random.
+     *
+     * SQLite already handles two writes at once. It does not handle the
+     * math we do in between them. That is what this protects.
+     *
+     * Mutex, not synchronized, because these functions suspend.
+     */
     private val mutex = Mutex()
+
+    /**
+     * Returns Flow, so the screen subscribes once and gets every future version automatically.
+     */
     override fun artworks(): Flow<List<Artwork>> {
         return artworkDao.observeAll().map {
             rows: List<ArtworkEntity> ->
@@ -38,6 +54,16 @@ class ArtworkRepositoryImpl @Inject constructor(
         return ArtworkMapper.toDomain(entity)
     }
 
+    /**
+     * Writes artworks to the database, numbering them after the last one.
+     *
+     * The caller must lock the mutex first. This function does not lock it.
+     * Kotlin's Mutex cannot be locked twice by the same caller — it would
+     * freeze forever. This is private so all callers stay in this file.
+     *
+     * One insertAll for the whole list, not one per artwork, so Room
+     * notifies the screen once instead of twenty times.
+     */
     private suspend fun insert(items: List<Artwork>) {
         var position: Int = artworkDao.maxPosition()
         val entities : MutableList<ArtworkEntity> = ArrayList()
@@ -48,14 +74,6 @@ class ArtworkRepositoryImpl @Inject constructor(
             entities.add(ArtworkMapper.toEntity(artwork,position))
         }
         artworkDao.insertAll(entities)
-    }
-
-    // Debug only: append a batch while the screen is live, to watch what
-    // a mid-fling Room emission does to the pager.
-    override suspend fun appendBatch(items: List<Artwork>) {
-        mutex.withLock {
-            insert(items)
-        }
     }
 
     override suspend fun seedIfEmpty() {
