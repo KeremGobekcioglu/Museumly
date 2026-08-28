@@ -3,6 +3,8 @@ package com.kg.museumly.data
 import com.kg.museumly.data.local.ArtworkDao
 import com.kg.museumly.data.local.ArtworkEntity
 import com.kg.museumly.data.local.ArtworkMapper
+import com.kg.museumly.data.local.ProviderCursorDao
+import com.kg.museumly.domain.ArtworkProvider
 import com.kg.museumly.domain.ArtworkRepository
 import com.kg.museumly.model.Artwork
 import kotlinx.coroutines.flow.Flow
@@ -15,6 +17,8 @@ import javax.inject.Singleton
 @Singleton
 class ArtworkRepositoryImpl @Inject constructor(
     private val artworkDao: ArtworkDao,
+    private val cursorDao: ProviderCursorDao,
+    private val providers: Set<@JvmSuppressWildcards ArtworkProvider>,
     private val seedSource: SeedSource
 ) : ArtworkRepository
 {
@@ -83,6 +87,10 @@ class ArtworkRepositoryImpl @Inject constructor(
                 return@withLock
             insert(seedSource.artworks())
         }
+    }
+
+    override suspend fun loadMore(size: Int) {
+        TODO("Not yet implemented")
     }
 
 }

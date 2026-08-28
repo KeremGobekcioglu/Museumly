@@ -1,7 +1,9 @@
 package com.kg.museumly.data.remote.met
 
+import android.util.Log
 import com.kg.museumly.domain.ArtworkProvider
 import com.kg.museumly.domain.PageResult
+import com.kg.museumly.model.Artwork
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
@@ -19,13 +21,60 @@ class MetProvider @Inject constructor(
     private var cachedIds: List<Int>? = null
     private val idsMutex = Mutex()
 
-    private suspend fun loadIds(): List<Int>
+    /**
+     * Cursor is a plain index into the ID list. Null means start at 0,
+     * and anything unparseable falls back to 0 too — worst case the user
+     * sees a few artworks again.
+     */
+    private fun parseCursor(cursor: String?) : Int
     {
+        if(cursor == null)
+            return 0
+        val parsed = cursor.toIntOrNull() ?: return 0
+        return parsed
+    }
+    /**
+     * One ID in, one artwork or null out.
+     *
+     * Returns null for: a network failure, a 404, a parse error, or a
+     * record the mapper rejects (not public domain, no image).
+     * A single bad artwork must never kill a whole page.
+     */
+    private suspend fun fetchArtwork(objectId: Int): Artwork?
+    {
+        return try {
+            val dto = api.getObject(objectId)
+            /**
+             * toDomain eliminates poor candidates. check the code.
+             *
+             */
+            MetMapper.toDomain(dto)
+        }
+        catch (e: Exception)
+        {
+            null
+        }
+    }
+    private suspend fun loadIds(): List<Int> {
         idsMutex.withLock {
-            var ids = cachedIds
-            if(ids == null)
-            {
-                val response = api.search("paintings")
+            val existing: List<Int>? = cachedIds
+            if (existing != null) {
+                return existing
+            }
+
+            try {
+                // european paintings
+                val response = api.search(departmentId = 11)
+                val fetched: List<Int>? = response.objectIDs
+                if (fetched == null) {
+                    Log.d("METPROVIDER", "load ids = ids == null.")
+                    return emptyList()
+                }
+                cachedIds = fetched
+                return fetched
+            } catch (e: Exception) {
+                Log.d("METPROVIDER", "LOAD IDS THROW = ${e.message}")
+                return emptyList()
             }
         }
     }
@@ -34,7 +83,30 @@ class MetProvider @Inject constructor(
         cursor: String?,
         size: Int
     ): PageResult {
-        TODO("Not yet implemented")
+
+        val allIds = loadIds()
+        var i = parseCursor(cursor)
+        val items : MutableList<Artwork> = ArrayList()
+
+        // Walk IDs until we have `size` good ones or run out.
+        // Rejected records are skipped permanently — they'd fail
+        // identically next time.
+        while(i < allIds.size && items.size < size)
+        {
+            val artwork = fetchArtwork(allIds[i])
+            if(artwork != null)
+            {
+                items.add(artwork)
+            }
+            i++
+        }
+
+        var next: String? = null
+        if(i < allIds.size)
+        {
+            next = i.toString()
+        }
+        return PageResult(items, next)
     }
 
 }

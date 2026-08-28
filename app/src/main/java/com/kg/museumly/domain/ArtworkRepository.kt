@@ -12,4 +12,7 @@ interface ArtworkRepository {
     //suspend fun insert(items: List<Artwork>)
 
     suspend fun seedIfEmpty()
+
+    suspend fun loadMore(size: Int = 20)
+
 }
