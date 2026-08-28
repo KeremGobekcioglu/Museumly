@@ -14,7 +14,7 @@ import androidx.room.PrimaryKey
  * Without this, SELECT * returns rows in whatever order the engine feels like,
  * and that order can change after an insert. Your pager needs page 7 to be
  * the same artwork tomorrow. This is the only thing guaranteeing that.
- * 
+ *
  * indices = [Index("position")] — because every query is ORDER BY position.
  * Without an index SQLite sorts the whole table each time. Invisible at 20 rows, not at 5,000.
  */
@@ -30,6 +30,8 @@ data class ArtworkEntity(
     val year: String?,
     val yearStart: Int?,
     val imageUrl: String,
-    val aspectRatio: Float,
-    val position: Int
+    val aspectRatio: Float?,
+    val position: Int,
+    val classification: String?,
+    val department: String?
 )

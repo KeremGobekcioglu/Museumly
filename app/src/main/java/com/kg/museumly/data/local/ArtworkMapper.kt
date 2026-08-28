@@ -13,7 +13,9 @@ object ArtworkMapper {
             year = entity.year,
             imageUrl = entity.imageUrl,
             aspectRatio = entity.aspectRatio,
-            yearStart = entity.yearStart
+            yearStart = entity.yearStart,
+            classification = entity.classification,
+            department = entity.department
         )
     }
 
@@ -27,7 +29,9 @@ object ArtworkMapper {
             yearStart = artwork.yearStart,
             imageUrl = artwork.imageUrl,
             aspectRatio = artwork.aspectRatio,
-            position = position
+            position = position,
+            classification = artwork.classification,
+            department = artwork.department
         )
     }
 }

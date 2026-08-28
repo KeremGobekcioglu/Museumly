@@ -9,8 +9,10 @@ data class Artwork(
     val artist: String?,
     val year: String?,
     val imageUrl: String,
-    val aspectRatio: Float,
-    val yearStart: Int? = null
+    val aspectRatio: Float?,
+    val yearStart: Int? = null,
+    val classification: String? = null,
+    val department: String? = null
 ) {
     val providerId: String
         get() = id.substringBefore(':')

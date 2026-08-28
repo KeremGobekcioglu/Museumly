@@ -74,10 +74,11 @@ private fun ArtworkPage(artwork: Artwork, modifier: Modifier = Modifier) {
     Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
             val containerRatio = maxWidth / maxHeight
-            val (imageWidth, imageHeight) = if (artwork.aspectRatio > containerRatio) {
-                maxWidth to maxWidth / artwork.aspectRatio
+            val aspectRatio = artwork.aspectRatio ?: containerRatio
+            val (imageWidth, imageHeight) = if (aspectRatio > containerRatio) {
+                maxWidth to maxWidth / aspectRatio
             } else {
-                maxHeight * artwork.aspectRatio to maxHeight
+                maxHeight * aspectRatio to maxHeight
             }
 
             var loadFailed by remember(artwork.id) { mutableStateOf(false) }
