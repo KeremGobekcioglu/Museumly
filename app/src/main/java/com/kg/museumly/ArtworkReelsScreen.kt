@@ -14,9 +14,12 @@ import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import android.util.Log
+import androidx.compose.foundation.ScrollState
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -27,12 +30,14 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import coil3.compose.AsyncImagePainter
+import com.kg.museumly.feature.scroll.presentation.ScrollUiState
 import com.kg.museumly.feature.scroll.presentation.ScrollViewModel
 import com.kg.museumly.model.Artwork
 
@@ -44,12 +49,56 @@ private const val TAG = "MuseumlyImages"
  * screen-sized page (Reels-style vertical snap via VerticalPager's real fling/snap).
  */
 @Composable
-fun ArtworkReelsScreen(viewModel: ScrollViewModel = hiltViewModel()) {
-    val artworks: List<Artwork> by viewModel.artworks.collectAsStateWithLifecycle()
-    val pagerState = rememberPagerState(pageCount = { artworks.size })
+fun ArtworkReelsScreen(
+    state: ScrollUiState,
+    refresh: () -> Unit,
+    onPageChanged: (Int) -> Unit
+) {
+
+    // Don't build the pager until we know the start position and have items.
+    // rememberPagerState reads initialPage exactly once — if it's created
+    // against an empty list, the position clamps to 0 and never corrects.
+    if (state.initialPage == null || state.artworks.isEmpty()) {
+        return
+    }
+
+    val pagerState = rememberPagerState(
+        initialPage = state.initialPage,
+        pageCount = { state.artworks.size }
+    )
+
+    LaunchedEffect(pagerState.currentPage, state.artworks.size) {
+        onPageChanged(pagerState.currentPage)
+        if (state.artworks.size - pagerState.currentPage <= 5) {
+            refresh()
+        }
+    }
+
+    if (state.isInitialLoad && state.artworks.isEmpty()) {
+        // first attempt still running
+        Box(modifier = Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator(color = Color.White)
+        }
+        return
+    }
+
+    if (state.artworks.isEmpty()) {
+        // tried, got nothing — network down or the provider is empty
+        Box(modifier = Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
+            Text(
+                text = "Something went wrong",
+                color = Color.White,
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 32.dp),
+            )
+        }
+        return
+    }
 
     Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
-        if (artworks.isEmpty()) {
+        if (state.artworks.isEmpty()) {
             return@Box
         }
         VerticalPager(
@@ -62,10 +111,10 @@ fun ArtworkReelsScreen(viewModel: ScrollViewModel = hiltViewModel()) {
              *         ArtworkPage(artwork = artwork)
              *     }
              */
-            ArtworkPage(artwork = artworks[page])
+            ArtworkPage(artwork = state.artworks[page])
         }
 
-        PageCounter(pagerState = pagerState, total = artworks.size)
+        PageCounter(pagerState = pagerState, total = state.artworks.size)
     }
 }
 

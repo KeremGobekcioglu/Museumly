@@ -1,11 +1,14 @@
 package com.kg.museumly.data
 
+import android.util.Log
 import com.kg.museumly.data.local.ArtworkDao
 import com.kg.museumly.data.local.ArtworkEntity
 import com.kg.museumly.data.local.ArtworkMapper
+import com.kg.museumly.data.local.ProviderCursor
 import com.kg.museumly.data.local.ProviderCursorDao
 import com.kg.museumly.domain.ArtworkProvider
 import com.kg.museumly.domain.ArtworkRepository
+import com.kg.museumly.domain.PageResult
 import com.kg.museumly.model.Artwork
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -90,7 +93,43 @@ class ArtworkRepositoryImpl @Inject constructor(
     }
 
     override suspend fun loadMore(size: Int) {
-        TODO("Not yet implemented")
+        mutex.withLock {
+            for(provider in providers)
+            {
+                Log.d("ARTWORKREPOSITORYIMPL" , "LOAD MORE.")
+                val saved: ProviderCursor? = cursorDao.get(provider.id)
+                // we need to check exhaustion for providers
+                if(saved != null && saved.next == null)
+                {
+                    // try next provider, this is finished.
+                    Log.d("REPO", "exhausted, skipping")
+                    continue
+                }
+
+                var cursor: String? = null
+                if(saved != null)
+                    cursor = saved.next
+                // if saved is null, it means we are at 0, at the beginning.
+                // The provider does everything: rebuilds its ID list if needed, walks
+                // from `cursor`, hydrates each artwork, drops the unusable ones.
+                Log.d("REPO", "calling fetchPage cursor=$cursor")
+                val page: PageResult = provider.fetchPage(cursor,size)
+                Log.d("REPO", "returned ${page.items.size} items, next=${page.next}")
+                // If page.next is null, this writes the exhaustion marker, and the
+                // continue check will skip this provider from now on.
+                cursorDao.put(ProviderCursor(provider.id,page.next))
+                Log.d("ARTWORKREPOSITORYIMPL" , "CURSOR = $cursor")
+                if(page.items.isNotEmpty())
+                {
+                    insert(page.items)
+                    return@withLock
+                }
+            }
+        }
+    }
+
+    override suspend fun count(): Int {
+        return artworkDao.count()
     }
 
 }

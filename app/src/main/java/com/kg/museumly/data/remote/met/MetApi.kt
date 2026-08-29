@@ -14,9 +14,9 @@ interface MetApi {
     suspend fun search(
         @Query("departmentId") departmentId: Int,
         @Query("q") query: String = "*",
-        @Query("isHighlight") isHighlight: Boolean = true,
+        //@Query("isHighlight") isHighlight: Boolean = true,
         @Query("hasImages") hasImages: Boolean = true,
-        @Query("isOnView") isOnView: Boolean = true
+        //@Query("isOnView") isOnView: Boolean = true
     ) : MetSearchDto
 
     @GET("objects/{objectId}")

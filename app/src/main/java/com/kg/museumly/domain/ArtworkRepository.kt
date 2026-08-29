@@ -15,4 +15,5 @@ interface ArtworkRepository {
 
     suspend fun loadMore(size: Int = 20)
 
+    suspend fun count(): Int
 }

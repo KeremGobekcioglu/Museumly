@@ -1,15 +1,23 @@
 package com.kg.museumly.feature.scroll.presentation
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.kg.museumly.data.local.FeedPositionSource
 import com.kg.museumly.domain.ArtworkRepository
 import com.kg.museumly.model.Artwork
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.job
 
 /***
  * stateIn converts a cold Flow into a hot StateFlow. Cold means each collector
@@ -36,19 +44,76 @@ import javax.inject.Inject
  */
 @HiltViewModel
 class ScrollViewModel @Inject constructor(
-    private val repository: ArtworkRepository
+    private val repository: ArtworkRepository,
+    private val positionStore: FeedPositionSource
 ) : ViewModel()
 {
-    val artworks: StateFlow<List<Artwork>> = repository.artworks()
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5_000),
-            initialValue = emptyList()
+    private val isLoadingMore = MutableStateFlow(false)
+    private val isInitialLoad = MutableStateFlow(true)
+    private var loadJob: Job? = null
+
+    private val initialPage = MutableStateFlow<Int?>(null)
+
+    val uiState: StateFlow<ScrollUiState> = combine(
+        repository.artworks(),
+        isLoadingMore,
+        isInitialLoad,
+        initialPage
+    ){
+            artworks: List<Artwork>, loading: Boolean, inital: Boolean, page: Int? ->
+        ScrollUiState(
+            artworks= artworks,
+            isLoadingMore = loading,
+            isInitialLoad = inital,
+            initialPage = page
         )
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = ScrollUiState()
+    )
 
     init {
         viewModelScope.launch {
-            repository.seedIfEmpty()
+            val stored: Int = positionStore.getFrontier()
+            var start: Int = stored - 2
+            if (start < 0) {
+                start = 0
+            }
+            initialPage.value = start
+        }
+
+        viewModelScope.launch {
+            // Ask the database directly. A Flow's first emission can't tell
+            // "empty because loading" from "empty because empty" — a count query can.
+            val existing: Int = repository.count()
+            if (existing == 0) {
+                loadMore()
+            }
+        }
+    }
+    fun loadMore()
+    {
+        Log.d("VM", "loadMore called, active=${loadJob?.isActive}")
+        if (loadJob?.isActive == true) {
+            Log.d("VM", "skipped, already loading")
+            return
+        }
+        loadJob = viewModelScope.launch {
+            isLoadingMore.value = true
+            try {
+                repository.loadMore()
+            }
+            finally {
+                isLoadingMore.value = false
+                isInitialLoad.value = false
+            }
+        }
+    }
+
+    fun onPageChanged(page: Int) {
+        viewModelScope.launch {
+            positionStore.setFrontier(page)
         }
     }
 }

@@ -52,6 +52,7 @@ class MetProvider @Inject constructor(
         }
         catch (e: Exception)
         {
+            Log.d("MET PROVIDER" , "FETCH ARTWORK ERROR = ${e.message}")
             null
         }
     }
@@ -70,6 +71,7 @@ class MetProvider @Inject constructor(
                     Log.d("METPROVIDER", "load ids = ids == null.")
                     return emptyList()
                 }
+                Log.d("METPROVIDER", "total=${response.total}, ids=${fetched.size}")
                 cachedIds = fetched
                 return fetched
             } catch (e: Exception) {
@@ -83,8 +85,9 @@ class MetProvider @Inject constructor(
         cursor: String?,
         size: Int
     ): PageResult {
-
+        Log.d("METPROVIDER", "fetchPage cursor=$cursor")
         val allIds = loadIds()
+        Log.d("METPROVIDER", "allIds size=${allIds.size}")
         var i = parseCursor(cursor)
         val items : MutableList<Artwork> = ArrayList()
 
