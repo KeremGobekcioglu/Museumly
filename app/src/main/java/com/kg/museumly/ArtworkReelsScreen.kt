@@ -55,25 +55,6 @@ fun ArtworkReelsScreen(
     onPageChanged: (Int) -> Unit
 ) {
 
-    // Don't build the pager until we know the start position and have items.
-    // rememberPagerState reads initialPage exactly once — if it's created
-    // against an empty list, the position clamps to 0 and never corrects.
-    if (state.initialPage == null || state.artworks.isEmpty()) {
-        return
-    }
-
-    val pagerState = rememberPagerState(
-        initialPage = state.initialPage,
-        pageCount = { state.artworks.size }
-    )
-
-    LaunchedEffect(pagerState.currentPage, state.artworks.size) {
-        onPageChanged(pagerState.currentPage)
-        if (state.artworks.size - pagerState.currentPage <= 5) {
-            refresh()
-        }
-    }
-
     if (state.isInitialLoad && state.artworks.isEmpty()) {
         // first attempt still running
         Box(modifier = Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
@@ -97,10 +78,26 @@ fun ArtworkReelsScreen(
         return
     }
 
-    Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
-        if (state.artworks.isEmpty()) {
-            return@Box
+    // Don't build the pager until we know the start position.
+    // rememberPagerState reads initialPage exactly once — if it's created
+    // against an empty list, the position clamps to 0 and never corrects.
+    if (state.initialPage == null) {
+        return
+    }
+
+    val pagerState = rememberPagerState(
+        initialPage = state.initialPage,
+        pageCount = { state.artworks.size }
+    )
+
+    LaunchedEffect(pagerState.currentPage, state.artworks.size) {
+        onPageChanged(pagerState.currentPage)
+        if (state.artworks.size - pagerState.currentPage <= 5) {
+            refresh()
         }
+    }
+
+    Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
         VerticalPager(
             state = pagerState,
             modifier = Modifier.fillMaxSize(),
