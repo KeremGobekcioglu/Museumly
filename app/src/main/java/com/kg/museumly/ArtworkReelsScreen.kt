@@ -108,7 +108,7 @@ fun ArtworkReelsScreen(
              *         ArtworkPage(artwork = artwork)
              *     }
              */
-            ArtworkPage(artwork = state.artworks[page])
+            ArtworkPageWithRespectToAspectRatio(artwork = state.artworks[page])
         }
 
         PageCounter(pagerState = pagerState, total = state.artworks.size)
@@ -116,56 +116,7 @@ fun ArtworkReelsScreen(
 }
 
 @Composable
-private fun ArtworkPage(artwork: Artwork, modifier: Modifier = Modifier) {
-    Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-            val containerRatio = maxWidth / maxHeight
-            val aspectRatio = artwork.aspectRatio ?: containerRatio
-            val (imageWidth, imageHeight) = if (aspectRatio > containerRatio) {
-                maxWidth to maxWidth / aspectRatio
-            } else {
-                maxHeight * aspectRatio to maxHeight
-            }
-
-            var loadFailed by remember(artwork.id) { mutableStateOf(false) }
-            Text(
-                text = artwork.providerId,
-                color = Color.White,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(16.dp)
-            )
-            AsyncImage(
-                model = artwork.imageUrl,
-                contentDescription = artwork.title,
-                onState = { state ->
-                    if (state is AsyncImagePainter.State.Error) {
-                        Log.e(TAG, "Failed to load ${artwork.id}: ${artwork.imageUrl}", state.result.throwable)
-                        loadFailed = true
-                    }
-                },
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .width(imageWidth)
-                    .height(imageHeight),
-            )
-
-            if (loadFailed) {
-                Text(
-                    text = "Couldn't load this image",
-                    color = Color.Red,
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.align(Alignment.Center),
-                )
-            }
-        }
-
-        ArtworkCaption(artwork = artwork, modifier = Modifier.align(Alignment.BottomStart))
-    }
-}
-
-@Composable
-private fun ArtworkCaption(artwork: Artwork, modifier: Modifier = Modifier) {
+internal fun ArtworkCaption(artwork: Artwork, modifier: Modifier = Modifier) {
     Column(
         modifier = modifier
             .fillMaxWidth()
