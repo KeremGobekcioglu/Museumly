@@ -128,7 +128,13 @@ private fun ArtworkPage(artwork: Artwork, modifier: Modifier = Modifier) {
             }
 
             var loadFailed by remember(artwork.id) { mutableStateOf(false) }
-
+            Text(
+                text = artwork.providerId,
+                color = Color.White,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(16.dp)
+            )
             AsyncImage(
                 model = artwork.imageUrl,
                 contentDescription = artwork.title,

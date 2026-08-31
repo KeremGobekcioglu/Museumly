@@ -10,7 +10,7 @@ interface ClevelandApi {
      * cc0 sits in the annotation string. it is just a plain string not a query.
      * i could use QueryName but i never see it is used.
      */
-    @GET("artworks/?cc0&orderby=id")
+    @GET("artworks/?cc0")
     suspend fun searchArtworks(
         @Query("has_image") hasImage: Int,
         @Query("skip") skip: Int,

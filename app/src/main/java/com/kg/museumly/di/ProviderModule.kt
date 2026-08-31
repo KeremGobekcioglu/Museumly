@@ -1,5 +1,6 @@
 package com.kg.museumly.di
 
+import com.kg.museumly.data.remote.cleveland.ClevelandProvider
 import com.kg.museumly.data.remote.met.MetProvider
 import com.kg.museumly.domain.ArtworkProvider
 import dagger.Binds
@@ -15,4 +16,8 @@ abstract class ProviderModule {
     @Binds
     @IntoSet
     abstract fun bindMetProvider(provider: MetProvider): ArtworkProvider
+
+    @Binds
+    @IntoSet
+    abstract fun bindClevelandProvider(provider: ClevelandProvider): ArtworkProvider
 }

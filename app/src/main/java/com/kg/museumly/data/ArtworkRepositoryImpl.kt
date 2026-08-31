@@ -40,6 +40,11 @@ class ArtworkRepositoryImpl @Inject constructor(
     private val mutex = Mutex()
 
     /**
+     * provider turns. it wraps.
+     */
+    private var turn: Int = 0
+
+    /**
      * Returns Flow, so the screen subscribes once and gets every future version automatically.
      */
     override fun artworks(): Flow<List<Artwork>> {
@@ -94,8 +99,11 @@ class ArtworkRepositoryImpl @Inject constructor(
 
     override suspend fun loadMore(size: Int) {
         mutex.withLock {
-            for(provider in providers)
+            val ordered : List<ArtworkProvider> = providers.sortedBy { it.id }
+            for(attempt in ordered.indices)
             {
+                val index : Int = (turn + attempt) % ordered.size
+                val provider: ArtworkProvider = ordered[index]
                 Log.d("ARTWORKREPOSITORYIMPL" , "LOAD MORE.")
                 val saved: ProviderCursor? = cursorDao.get(provider.id)
                 // we need to check exhaustion for providers
@@ -122,6 +130,8 @@ class ArtworkRepositoryImpl @Inject constructor(
                 if(page.items.isNotEmpty())
                 {
                     insert(page.items)
+                    //update turn
+                    turn = (index + 1) % ordered.size
                     return@withLock
                 }
             }
