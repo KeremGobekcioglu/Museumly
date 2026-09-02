@@ -1,4 +1,4 @@
-package com.kg.museumly
+package com.kg.museumly.feature.scroll.presentation
 
 import android.content.ContentValues.TAG
 import android.util.Log
@@ -134,7 +134,7 @@ internal fun ArtworkPageWithRespectToAspectRatio(artwork: Artwork, modifier: Mod
                 modifier = Modifier
                     .align(Alignment.Center)
                     .width(imageWidth)
-                    .height(imageHeight),
+                    .height(imageHeight)
             )
 
             if (loadFailed) {
