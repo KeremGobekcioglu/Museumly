@@ -88,13 +88,10 @@ fun ArtworkReelsScreen(
             state = pagerState,
             modifier = Modifier.fillMaxSize(),
         ) { page ->
-            /**
-             * val artwork = artworks.getOrNull(page)
-             *     if (artwork != null) {
-             *         ArtworkPage(artwork = artwork)
-             *     }
-             */
-            ArtworkPageWithRespectToAspectRatio(artwork = state.artworks[page])
+            val artwork = state.artworks.getOrNull(page)
+                if (artwork != null) {
+                    ArtworkPageWithRespectToAspectRatio(artwork = artwork)
+                }
         }
 
         PageCounter(pagerState = pagerState, total = state.artworks.size)
