@@ -1,12 +1,14 @@
 package com.kg.museumly.domain
 
 import com.kg.museumly.model.Artwork
+import com.kg.museumly.model.ArtworkDetail
 
 /**
  * caller needs to know when a provider is exhausted. next == null.
  */
 data class PageResult(
     val items: List<Artwork>,
+    val details: List<ArtworkDetail>,
     val next: String?
 )
 

@@ -4,6 +4,7 @@ import android.util.Log
 import com.kg.museumly.domain.ArtworkProvider
 import com.kg.museumly.domain.PageResult
 import com.kg.museumly.model.Artwork
+import com.kg.museumly.model.ArtworkDetail
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
@@ -40,7 +41,7 @@ class MetProvider @Inject constructor(
      * record the mapper rejects (not public domain, no image).
      * A single bad artwork must never kill a whole page.
      */
-    private suspend fun fetchArtwork(objectId: Int): Artwork?
+    private suspend fun fetchArtwork(objectId: Int): Pair<Artwork, ArtworkDetail>?
     {
         return try {
             val dto = api.getObject(objectId)
@@ -48,7 +49,8 @@ class MetProvider @Inject constructor(
              * toDomain eliminates poor candidates. check the code.
              *
              */
-            MetMapper.toDomain(dto)
+            val artwork = MetMapper.toDomain(dto) ?: return null
+            Pair(artwork, MetMapper.toDetail(dto))
         }
         catch (e: Exception)
         {
@@ -90,16 +92,22 @@ class MetProvider @Inject constructor(
         Log.d("METPROVIDER", "allIds size=${allIds.size}")
         var i = parseCursor(cursor)
         val items : MutableList<Artwork> = ArrayList()
-
+        val details: MutableList<ArtworkDetail> = ArrayList()
         // Walk IDs until we have `size` good ones or run out.
         // Rejected records are skipped permanently — they'd fail
         // identically next time.
         while(i < allIds.size && items.size < size)
         {
-            val artwork = fetchArtwork(allIds[i])
-            if(artwork != null)
+            //val artwork = fetchArtwork(allIds[i])
+            val pair = fetchArtwork(allIds[i])
+//            if(artwork != null)
+//            {
+//                items.add(artwork)
+//            }
+            if(pair != null)
             {
-                items.add(artwork)
+                items.add(pair.first)
+                details.add(pair.second)
             }
             i++
         }
@@ -109,7 +117,7 @@ class MetProvider @Inject constructor(
         {
             next = i.toString()
         }
-        return PageResult(items, next)
+        return PageResult(items, details, next)
     }
 
 }

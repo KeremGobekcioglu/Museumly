@@ -97,4 +97,15 @@ object ClevelandMapper {
             period = dto.creationDate,
         )
     }
+
+    fun toArtworksWithDetail(dtos: List<ClevelandArtworkDto>): List<Pair<Artwork, ArtworkDetail>> {
+        val results: MutableList<Pair<Artwork, ArtworkDetail>> = mutableListOf()
+        for (dto in dtos) {
+            val artwork: Artwork? = toArtwork(dto)
+            if (artwork != null) {
+                results.add(Pair(artwork, toDetail(dto)))
+            }
+        }
+        return results
+    }
 }
