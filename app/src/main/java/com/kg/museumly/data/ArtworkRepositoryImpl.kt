@@ -2,14 +2,19 @@ package com.kg.museumly.data
 
 import android.util.Log
 import com.kg.museumly.data.local.ArtworkDao
+import com.kg.museumly.data.local.ArtworkDetailMapper
 import com.kg.museumly.data.local.ArtworkEntity
 import com.kg.museumly.data.local.ArtworkMapper
 import com.kg.museumly.data.local.ProviderCursor
 import com.kg.museumly.data.local.ProviderCursorDao
+import com.kg.museumly.data.local.detail.ArtworkDetailDao
+import com.kg.museumly.data.local.detail.ArtworkDetailEntity
 import com.kg.museumly.domain.ArtworkProvider
 import com.kg.museumly.domain.ArtworkRepository
 import com.kg.museumly.domain.PageResult
 import com.kg.museumly.model.Artwork
+import com.kg.museumly.model.ArtworkDetail
+import com.kg.museumly.model.ArtworkWithDetail
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
@@ -20,6 +25,7 @@ import javax.inject.Singleton
 @Singleton
 class ArtworkRepositoryImpl @Inject constructor(
     private val artworkDao: ArtworkDao,
+    private val artworkDetailDao: ArtworkDetailDao,
     private val cursorDao: ProviderCursorDao,
     private val providers: Set<@JvmSuppressWildcards ArtworkProvider>,
     private val seedSource: SeedSource
@@ -59,6 +65,14 @@ class ArtworkRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun artworkWithDetail(id: String): ArtworkWithDetail? {
+        Log.d("REPOSITORY ARTWORKWITHDETAIL", "ARTWORK ID : $id")
+        val artworkEntity = artworkDao.byId(id) ?: return null
+        val artworkDetailEntity = artworkDetailDao.getById(id) ?: return null
+        Log.d("REPOSITORY ARTWORKWITHDETAIL", "STILL NOT NULL")
+        return ArtworkWithDetail(ArtworkMapper.toDomain(artworkEntity), ArtworkDetailMapper.toDomain(artworkDetailEntity))
+    }
+
     override suspend fun byId(id: String): Artwork? {
         val entity : ArtworkEntity? = artworkDao.byId(id)
         if(entity == null)
@@ -76,26 +90,38 @@ class ArtworkRepositoryImpl @Inject constructor(
      * One insertAll for the whole list, not one per artwork, so Room
      * notifies the screen once instead of twenty times.
      */
-    private suspend fun insert(items: List<Artwork>) {
+    private suspend fun insert(items: List<Artwork>, details: List<ArtworkDetail>) {
         var position: Int = artworkDao.maxPosition()
         val entities : MutableList<ArtworkEntity> = ArrayList()
-
-        for(artwork in items)
-        {
+        val detailEntities: MutableList<ArtworkDetailEntity> = ArrayList()
+        for (i in items.indices) {
             position += 1
-            entities.add(ArtworkMapper.toEntity(artwork,position))
+            val artwork: Artwork = items[i]
+            val detail: ArtworkDetail = details[i]
+            entities.add(ArtworkMapper.toEntity(artwork, position))
+            detailEntities.add(
+                ArtworkDetailEntity(
+                    id = artwork.id,
+                    medium = detail.medium,
+                    dimensions = detail.dimensions,
+                    creditLine = detail.creditLine,
+                    culture = detail.culture,
+                    period = detail.period,
+                )
+            )
         }
         artworkDao.insertAll(entities)
+        artworkDetailDao.insertAll(detailEntities)
     }
 
-    override suspend fun seedIfEmpty() {
-        mutex.withLock {
-            val existing: Int = artworkDao.count()
-            if(existing > 0)
-                return@withLock
-            insert(seedSource.artworks())
-        }
-    }
+//    override suspend fun seedIfEmpty() {
+//        mutex.withLock {
+//            val existing: Int = artworkDao.count()
+//            if(existing > 0)
+//                return@withLock
+//            insert(seedSource.artworks())
+//        }
+//    }
 
     override suspend fun loadMore(size: Int) {
         mutex.withLock {
@@ -129,7 +155,7 @@ class ArtworkRepositoryImpl @Inject constructor(
                 Log.d("ARTWORKREPOSITORYIMPL" , "CURSOR = $cursor")
                 if(page.items.isNotEmpty())
                 {
-                    insert(page.items)
+                    insert(page.items , page.details)
                     //update turn
                     turn = (index + 1) % ordered.size
                     return@withLock

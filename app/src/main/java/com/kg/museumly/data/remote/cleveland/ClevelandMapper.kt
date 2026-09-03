@@ -98,6 +98,7 @@ object ClevelandMapper {
         )
     }
 
+    // same null check with toArtworks.
     fun toArtworksWithDetail(dtos: List<ClevelandArtworkDto>): List<Pair<Artwork, ArtworkDetail>> {
         val results: MutableList<Pair<Artwork, ArtworkDetail>> = mutableListOf()
         for (dto in dtos) {

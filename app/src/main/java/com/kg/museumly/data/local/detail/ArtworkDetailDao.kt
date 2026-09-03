@@ -12,4 +12,7 @@ interface ArtworkDetailDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(detail: ArtworkDetailEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(details: List<ArtworkDetailEntity>)
 }
