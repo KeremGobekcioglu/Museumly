@@ -90,42 +90,11 @@ fun ArtworkReelsScreen(
         ) { page ->
             val artwork = state.artworks.getOrNull(page)
                 if (artwork != null) {
-                    ArtworkPageWithRespectToAspectRatio(artwork = artwork)
+                    ArtworkPageWithRespectToAspectRatio(artwork = artwork, onDetailPage = onDetailPage)
                 }
         }
 
         PageCounter(pagerState = pagerState, total = state.artworks.size)
-    }
-}
-
-@Composable
-internal fun ArtworkCaption(artwork: Artwork, modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f)),
-                ),
-            )
-            .safeDrawingPadding()
-            .padding(horizontal = 20.dp, vertical = 24.dp),
-    ) {
-        Text(
-            text = artwork.title,
-            color = Color.White,
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Text(
-            text = "${artwork.artist} · ${artwork.year}",
-            color = Color.White.copy(alpha = 0.75f),
-            style = MaterialTheme.typography.bodyMedium,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
     }
 }
 

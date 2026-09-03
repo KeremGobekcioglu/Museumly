@@ -1,6 +1,8 @@
 package com.kg.museumly.data.remote.met
 
+import com.kg.museumly.data.local.detail.ArtworkDetailEntity
 import com.kg.museumly.model.Artwork
+import com.kg.museumly.model.ArtworkDetail
 
 object MetMapper
 {
@@ -42,6 +44,17 @@ object MetMapper
             classification = classification,
             year = year,
             department = department
+        )
+    }
+
+    // MetMapper
+    fun toDetail(dto: MetObjectDto): ArtworkDetail {
+        return ArtworkDetail(
+            medium = dto.medium,
+            dimensions = dto.dimensions,
+            creditLine = dto.creditLine,
+            culture = dto.culture,
+            period = dto.period,
         )
     }
 }

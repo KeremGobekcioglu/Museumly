@@ -4,6 +4,7 @@ import android.util.Log
 import com.kg.museumly.domain.ArtworkProvider
 import com.kg.museumly.domain.PageResult
 import com.kg.museumly.model.Artwork
+import com.kg.museumly.model.ArtworkDetail
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -46,6 +47,7 @@ class ClevelandProvider @Inject constructor(
         // we do get some items and skip them to not get again( move cursor)
         var skip : Int = parseCursor(cursor)
         val items: MutableList<Artwork> = ArrayList()
+        val details: MutableList<ArtworkDetail> = ArrayList()
         // are we done, did we hit end
         var exhausted = false
         // it is not skip, because we dont know if we accept the data or not.
@@ -68,13 +70,18 @@ class ClevelandProvider @Inject constructor(
              * skip tracks consumption, items tracks acceptance.
              */
             skip+=dtos.size
-            items.addAll(ClevelandMapper.toArtworks(dtos))
+            //items.addAll(ClevelandMapper.toArtworks(dtos))
+            val pairs = ClevelandMapper.toArtworksWithDetail(dtos)
+            for (pair in pairs) {
+                items.add(pair.first)
+                details.add(pair.second)
+            }
         }
         var next: String? = null
         if(!exhausted)
         {
             next = skip.toString()
         }
-        return PageResult(items,next)
+        return PageResult(items,details,next)
     }
 }

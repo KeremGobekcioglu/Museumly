@@ -11,6 +11,9 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.toRoute
+import com.kg.museumly.feature.detail.DetailScreen
+import com.kg.museumly.feature.detail.DetailUiState
+import com.kg.museumly.feature.detail.DetailViewModel
 import com.kg.museumly.feature.scroll.presentation.ArtworkReelsScreen
 import com.kg.museumly.feature.scroll.presentation.ScrollUiState
 import com.kg.museumly.feature.scroll.presentation.ScrollViewModel
@@ -31,16 +34,20 @@ fun MuseumlyNavGraph(navController: NavHostController)
             val viewModel: ScrollViewModel = hiltViewModel()
             val state: ScrollUiState by viewModel.uiState.collectAsStateWithLifecycle()
             ArtworkReelsScreen(
-                state,
-                viewModel::loadMore,
-                viewModel::onPageChanged,
-                {}
+                state = state,
+                refresh = viewModel::loadMore,
+                onPageChanged = viewModel::onPageChanged,
+                onDetailPage = { id -> navController.navigate(DetailPage(id)) }
             )
         }
 
-        composable<DetailPage>{ backStackEntry ->
-            val route: DetailPage = backStackEntry.toRoute()
-
+        composable<DetailPage>{
+            val viewmodel: DetailViewModel = hiltViewModel()
+            val state: DetailUiState by viewmodel.state.collectAsStateWithLifecycle()
+            DetailScreen(
+                state = state,
+                onBack = { navController.popBackStack() }
+            )
         }
     }
 }

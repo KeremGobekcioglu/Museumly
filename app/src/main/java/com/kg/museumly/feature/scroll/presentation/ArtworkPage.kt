@@ -4,13 +4,17 @@ import android.content.ContentValues.TAG
 import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -21,15 +25,22 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import coil3.compose.AsyncImagePainter
 import com.kg.museumly.model.Artwork
 
 @Composable
-internal fun ArtworkPageWithoutAspectRatio(artwork: Artwork, modifier: Modifier = Modifier) {
+internal fun ArtworkPageWithoutAspectRatio(
+    artwork: Artwork,
+    modifier: Modifier = Modifier,
+    onDetailPage: (String) -> Unit,
+)  {
     Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         var loadFailed by remember(artwork.id) { mutableStateOf(false) }
         AsyncImage(
@@ -61,7 +72,11 @@ internal fun ArtworkPageWithoutAspectRatio(artwork: Artwork, modifier: Modifier 
     }
 }
 @Composable
-internal fun ArtworkPageWithRestrainedBox(artwork: Artwork, modifier: Modifier = Modifier) {
+internal fun ArtworkPageWithRestrainedBox(
+    artwork: Artwork,
+    modifier: Modifier = Modifier,
+    onDetailPage: (String) -> Unit,
+)  {
     Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         var loadFailed by remember(artwork.id) { mutableStateOf(false) }
 
@@ -103,7 +118,11 @@ internal fun ArtworkPageWithRestrainedBox(artwork: Artwork, modifier: Modifier =
 
 
 @Composable
-internal fun ArtworkPageWithRespectToAspectRatio(artwork: Artwork, modifier: Modifier = Modifier) {
+internal fun ArtworkPageWithRespectToAspectRatio(
+    artwork: Artwork,
+    modifier: Modifier = Modifier,
+    onDetailPage: (String) -> Unit,
+) {
     Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
             val containerRatio = maxWidth / maxHeight
@@ -135,6 +154,10 @@ internal fun ArtworkPageWithRespectToAspectRatio(artwork: Artwork, modifier: Mod
                     .align(Alignment.Center)
                     .width(imageWidth)
                     .height(imageHeight)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                    ) { onDetailPage(artwork.id) }
             )
 
             if (loadFailed) {
@@ -148,5 +171,36 @@ internal fun ArtworkPageWithRespectToAspectRatio(artwork: Artwork, modifier: Mod
         }
 
         ArtworkCaption(artwork = artwork, modifier = Modifier.align(Alignment.BottomStart))
+    }
+}
+
+@Composable
+private fun ArtworkCaption(artwork: Artwork, modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f)),
+                ),
+            )
+            .safeDrawingPadding()
+            .padding(horizontal = 20.dp, vertical = 24.dp),
+    ) {
+        Text(
+            text = artwork.title,
+            color = Color.White,
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Text(
+            text = "${artwork.artist} · ${artwork.year}",
+            color = Color.White.copy(alpha = 0.75f),
+            style = MaterialTheme.typography.bodyMedium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
