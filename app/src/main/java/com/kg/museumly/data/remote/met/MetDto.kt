@@ -24,5 +24,10 @@ data class MetObjectDto(
     val primaryImageSmall: String? = null,
     val isPublicDomain: Boolean = false,
     val classification: String? = null,
-    val department: String? = null
+    val department: String? = null,
+    val medium: String? = null,
+    val dimensions: String? = null,
+    val creditLine: String? = null,
+    val culture: String? = null,
+    val period: String? = null,
 )

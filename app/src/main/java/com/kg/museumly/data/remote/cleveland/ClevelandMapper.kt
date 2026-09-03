@@ -1,6 +1,8 @@
 package com.kg.museumly.data.remote.cleveland
 
+import com.kg.museumly.data.local.detail.ArtworkDetailEntity
 import com.kg.museumly.model.Artwork
+import com.kg.museumly.model.ArtworkDetail
 
 
 object ClevelandMapper {
@@ -82,5 +84,17 @@ object ClevelandMapper {
         }
 
         return width / height
+    }
+
+    // ClevelandMapper
+    fun toDetail(dto: ClevelandArtworkDto): ArtworkDetail {
+        val cultureJoined: String? = if (dto.culture.isEmpty()) null else dto.culture.joinToString(", ")
+        return ArtworkDetail(
+            medium = dto.technique,
+            dimensions = dto.measurements,
+            creditLine = dto.creditline,
+            culture = cultureJoined,
+            period = dto.creationDate,
+        )
     }
 }

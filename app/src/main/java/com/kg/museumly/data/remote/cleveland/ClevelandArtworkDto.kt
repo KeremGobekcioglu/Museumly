@@ -21,7 +21,8 @@ data class ClevelandArtworkDto(
     val technique: String? = null,
     val measurements: String? = null,
     val culture: List<String> = emptyList(),
-    val url: String? = null
+    val url: String? = null,
+    @SerialName("creditline") val creditline: String? = null,
 )
 
 @Serializable
