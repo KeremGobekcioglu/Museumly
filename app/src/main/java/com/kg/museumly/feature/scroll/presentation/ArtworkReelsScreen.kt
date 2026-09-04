@@ -73,7 +73,7 @@ fun ArtworkReelsScreen(
 
     val pagerState = rememberPagerState(
         initialPage = state.initialPage,
-        pageCount = { state.artworks.size }
+        pageCount = { state.artworks.size + 1 /*loading page*/ }
     )
 
     LaunchedEffect(pagerState.currentPage, state.artworks.size) {
@@ -88,13 +88,27 @@ fun ArtworkReelsScreen(
             state = pagerState,
             modifier = Modifier.fillMaxSize(),
         ) { page ->
-            val artwork = state.artworks.getOrNull(page)
+            if(page < state.artworks.size)
+            {
+                val artwork = state.artworks.getOrNull(page)
                 if (artwork != null) {
                     ArtworkPageWithRespectToAspectRatio(artwork = artwork, onDetailPage = onDetailPage)
                 }
+            }
+            else
+            {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(color = Color.White)
+                }
+            }
         }
 
-        PageCounter(pagerState = pagerState, total = state.artworks.size)
+        if (pagerState.currentPage < state.artworks.size) {
+            PageCounter(pagerState = pagerState, total = state.artworks.size)
+        }
     }
 }
 
