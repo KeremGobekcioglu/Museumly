@@ -5,19 +5,18 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kg.museumly.data.local.FeedPositionSource
 import com.kg.museumly.domain.ArtworkRepository
+import com.kg.museumly.domain.LoadOutcome
 import com.kg.museumly.model.Artwork
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.job
+import kotlin.coroutines.cancellation.CancellationException
 
 /***
  * stateIn converts a cold Flow into a hot StateFlow. Cold means each collector
@@ -51,6 +50,8 @@ class ScrollViewModel @Inject constructor(
     private val isLoadingMore = MutableStateFlow(false)
     private val isInitialLoad = MutableStateFlow(true)
     private var loadJob: Job? = null
+    private val error = MutableStateFlow<String?>(null)
+
 
     private val initialPage = MutableStateFlow<Int?>(null)
 
@@ -58,14 +59,16 @@ class ScrollViewModel @Inject constructor(
         repository.artworks(),
         isLoadingMore,
         isInitialLoad,
-        initialPage
+        initialPage,
+        error
     ){
-            artworks: List<Artwork>, loading: Boolean, inital: Boolean, page: Int? ->
+            artworks: List<Artwork>, loading: Boolean, inital: Boolean, page: Int?, err: String? ->
         ScrollUiState(
             artworks= artworks,
             isLoadingMore = loading,
             isInitialLoad = inital,
-            initialPage = page
+            initialPage = page,
+            error = err
         )
     }.stateIn(
         scope = viewModelScope,
@@ -101,10 +104,17 @@ class ScrollViewModel @Inject constructor(
         }
         loadJob = viewModelScope.launch {
             isLoadingMore.value = true
+            error.value = null
             try {
-                repository.loadMore()
-            }
-            finally {
+                val outcome = repository.loadMore()
+                if (outcome == LoadOutcome.FAILED) {
+                    error.value = "Couldn't load more artworks"
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                error.value = e.message ?: "Couldn't load more artworks"
+            } finally {
                 isLoadingMore.value = false
                 isInitialLoad.value = false
             }

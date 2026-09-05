@@ -11,7 +11,9 @@ import com.kg.museumly.data.local.detail.ArtworkDetailDao
 import com.kg.museumly.data.local.detail.ArtworkDetailEntity
 import com.kg.museumly.domain.ArtworkProvider
 import com.kg.museumly.domain.ArtworkRepository
+import com.kg.museumly.domain.LoadOutcome
 import com.kg.museumly.domain.PageResult
+import com.kg.museumly.domain.PageStatus
 import com.kg.museumly.model.Artwork
 import com.kg.museumly.model.ArtworkDetail
 import com.kg.museumly.model.ArtworkWithDetail
@@ -123,9 +125,10 @@ class ArtworkRepositoryImpl @Inject constructor(
 //        }
 //    }
 
-    override suspend fun loadMore(size: Int) {
+    override suspend fun loadMore(size: Int): LoadOutcome{
         mutex.withLock {
             val ordered : List<ArtworkProvider> = providers.sortedBy { it.id }
+            var anyFailed = false
             for(attempt in ordered.indices)
             {
                 val index : Int = (turn + attempt) % ordered.size
@@ -149,6 +152,10 @@ class ArtworkRepositoryImpl @Inject constructor(
                 Log.d("REPO", "calling fetchPage cursor=$cursor")
                 val page: PageResult = provider.fetchPage(cursor,size)
                 Log.d("REPO", "returned ${page.items.size} items, next=${page.next}")
+                if (page.status == PageStatus.FAILED) {
+                    anyFailed = true
+                    continue
+                }
                 // If page.next is null, this writes the exhaustion marker, and the
                 // continue check will skip this provider from now on.
                 cursorDao.put(ProviderCursor(provider.id,page.next))
@@ -158,9 +165,13 @@ class ArtworkRepositoryImpl @Inject constructor(
                     insert(page.items , page.details)
                     //update turn
                     turn = (index + 1) % ordered.size
-                    return@withLock
+                    return LoadOutcome.LOADED
                 }
             }
+            if (anyFailed) {
+                return LoadOutcome.FAILED
+            }
+            return LoadOutcome.EXHAUSTED
         }
     }
 

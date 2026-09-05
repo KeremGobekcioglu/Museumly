@@ -195,12 +195,28 @@ private fun ArtworkCaption(artwork: Artwork, modifier: Modifier = Modifier) {
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
-        Text(
-            text = "${artwork.artist} · ${artwork.year}",
-            color = Color.White.copy(alpha = 0.75f),
-            style = MaterialTheme.typography.bodyMedium,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
+        val line: String? = captionLine(artwork.artist, artwork.year)
+        if (line != null) {
+            Text(
+                text = line,
+                color = Color.White.copy(alpha = 0.75f),
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
+}
+
+private fun captionLine(artist: String?, year: String?): String? {
+    if (artist != null && year != null) {
+        return "$artist · $year"
+    }
+    if (artist != null) {
+        return artist
+    }
+    if (year != null) {
+        return year
+    }
+    return null
 }

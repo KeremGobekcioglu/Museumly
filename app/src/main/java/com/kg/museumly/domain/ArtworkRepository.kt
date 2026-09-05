@@ -9,7 +9,7 @@ interface ArtworkRepository {
     fun artworks(): Flow<List<Artwork>>
     suspend fun artworkWithDetail(id: String): ArtworkWithDetail?
     suspend fun byId( id: String) : Artwork?
-    suspend fun loadMore(size: Int = 20)
+    suspend fun loadMore(size: Int = 20) : LoadOutcome
 
     suspend fun count(): Int
 }

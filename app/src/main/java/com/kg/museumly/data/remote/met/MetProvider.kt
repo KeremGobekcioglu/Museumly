@@ -3,6 +3,7 @@ package com.kg.museumly.data.remote.met
 import android.util.Log
 import com.kg.museumly.domain.ArtworkProvider
 import com.kg.museumly.domain.PageResult
+import com.kg.museumly.domain.PageStatus
 import com.kg.museumly.model.Artwork
 import com.kg.museumly.model.ArtworkDetail
 import kotlinx.coroutines.sync.Mutex
@@ -58,7 +59,7 @@ class MetProvider @Inject constructor(
             null
         }
     }
-    private suspend fun loadIds(): List<Int> {
+    private suspend fun loadIds(): List<Int>? {
         idsMutex.withLock {
             val existing: List<Int>? = cachedIds
             if (existing != null) {
@@ -71,14 +72,14 @@ class MetProvider @Inject constructor(
                 val fetched: List<Int>? = response.objectIDs
                 if (fetched == null) {
                     Log.d("METPROVIDER", "load ids = ids == null.")
-                    return emptyList()
+                    return null
                 }
                 Log.d("METPROVIDER", "total=${response.total}, ids=${fetched.size}")
                 cachedIds = fetched
                 return fetched
             } catch (e: Exception) {
                 Log.d("METPROVIDER", "LOAD IDS THROW = ${e.message}")
-                return emptyList()
+                return null
             }
         }
     }
@@ -89,6 +90,7 @@ class MetProvider @Inject constructor(
     ): PageResult {
         Log.d("METPROVIDER", "fetchPage cursor=$cursor")
         val allIds = loadIds()
+            ?: return PageResult(emptyList(), emptyList(), cursor, PageStatus.FAILED)
         Log.d("METPROVIDER", "allIds size=${allIds.size}")
         var i = parseCursor(cursor)
         val items : MutableList<Artwork> = ArrayList()
@@ -111,13 +113,16 @@ class MetProvider @Inject constructor(
             }
             i++
         }
-
+        var status = PageStatus.OK
         var next: String? = null
         if(i < allIds.size)
         {
             next = i.toString()
         }
-        return PageResult(items, details, next)
+        else {
+            status = PageStatus.EXHAUSTED
+        }
+        return PageResult(items, details, next, status)
     }
 
 }
