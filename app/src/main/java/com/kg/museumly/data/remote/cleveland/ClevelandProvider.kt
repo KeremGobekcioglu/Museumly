@@ -3,6 +3,7 @@ package com.kg.museumly.data.remote.cleveland
 import android.util.Log
 import com.kg.museumly.domain.ArtworkProvider
 import com.kg.museumly.domain.PageResult
+import com.kg.museumly.domain.PageStatus
 import com.kg.museumly.model.Artwork
 import com.kg.museumly.model.ArtworkDetail
 import javax.inject.Inject
@@ -50,6 +51,7 @@ class ClevelandProvider @Inject constructor(
         val details: MutableList<ArtworkDetail> = ArrayList()
         // are we done, did we hit end
         var exhausted = false
+        var failed = false
         // it is not skip, because we dont know if we accept the data or not.
         while(items.size < size)
         {
@@ -58,6 +60,7 @@ class ClevelandProvider @Inject constructor(
             val dtos = fetchDtos(skip,need)
             // call failed.
             if (dtos == null) {
+                failed = true
                 break
             }
             // we got the end.
@@ -77,11 +80,19 @@ class ClevelandProvider @Inject constructor(
                 details.add(pair.second)
             }
         }
+
+        var status = PageStatus.OK
+        if (exhausted) {
+            status = PageStatus.EXHAUSTED
+        } else if (failed && items.isEmpty()) {
+            status = PageStatus.FAILED
+        }
+
         var next: String? = null
         if(!exhausted)
         {
             next = skip.toString()
         }
-        return PageResult(items,details,next)
+        return PageResult(items,details,next,status)
     }
 }

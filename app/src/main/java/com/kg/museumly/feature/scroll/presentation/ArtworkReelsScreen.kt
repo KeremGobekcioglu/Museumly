@@ -13,6 +13,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
@@ -41,25 +42,52 @@ fun ArtworkReelsScreen(
     onDetailPage: (String) -> Unit
 ) {
 
-    if (state.isInitialLoad && state.artworks.isEmpty()) {
-        // first attempt still running
-        Box(modifier = Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
+    // A fetch is genuinely in flight and we have nothing to show yet.
+    // tail defaults to Loading at construction (before the launched
+    // coroutine has had a chance to run), so this covers the very first
+    // frame as well as every fetch after that, including a retry.
+    if (state.tail == TailState.Loading && state.artworks.isEmpty()) {
+        Box(
+            modifier = Modifier.fillMaxSize().background(Color.Black),
+            contentAlignment = Alignment.Center
+        ) {
             CircularProgressIndicator(color = Color.White)
         }
         return
     }
 
+    // Nothing in Room and nothing loading. Two different situations:
+    // the fetch failed, or every provider is genuinely empty. Only the
+    // first is retryable, and this early-returns before the LaunchedEffect
+    // below, so a button is the only way back.
     if (state.artworks.isEmpty()) {
-        // tried, got nothing — network down or the provider is empty
-        Box(modifier = Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
-            Text(
-                text = "Something went wrong",
-                color = Color.White,
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(horizontal = 32.dp),
-            )
+        Box(
+            modifier = Modifier.fillMaxSize().background(Color.Black),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                val tail = state.tail
+                if (tail is TailState.Failed) {
+                    Text(
+                        text = tail.message,
+                        color = Color.White,
+                        style = MaterialTheme.typography.headlineSmall,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(horizontal = 32.dp),
+                    )
+                    TextButton(onClick = refresh) {
+                        Text("Retry", color = Color.White)
+                    }
+                } else {
+                    Text(
+                        text = "Nothing here yet",
+                        color = Color.White,
+                        style = MaterialTheme.typography.headlineSmall,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(horizontal = 32.dp),
+                    )
+                }
+            }
         }
         return
     }
@@ -78,6 +106,10 @@ fun ArtworkReelsScreen(
 
     LaunchedEffect(pagerState.currentPage, state.artworks.size) {
         onPageChanged(pagerState.currentPage)
+        // <= (not <) so landing directly on the tail placeholder page — e.g. a
+        // fast fling that skips past the "within 5 of the end" pages — still
+        // triggers a load instead of leaving tail stuck at Idle with nothing
+        // ever fetching.
         if (state.artworks.size - pagerState.currentPage <= 5) {
             refresh()
         }
@@ -101,7 +133,29 @@ fun ArtworkReelsScreen(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
-                    CircularProgressIndicator(color = Color.White)
+                    when (val tail = state.tail) {
+                        // Idle here means a load just finished right as the user
+                        // landed on this page and the next one hasn't been
+                        // triggered yet — visually indistinguishable from Loading.
+                        TailState.Loading, TailState.Idle -> CircularProgressIndicator(color = Color.White)
+                        is TailState.Failed -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = tail.message,
+                                color = Color.White,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(horizontal = 32.dp),
+                            )
+                            TextButton(onClick = refresh) {
+                                Text("Retry", color = Color.White)
+                            }
+                        }
+                        TailState.Exhausted -> Text(
+                            text = "You're all caught up",
+                            color = Color.White,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(horizontal = 32.dp),
+                        )
+                    }
                 }
             }
         }

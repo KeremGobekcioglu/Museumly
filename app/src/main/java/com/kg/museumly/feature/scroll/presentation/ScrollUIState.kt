@@ -4,8 +4,13 @@ import com.kg.museumly.model.Artwork
 
 data class ScrollUiState(
     val artworks: List<Artwork> = emptyList(),
-    val isLoadingMore: Boolean = false,
-    val error: String? = null,
     val initialPage: Int? = null,
-    val isInitialLoad: Boolean = true,
+    val tail: TailState = TailState.Loading
 )
+
+sealed interface TailState {
+    data object Idle : TailState
+    object Loading : TailState
+    data class Failed(val message: String) : TailState
+    object Exhausted : TailState
+}
