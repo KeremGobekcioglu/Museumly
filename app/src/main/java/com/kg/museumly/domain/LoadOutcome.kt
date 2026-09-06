@@ -1,3 +1,7 @@
 package com.kg.museumly.domain
 
-enum class LoadOutcome { LOADED, EXHAUSTED, FAILED }
+sealed class LoadOutcome {
+    data object Loaded : LoadOutcome()
+    data object Exhausted : LoadOutcome()
+    data class Failed(val reason: String) : LoadOutcome()
+}

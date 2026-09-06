@@ -1,13 +1,17 @@
 package com.kg.museumly.data.remote.cleveland
 
 import android.util.Log
+import com.kg.museumly.domain.ApiResult
 import com.kg.museumly.domain.ArtworkProvider
 import com.kg.museumly.domain.PageResult
 import com.kg.museumly.domain.PageStatus
 import com.kg.museumly.model.Artwork
 import com.kg.museumly.model.ArtworkDetail
+import retrofit2.HttpException
+import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.coroutines.cancellation.CancellationException
 
 @Singleton
 class ClevelandProvider @Inject constructor(
@@ -22,7 +26,7 @@ class ClevelandProvider @Inject constructor(
         val parsed = cursor.toIntOrNull() ?: return 0
         return parsed
     }
-    private suspend fun fetchDtos(skip: Int, limit: Int) : List<ClevelandArtworkDto>?
+    private suspend fun fetchDtos(skip: Int, limit: Int) : ApiResult<List<ClevelandArtworkDto>>
     {
         return try {
             val response = api.searchArtworks(
@@ -32,12 +36,24 @@ class ClevelandProvider @Inject constructor(
                 department = null,
                 fields = null
             )
-            response.data
+            ApiResult.Success(response.data)
         }
-        catch (e: Exception)
+        catch (e: CancellationException)
         {
-            Log.d("CLEVELANDPROVIDER","EXCEPTION FETCH DTOS = ${e.message}")
-            null
+            throw e
+        }
+        catch (e: HttpException) {
+            when {
+                e.code() == 404 -> ApiResult.Rejected("404 for skip=$skip limit=$limit")
+                e.code() in 500..599 || e.code() == 429 -> ApiResult.Failed(e)
+                else -> ApiResult.Rejected("HTTP ${e.code()} for skip=$skip limit=$limit")
+            }
+        }
+        catch (e: IOException) {
+            ApiResult.Failed(e)
+        } catch (e: Exception) {
+            Log.d("CLEVELANDPROVIDER", "unexpected error for skip=$skip: ${e.message}")
+            ApiResult.Failed(e)
         }
     }
 
@@ -52,15 +68,35 @@ class ClevelandProvider @Inject constructor(
         // are we done, did we hit end
         var exhausted = false
         var failed = false
+        var failureReason: String? = null
         // it is not skip, because we dont know if we accept the data or not.
         while(items.size < size)
         {
             // first pass, need is 20. if 13 of items rejected, need will be 13.
             val need = size - items.size
-            val dtos = fetchDtos(skip,need)
+            var outcome = fetchDtos(skip, need)
+            if (outcome is ApiResult.Failed) {
+                Log.d("CLEVELANDPROVIDER", "retrying skip=$skip after transient failure: ${outcome.cause.message}")
+                outcome = fetchDtos(skip, need)
+            }
+            val dtos = when(outcome)
+            {
+                is ApiResult.Success -> outcome.value
+                is ApiResult.Rejected -> {
+                    Log.d("CLEVELANDPROVIDER", "giving up: ${outcome.reason}")
+                    failed = true
+                    failureReason = outcome.reason
+                    null
+                }
+                is ApiResult.Failed -> {
+                    Log.d("CLEVELANDPROVIDER", "giving up on skip=$skip after retry: ${outcome.cause.message}")
+                    failed = true
+                    failureReason = outcome.cause.message ?: "Cleveland request failed"
+                    null
+                }
+            }
             // call failed.
             if (dtos == null) {
-                failed = true
                 break
             }
             // we got the end.
@@ -93,6 +129,6 @@ class ClevelandProvider @Inject constructor(
         {
             next = skip.toString()
         }
-        return PageResult(items,details,next,status)
+        return PageResult(items,details,next,status,failureReason)
     }
 }

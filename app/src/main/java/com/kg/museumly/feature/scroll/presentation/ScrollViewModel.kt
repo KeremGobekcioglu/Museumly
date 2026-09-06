@@ -102,10 +102,10 @@ class ScrollViewModel @Inject constructor(
         loadJob = viewModelScope.launch {
             tail.value = TailState.Loading
             try {
-                tail.value = when (repository.loadMore()) {
-                    LoadOutcome.LOADED -> TailState.Idle
-                    LoadOutcome.EXHAUSTED -> TailState.Exhausted
-                    LoadOutcome.FAILED -> TailState.Failed("Couldn't load more artworks")
+                tail.value = when (val outcome = repository.loadMore()) {
+                    LoadOutcome.Loaded -> TailState.Idle
+                    LoadOutcome.Exhausted -> TailState.Exhausted
+                    is LoadOutcome.Failed -> TailState.Failed(outcome.reason)
                 }
             } catch (e: CancellationException) {
                 throw e

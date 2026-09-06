@@ -1,6 +1,7 @@
 package com.kg.museumly.data.remote.met
 
 import android.util.Log
+import com.kg.museumly.domain.ApiResult
 import com.kg.museumly.domain.ArtworkProvider
 import com.kg.museumly.domain.PageResult
 import com.kg.museumly.domain.PageStatus
@@ -8,8 +9,11 @@ import com.kg.museumly.model.Artwork
 import com.kg.museumly.model.ArtworkDetail
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import retrofit2.HttpException
+import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.coroutines.cancellation.CancellationException
 
 /**
  * right now we can only get paintings if it is our query.
@@ -42,7 +46,7 @@ class MetProvider @Inject constructor(
      * record the mapper rejects (not public domain, no image).
      * A single bad artwork must never kill a whole page.
      */
-    private suspend fun fetchArtwork(objectId: Int): Pair<Artwork, ArtworkDetail>?
+    private suspend fun fetchArtwork(objectId: Int): ApiResult<Pair<Artwork, ArtworkDetail>>
     {
         return try {
             val dto = api.getObject(objectId)
@@ -50,36 +54,57 @@ class MetProvider @Inject constructor(
              * toDomain eliminates poor candidates. check the code.
              *
              */
-            val artwork = MetMapper.toDomain(dto) ?: return null
-            Pair(artwork, MetMapper.toDetail(dto))
+            val artwork = MetMapper.toDomain(dto) ?:
+                return ApiResult.Rejected("mapper rejected object $objectId")
+            ApiResult.Success(Pair(artwork, MetMapper.toDetail(dto)))
         }
-        catch (e: Exception)
+        catch (e: CancellationException)
         {
-            Log.d("MET PROVIDER" , "FETCH ARTWORK ERROR = ${e.message}")
-            null
+            throw e
+        }
+        catch (e: HttpException)
+        {
+            when {
+                e.code() == 404 -> ApiResult.Rejected("404 for object $objectId")
+                e.code() in 500..599 || e.code() == 429 -> ApiResult.Failed(e)
+                else -> ApiResult.Rejected("HTTP ${e.code()} for object $objectId")
+            }
+        }
+        catch (e: IOException) {
+            ApiResult.Failed(e)
+        } catch (e: Exception) {
+            Log.d("MET PROVIDER", "unexpected error for $objectId: ${e.message}")
+            ApiResult.Failed(e)
         }
     }
-    private suspend fun loadIds(): List<Int>? {
+    private suspend fun loadIds(): ApiResult<List<Int>> {
         idsMutex.withLock {
             val existing: List<Int>? = cachedIds
             if (existing != null) {
-                return existing
+                return ApiResult.Success(existing)
             }
 
-            try {
+            return try {
                 // european paintings
                 val response = api.search(departmentId = 11)
                 val fetched: List<Int>? = response.objectIDs
                 if (fetched == null) {
                     Log.d("METPROVIDER", "load ids = ids == null.")
-                    return null
+                    return ApiResult.Rejected("Met search returned no object IDs")
                 }
                 Log.d("METPROVIDER", "total=${response.total}, ids=${fetched.size}")
                 cachedIds = fetched
-                return fetched
+                ApiResult.Success(fetched)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: HttpException) {
+                if (e.code() in 500..599 || e.code() == 429) ApiResult.Failed(e)
+                else ApiResult.Rejected("HTTP ${e.code()} loading Met ID list")
+            } catch (e: IOException) {
+                ApiResult.Failed(e)
             } catch (e: Exception) {
                 Log.d("METPROVIDER", "LOAD IDS THROW = ${e.message}")
-                return null
+                ApiResult.Failed(e)
             }
         }
     }
@@ -89,8 +114,16 @@ class MetProvider @Inject constructor(
         size: Int
     ): PageResult {
         Log.d("METPROVIDER", "fetchPage cursor=$cursor")
-        val allIds = loadIds()
-            ?: return PageResult(emptyList(), emptyList(), cursor, PageStatus.FAILED)
+        var idsOutcome = loadIds()
+        if (idsOutcome is ApiResult.Failed) {
+            Log.d("METPROVIDER", "retrying id list load after transient failure: ${idsOutcome.cause.message}")
+            idsOutcome = loadIds()
+        }
+        val allIds = when (idsOutcome) {
+            is ApiResult.Success -> idsOutcome.value
+            is ApiResult.Rejected -> return PageResult(emptyList(), emptyList(), cursor, PageStatus.FAILED, idsOutcome.reason)
+            is ApiResult.Failed -> return PageResult(emptyList(), emptyList(), cursor, PageStatus.FAILED, idsOutcome.cause.message ?: "Failed to load Met catalog")
+        }
         Log.d("METPROVIDER", "allIds size=${allIds.size}")
         var i = parseCursor(cursor)
         val items : MutableList<Artwork> = ArrayList()
@@ -100,16 +133,23 @@ class MetProvider @Inject constructor(
         // identically next time.
         while(i < allIds.size && items.size < size)
         {
-            //val artwork = fetchArtwork(allIds[i])
-            val pair = fetchArtwork(allIds[i])
-//            if(artwork != null)
-//            {
-//                items.add(artwork)
-//            }
-            if(pair != null)
+            val objectId = allIds[i]
+            var resultPair = fetchArtwork(objectId)
+            if(resultPair is ApiResult.Failed)
             {
-                items.add(pair.first)
-                details.add(pair.second)
+                Log.d("METPROVIDER", "retrying object $objectId after transient failure: ${resultPair.cause.message}")
+                resultPair = fetchArtwork(objectId)
+            }
+            when(resultPair)
+            {
+                is ApiResult.Success -> {
+                    items.add(resultPair.value.first)
+                    details.add(resultPair.value.second)
+                }
+                is ApiResult.Rejected ->
+                        Log.d("METPROVIDER", "skipping object $objectId: ${resultPair.reason}")
+                is ApiResult.Failed ->
+                        Log.d("METPROVIDER", "giving up on object $objectId after retry: ${resultPair.cause.message}")
             }
             i++
         }
