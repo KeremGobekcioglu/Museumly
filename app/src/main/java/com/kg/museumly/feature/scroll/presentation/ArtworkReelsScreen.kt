@@ -43,10 +43,10 @@ fun ArtworkReelsScreen(
 ) {
 
     // A fetch is genuinely in flight and we have nothing to show yet.
-    // isInitialLoad covers the very first frame, before the launched
-    // coroutine has had a chance to flip isLoadingMore to true; isLoadingMore
-    // covers every fetch after that, including a retry after a failure.
-    if ((state.isInitialLoad || state.isLoadingMore) && state.artworks.isEmpty()) {
+    // tail defaults to Loading at construction (before the launched
+    // coroutine has had a chance to run), so this covers the very first
+    // frame as well as every fetch after that, including a retry.
+    if (state.tail == TailState.Loading && state.artworks.isEmpty()) {
         Box(
             modifier = Modifier.fillMaxSize().background(Color.Black),
             contentAlignment = Alignment.Center
@@ -66,9 +66,10 @@ fun ArtworkReelsScreen(
             contentAlignment = Alignment.Center
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                if (state.error != null) {
+                val tail = state.tail
+                if (tail is TailState.Failed) {
                     Text(
-                        text = state.error,
+                        text = tail.message,
                         color = Color.White,
                         style = MaterialTheme.typography.headlineSmall,
                         textAlign = TextAlign.Center,
@@ -105,9 +106,11 @@ fun ArtworkReelsScreen(
 
     LaunchedEffect(pagerState.currentPage, state.artworks.size) {
         onPageChanged(pagerState.currentPage)
-        if (pagerState.currentPage < state.artworks.size &&
-            state.artworks.size - pagerState.currentPage <= 5
-        ) {
+        // <= (not <) so landing directly on the tail placeholder page — e.g. a
+        // fast fling that skips past the "within 5 of the end" pages — still
+        // triggers a load instead of leaving tail stuck at Idle with nothing
+        // ever fetching.
+        if (state.artworks.size - pagerState.currentPage <= 5) {
             refresh()
         }
     }
@@ -130,11 +133,14 @@ fun ArtworkReelsScreen(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
-                    when {
-                        state.isLoadingMore -> CircularProgressIndicator(color = Color.White)
-                        state.error != null -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    when (val tail = state.tail) {
+                        // Idle here means a load just finished right as the user
+                        // landed on this page and the next one hasn't been
+                        // triggered yet — visually indistinguishable from Loading.
+                        TailState.Loading, TailState.Idle -> CircularProgressIndicator(color = Color.White)
+                        is TailState.Failed -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(
-                                text = state.error,
+                                text = tail.message,
                                 color = Color.White,
                                 textAlign = TextAlign.Center,
                                 modifier = Modifier.padding(horizontal = 32.dp),
@@ -143,7 +149,7 @@ fun ArtworkReelsScreen(
                                 Text("Retry", color = Color.White)
                             }
                         }
-                        else -> Text(
+                        TailState.Exhausted -> Text(
                             text = "You're all caught up",
                             color = Color.White,
                             textAlign = TextAlign.Center,

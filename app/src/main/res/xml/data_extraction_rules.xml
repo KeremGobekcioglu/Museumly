@@ -5,15 +5,11 @@
 -->
 <data-extraction-rules>
     <cloud-backup>
-        <!-- TODO: Use <include> and <exclude> to control what is backed up.
-        <include .../>
-        <exclude .../>
-        -->
+        <!-- Feed scroll position is per-install ephemeral state, not user data
+             worth restoring across reinstalls/devices. -->
+        <exclude domain="file" path="datastore/feed_position.preferences_pb"/>
     </cloud-backup>
-    <!--
     <device-transfer>
-        <include .../>
-        <exclude .../>
+        <exclude domain="file" path="datastore/feed_position.preferences_pb"/>
     </device-transfer>
-    -->
 </data-extraction-rules>

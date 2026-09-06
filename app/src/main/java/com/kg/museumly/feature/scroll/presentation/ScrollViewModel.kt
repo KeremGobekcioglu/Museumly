@@ -47,28 +47,20 @@ class ScrollViewModel @Inject constructor(
     private val positionStore: FeedPositionSource
 ) : ViewModel()
 {
-    private val isLoadingMore = MutableStateFlow(false)
-    private val isInitialLoad = MutableStateFlow(true)
     private var loadJob: Job? = null
-    private val error = MutableStateFlow<String?>(null)
-
-
+    private val tail = MutableStateFlow<TailState>(TailState.Loading)
     private val initialPage = MutableStateFlow<Int?>(null)
 
     val uiState: StateFlow<ScrollUiState> = combine(
         repository.artworks(),
-        isLoadingMore,
-        isInitialLoad,
         initialPage,
-        error
+        tail
     ){
-            artworks: List<Artwork>, loading: Boolean, inital: Boolean, page: Int?, err: String? ->
+            artworks: List<Artwork>, page: Int?, tailState: TailState ->
         ScrollUiState(
-            artworks= artworks,
-            isLoadingMore = loading,
-            isInitialLoad = inital,
+            artworks = artworks,
             initialPage = page,
-            error = err
+            tail = tailState
         )
     }.stateIn(
         scope = viewModelScope,
@@ -92,6 +84,11 @@ class ScrollViewModel @Inject constructor(
             val existing: Int = repository.count()
             if (existing == 0) {
                 loadMore()
+            } else {
+                // Cache already has data and nothing is pending. Without this,
+                // tail stays stuck at its Loading default and the tail
+                // placeholder page would spin forever with no fetch in flight.
+                tail.value = TailState.Idle
             }
         }
     }
@@ -103,20 +100,17 @@ class ScrollViewModel @Inject constructor(
             return
         }
         loadJob = viewModelScope.launch {
-            isLoadingMore.value = true
-            error.value = null
+            tail.value = TailState.Loading
             try {
-                val outcome = repository.loadMore()
-                if (outcome == LoadOutcome.FAILED) {
-                    error.value = "Couldn't load more artworks"
+                tail.value = when (repository.loadMore()) {
+                    LoadOutcome.LOADED -> TailState.Idle
+                    LoadOutcome.EXHAUSTED -> TailState.Exhausted
+                    LoadOutcome.FAILED -> TailState.Failed("Couldn't load more artworks")
                 }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                error.value = e.message ?: "Couldn't load more artworks"
-            } finally {
-                isLoadingMore.value = false
-                isInitialLoad.value = false
+                tail.value = TailState.Failed(e.message ?: "Couldn't load more artworks")
             }
         }
     }
