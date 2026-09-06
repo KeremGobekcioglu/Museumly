@@ -130,7 +130,7 @@ class ArtworkRepositoryImpl @Inject constructor(
     override suspend fun loadMore(size: Int): LoadOutcome{
         mutex.withLock {
             val ordered : List<ArtworkProvider> = providers.sortedBy { it.id }
-            var anyFailed = false
+            var failureReason: String? = null
             val turn : Int = turnSource.getTurn()
             for(attempt in ordered.indices)
             {
@@ -156,7 +156,7 @@ class ArtworkRepositoryImpl @Inject constructor(
                 val page: PageResult = provider.fetchPage(cursor,size)
                 Log.d("REPO", "returned ${page.items.size} items, next=${page.next}")
                 if (page.status == PageStatus.FAILED) {
-                    anyFailed = true
+                    failureReason = page.failureReason ?: "${provider.id} failed"
                     continue
                 }
                 // If page.next is null, this writes the exhaustion marker, and the
@@ -168,13 +168,13 @@ class ArtworkRepositoryImpl @Inject constructor(
                     insert(page.items , page.details)
                     //update turn
                     turnSource.setTurn((index + 1) % ordered.size)
-                    return LoadOutcome.LOADED
+                    return LoadOutcome.Loaded
                 }
             }
-            if (anyFailed) {
-                return LoadOutcome.FAILED
+            if (failureReason != null) {
+                return LoadOutcome.Failed(failureReason)
             }
-            return LoadOutcome.EXHAUSTED
+            return LoadOutcome.Exhausted
         }
     }
 

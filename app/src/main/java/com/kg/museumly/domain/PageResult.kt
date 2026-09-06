@@ -20,5 +20,6 @@ data class PageResult(
     val items: List<Artwork>,
     val details: List<ArtworkDetail>,
     val next: String?,
-    val status: PageStatus
+    val status: PageStatus,
+    val failureReason: String? = null
 )
