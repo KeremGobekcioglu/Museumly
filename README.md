@@ -64,7 +64,8 @@ exhausted, and the repository skips that provider permanently.
 **Round robin.** `loadMore` starts at a remembered `turn` index and stops after the first
 provider that returns items. `turn` advances only on success, so an exhausted provider
 doesn't waste a round. Providers are sorted by `id` before rotating — `@IntoSet` gives no
-ordering guarantee, so without the sort "provider 0" is arbitrary.
+ordering guarantee, so without the sort "provider 0" is arbitrary. `turn` is persisted via
+`ProviderTurnSource` (its own DataStore file), not held in memory — see the trap below.
 
 **Feed ordering is settled: stable, append-only, no shuffle.** The corpus only grows
 forward. Frontier is a single high-water-mark `Int` in DataStore (`FeedPositionSource`);
@@ -208,6 +209,16 @@ not a `LaunchedEffect` — the latter fires before data exists and caused a spur
 every launch.
 
 **Overlap guard is `Job?.isActive`, not a `Boolean` flag.**
+
+**`turn` reset on every process death, not just reinstall.** It was a plain field on the
+`@Singleton` repository — in memory only, never written anywhere. Providers are tried in
+`id` order, so after any cold start (not just an uninstall) `turn` came back as `0` and the
+rotation always retried the alphabetically-first provider (Cleveland) instead of resuming
+where it left off. Provider cursors were already persisted; `turn` was the one piece of
+rotation state that wasn't. Fixed by `ProviderTurnSource`, the same DataStore-backed
+get/set-with-a-key shape as `FeedPositionSource`. Deliberately *not* excluded from Auto
+Backup like the frontier is — `turn` needs to stay in sync with the (also backed-up)
+cursors, not reset to a fresh start.
 
 **Auto Backup survives reinstall.** On by default since API 23, so uninstalling and
 reinstalling restores DataStore and Room from the cloud — the frontier and any poisoned
@@ -370,6 +381,12 @@ Other open questions:
   stored high-water mark (frontier was regressing by 2 on every cold start), the caption
   printing `"null · 1550-1650"` for unattributed works, and excluded DataStore and Room from
   Auto Backup.
+- **2026-09-06** — **Provider round-robin turn persisted.** `turn` lived only in memory on
+  `ArtworkRepositoryImpl` and reset to `0` on every process death, so closing the app while
+  mid-rotation and reopening it always retried the alphabetically-first provider (Cleveland)
+  instead of resuming from wherever the round robin actually was. Added
+  `ProviderTurnSource`, a DataStore-backed store shaped like `FeedPositionSource`; the
+  repository now reads/writes `turn` through it instead of a mutable field.
 - **2026-09-01** — **Cleveland provider complete; seam validated.** Two providers now
   round-robin 20 records each. Repository switched from drain-in-order to rotation with a
   sorted provider list and per-provider cursors. Found and worked around: `orderby` broken
