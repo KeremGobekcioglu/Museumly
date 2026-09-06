@@ -7,6 +7,7 @@ import com.kg.museumly.data.local.ArtworkEntity
 import com.kg.museumly.data.local.ArtworkMapper
 import com.kg.museumly.data.local.ProviderCursor
 import com.kg.museumly.data.local.ProviderCursorDao
+import com.kg.museumly.data.local.ProviderTurnSource
 import com.kg.museumly.data.local.detail.ArtworkDetailDao
 import com.kg.museumly.data.local.detail.ArtworkDetailEntity
 import com.kg.museumly.domain.ArtworkProvider
@@ -30,7 +31,8 @@ class ArtworkRepositoryImpl @Inject constructor(
     private val artworkDetailDao: ArtworkDetailDao,
     private val cursorDao: ProviderCursorDao,
     private val providers: Set<@JvmSuppressWildcards ArtworkProvider>,
-    private val seedSource: SeedSource
+    private val seedSource: SeedSource,
+    private val turnSource: ProviderTurnSource
 ) : ArtworkRepository
 {
     /**
@@ -50,7 +52,7 @@ class ArtworkRepositoryImpl @Inject constructor(
     /**
      * provider turns. it wraps.
      */
-    private var turn: Int = 0
+
 
     /**
      * Returns Flow, so the screen subscribes once and gets every future version automatically.
@@ -129,6 +131,7 @@ class ArtworkRepositoryImpl @Inject constructor(
         mutex.withLock {
             val ordered : List<ArtworkProvider> = providers.sortedBy { it.id }
             var anyFailed = false
+            val turn : Int = turnSource.getTurn()
             for(attempt in ordered.indices)
             {
                 val index : Int = (turn + attempt) % ordered.size
@@ -164,7 +167,7 @@ class ArtworkRepositoryImpl @Inject constructor(
                 {
                     insert(page.items , page.details)
                     //update turn
-                    turn = (index + 1) % ordered.size
+                    turnSource.setTurn((index + 1) % ordered.size)
                     return LoadOutcome.LOADED
                 }
             }
