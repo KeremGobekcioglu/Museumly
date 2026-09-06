@@ -71,12 +71,51 @@ forward. Frontier is a single high-water-mark `Int` in DataStore (`FeedPositionS
 cold start opens two items behind it. Explicitly rejected: resume-where-left-off,
 seen-flags, hiding. Backward traversal stays intact.
 
+**`setFrontier` ignores any value lower than what is stored**, and does the compare inside
+`dataStore.edit` so the read-then-write is transactional. Without this the display offset
+gets written back as the frontier: open at `stored - 2`, `LaunchedEffect` fires
+`onPageChanged` on first composition, and the frontier regresses by 2 on every cold start
+even if the user never scrolls. A frontier only ever advances — enforce it, don't just name
+it that.
+
 **Position numbering is guarded by a mutex.** `insert` reads `maxPosition()` then writes.
 Two concurrent writers would both read 19 and both write 20..39. SQLite handles
 simultaneous writes; it does not handle the arithmetic between them.
 
 **Mapper as gatekeeper.** Records failing quality checks return `null` silently. Upstream
-callers never see invalid records.
+callers never see invalid records. Note this is per-record rejection, not error handling —
+a mapper returning null says nothing about whether the fetch worked.
+
+### Failure vs exhaustion — the distinction the whole stack now carries
+
+Every layer used to swallow its own errors, so an empty page from a network failure was
+byte-for-byte identical to an empty page from a finished corpus. Nothing could tell them
+apart, so the UI showed "You're all caught up" when the network was down.
+
+`PageStatus` on `PageResult`:
+
+| Status | Meaning |
+|---|---|
+| `OK` | records returned, more may exist |
+| `EXHAUSTED` | provider genuinely reached the end of its corpus |
+| `FAILED` | the call failed; says nothing about whether more exists |
+
+Partial success is `OK`, not `FAILED` — 13 records then a timeout means keep the 13 and
+resume from the correct cursor. Only a total loss is `FAILED`.
+
+The repository aggregates to `LoadOutcome` (`LOADED` / `EXHAUSTED` / `FAILED`) and
+**skips the cursor write entirely on `FAILED`.** That line is the structural fix for the
+cursor-poisoning trap — see below.
+
+`TailState` is a sealed interface (`Idle` / `Loading` / `Failed(message)` / `Exhausted`),
+one field on `ScrollUiState`. It replaced three independent booleans that could represent
+32 combinations of which about five were real. The bug that forced the change: "exhausted"
+and "never attempted" produced identical field values, so a cold start with data already in
+Room rendered the terminal page and could not be escaped. `Idle` means "ready to fetch" —
+never asked, or last attempt succeeded. Both want the same behaviour at the sentinel.
+
+Prefer a sealed type over booleans wherever states are mutually exclusive. Booleans require
+you to have anticipated every combination; a sealed `when` is checked by the compiler.
 
 ---
 
@@ -145,11 +184,20 @@ Cache on success only.
 
 ## Traps that have already cost time
 
-**Cursor poisoning.** A failed first fetch that returns an empty page writes
+**Cursor poisoning.** A failed fetch that returns an empty page writes
 `ProviderCursor(id, null)` — the exhaustion marker. The repository then skips that provider
-forever, across launches, even after the bug is fixed. **Clear app data before retesting a
-provider that failed.** This is the `loadIds` empty-cache bug in a different layer; it has
-now bitten twice.
+forever, across launches, even after the bug is fixed. Bitten twice, in two different
+layers: once as `loadIds` caching an empty list, once as the repository writing a null
+cursor after a failed `loadIds` returned `emptyList()` and made `i < allIds.size` false.
+
+**Now structurally prevented** — the repository `continue`s past the `cursorDao.put` on
+`PageStatus.FAILED`, so a failed provider's position is never touched. `loadIds` returns
+`List<Int>?` with null meaning failure, so an empty department and a dead network are no
+longer the same value.
+
+Still: **clear app data before retesting a provider that failed.** And note Auto Backup
+restores app data on reinstall by default, so a reinstall does *not* clear it — see the
+backup rules below.
 
 **Pager construction guard.** `rememberPagerState` reads `initialPage` exactly once and
 clamps to 0 against an empty list permanently. The pager must not be constructed until
@@ -160,6 +208,25 @@ not a `LaunchedEffect` — the latter fires before data exists and caused a spur
 every launch.
 
 **Overlap guard is `Job?.isActive`, not a `Boolean` flag.**
+
+**Auto Backup survives reinstall.** On by default since API 23, so uninstalling and
+reinstalling restores DataStore and Room from the cloud — the frontier and any poisoned
+cursor come back with it. Excluded via `fullBackupContent` (API 23–30) and
+`dataExtractionRules` (API 31+); **both files are needed**, each with its own manifest
+attribute, or the range you didn't declare still backs up. Every byte here is re-fetchable
+public data, so none of it is worth backing up.
+
+**`LaunchedEffect` keys, not recompositions.** `LaunchedEffect(currentPage, artworks.size)`
+relaunches only when a key changes — it does *not* re-run on every recomposition. A guard
+was once added to stop the prefetch "firing repeatedly" on the sentinel page; the repeated
+firing didn't exist, and the guard broke a real case (a fast fling landing directly on the
+sentinel, skipping the pages that would have triggered a prefetch). The trigger is
+`artworks.size - currentPage <= 5` with no position guard.
+
+**The sentinel page.** `pageCount = artworks.size + 1`. Without the extra page there is
+physically nowhere to show loading, failure, or exhaustion — the pager simply refuses to
+advance past the last artwork, which reads as a freeze. The sentinel renders `TailState`
+directly, and `Idle` there triggers a fetch rather than claiming the corpus ended.
 
 **AIC is blocked by Cloudflare.** `www.artic.edu/iiif/...` returns 403 with a JS challenge
 to any non-browser client. Cloudflare fingerprints the TLS handshake (JA3/JA4) and HTTP/2
@@ -215,22 +282,39 @@ Dependency discipline: everything in `gradle/libs.versions.toml`, never inline i
 
 ## Deferred, in order
 
-1. **Department expansion** — `MetProvider` hardcodes `departmentId=11`. Now designable
+1. **The frame question** — live, and it blocks the detail page. See Open questions.
+2. **Met throughput.** Met produces at ~0.4s/artwork (N+1, sequential); a fast scroll
+   consumes at ~0.5s/page. It barely keeps up, and any hiccup inverts it. Cleveland is
+   ~0.11s/artwork and has 4× headroom, so the feed alternates comfortable and stalling —
+   worse than consistently mediocre, because the user can't form a model of it. The fix is
+   parallel fan-out (`Semaphore(8)` + `async`, ~8s → ~1.5s per 20), which would put Met
+   ahead of the scroll rate. **Deliberately shelved** — implement when ready, don't paste.
+   Note raising the prefetch threshold instead is tuning to one network; and shrinking the
+   page size doesn't help Met at all (per-artwork cost is fixed) while quadrupling
+   Cleveland's request count.
+3. **Department expansion** — `MetProvider` hardcodes `departmentId=11`. Now designable
    against real data from both providers rather than guessed. Note the taxonomies don't
    overlap cleanly: Cleveland has "Chinese Art" and "Islamic Art", the Met has "Fashion"
    and "Musical Instruments".
-2. **Features** — wait until enough providers and artworks exist that users can genuinely
-   travel the app.
-3. **Parallel fan-out** in `MetProvider.fetchPage` (`Semaphore(8)` + `async`, ~8s → ~1.5s).
-   Deliberately shelved.
-4. **Error surfacing** — `ScrollUiState.error` exists but nothing can set it. Every layer
-   currently swallows errors. Concretely: a short page from Cleveland is indistinguishable
-   from a nearly-exhausted corpus, and a silently-empty provider looks identical to one
-   that isn't bound.
-5. **Row-count capping** — Room rows are tiny (~500B). Coil's disk cache is the real
+4. **Detail page.** Cleveland is data-rich: `tombstone` always populated, plus `technique`,
+   `measurements`, `culture`, `url`, and `description` / `did_you_know` where they exist
+   (null rate never probed). Met is thinner — `objectDate`, `medium`, `dimensions`,
+   `creditLine`, `culture`, `period`, `objectURL` — with no interpretive prose at all.
+   Design for catalogue data across both and treat Cleveland's prose as enrichment; a
+   detail page built around "the story of this work" would be empty on every Met record.
+   Fetch via `/artworks/{id}` and `/objects/{id}` rather than growing the `Artwork` model.
+5. **Mixed-provider failure is silent.** If Met fails and Cleveland succeeds, the outcome is
+   `LOADED`, no error, the page fills — correct for the user, invisible for debugging. The
+   repository already computes `anyFailed`; it just doesn't survive the `LOADED` return.
+6. **Row-count capping** — Room rows are tiny (~500B). Coil's disk cache is the real
    storage consumer and is self-managing.
-6. **Cursor/insert ordering** — the cursor advances before `insert` runs. If `insert`
+7. **Cursor/insert ordering** — the cursor advances before `insert` runs. If `insert`
    throws, the cursor has moved past records that never landed. Permanent hole, no signal.
+8. **Mutex scope.** The repository lock is held across the entire network fetch — seconds of
+   I/O guarding arithmetic that takes microseconds. Narrowing it is the enabler for
+   concurrent provider fetches or a background pipeline. Not free: `turn` is shared mutable
+   state and each cursor is a read-modify-write, so it needs per-provider serialisation
+   rather than one global lock.
 
 Also unaddressed: `record_type` (`cover`/`part`/`component`/`object`) means a Cleveland
 portfolio can appear as 40+ near-identical records. Whether that floods a department is
@@ -240,18 +324,52 @@ unknown until there's real scroll data.
 
 ## Open questions
 
-- [ ] Does the Cleveland/Met aspect-ratio transition read as two museums or as a bug?
-  Cleveland records letterbox (real dimensions); Met records fill the frame (null
-  `aspectRatio`). Answer on a device, not in the preview pane.
+**The frame question — live, and everything on the screen waits on it.**
+
+A device test with a fixed constrained box (`fillMaxWidth(0.6f)`, `fillMaxHeight(0.4f)`,
+visible border) against each page taking the artwork's own shape: **the fixed frame reads
+better.** Works hang at different sizes but the wall doesn't move, and the constancy is what
+makes it a room rather than a feed. That's the north star turning into a layout decision.
+
+- [ ] Fixed box with the image floating inside, box adapting to each work's ratio, or fixed
+  outer bounds with an adapting box within? Only the third makes `aspectRatio`
+  load-bearing — and only Cleveland provides it, so Met works would sit in a fixed box
+  while Cleveland works get fitted frames. Whether that asymmetry is visible is unknown.
+- [ ] Caption anchored to the screen or to the frame? Currently the screen. Anchored to the
+  frame it becomes a wall label; on the screen it stays a Reels caption. Small change,
+  changes everything about how it reads.
+- [ ] Does the page counter stay? "23 / 60" tells the user they're in a growing list, which
+  is precisely the search-engine feeling this app rejects. Museums don't number the wall.
+- [ ] Does tapping into a work navigate somewhere? If yes, the frame decision should account
+  for a shared-element transition.
+
+Other open questions:
+
 - [ ] Does "finite and curated" mean a hand-picked set, or a generated finite subset?
-- [ ] Is provider attribution a feature or debug scaffolding? Currently a raw string in
-  the corner.
+- [ ] Is provider attribution a feature or debug scaffolding? Currently a raw `"cleveland"`
+  string in the corner. Attribution is something museums care about, and "which museum
+  am I in" is arguably part of travelling — but a raw id isn't the answer either way.
 - [ ] Is Europeana worth its mixed-licensing complexity for European coverage?
+- [ ] Does Met ever return `artistDisplayName: ""` rather than absent? `captionLine` treats
+  null correctly but a blank string would render `" · 1550"`. Cleveland's path is clean
+  (mapper returns null for `creators: []`).
 
 ---
 
 ## Changelog
 
+- **2026-09-06** — **Error propagation and state modelling.** Added `PageStatus` to
+  `PageResult` and `LoadOutcome` from the repository, so failure and exhaustion stopped
+  being the same empty page. Repository now skips the cursor write on `FAILED`, which
+  structurally prevents cursor poisoning; `loadIds` returns nullable so a dead network and
+  an empty department are distinguishable. Added the sentinel page (`pageCount + 1`) — there
+  was previously nowhere to render loading or failure, which is why the feed appeared to
+  freeze. Replaced `isLoadingMore` / `isInitialLoad` / `error` with a sealed `TailState`
+  after "exhausted" and "never attempted" turned out to be indistinguishable and stranded
+  the user on a permanent terminal page. Fixed `setFrontier` to reject values below the
+  stored high-water mark (frontier was regressing by 2 on every cold start), the caption
+  printing `"null · 1550-1650"` for unattributed works, and excluded DataStore and Room from
+  Auto Backup.
 - **2026-09-01** — **Cleveland provider complete; seam validated.** Two providers now
   round-robin 20 records each. Repository switched from drain-in-order to rotation with a
   sorted provider list and per-provider cursors. Found and worked around: `orderby` broken
