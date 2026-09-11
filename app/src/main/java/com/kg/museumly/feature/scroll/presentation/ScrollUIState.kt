@@ -1,5 +1,6 @@
 package com.kg.museumly.feature.scroll.presentation
 
+import com.kg.museumly.domain.ErrorKind
 import com.kg.museumly.model.Artwork
 
 data class ScrollUiState(
@@ -11,6 +12,6 @@ data class ScrollUiState(
 sealed interface TailState {
     data object Idle : TailState
     object Loading : TailState
-    data class Failed(val message: String) : TailState
+    data class Failed(val message: String, val kind: ErrorKind = ErrorKind.UNKNOWN) : TailState
     object Exhausted : TailState
 }

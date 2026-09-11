@@ -3,8 +3,10 @@ package com.kg.museumly.data.remote.cleveland
 import android.util.Log
 import com.kg.museumly.domain.ApiResult
 import com.kg.museumly.domain.ArtworkProvider
+import com.kg.museumly.domain.ErrorKind
 import com.kg.museumly.domain.PageResult
 import com.kg.museumly.domain.PageStatus
+import com.kg.museumly.data.remote.toErrorKind
 import com.kg.museumly.model.Artwork
 import com.kg.museumly.model.ArtworkDetail
 import retrofit2.HttpException
@@ -69,6 +71,7 @@ class ClevelandProvider @Inject constructor(
         var exhausted = false
         var failed = false
         var failureReason: String? = null
+        var failureKind: ErrorKind = ErrorKind.UNKNOWN
         // it is not skip, because we dont know if we accept the data or not.
         while(items.size < size)
         {
@@ -86,12 +89,14 @@ class ClevelandProvider @Inject constructor(
                     Log.d("CLEVELANDPROVIDER", "giving up: ${outcome.reason}")
                     failed = true
                     failureReason = outcome.reason
+                    failureKind = ErrorKind.UNKNOWN
                     null
                 }
                 is ApiResult.Failed -> {
                     Log.d("CLEVELANDPROVIDER", "giving up on skip=$skip after retry: ${outcome.cause.message}")
                     failed = true
                     failureReason = outcome.cause.message ?: "Cleveland request failed"
+                    failureKind = outcome.toErrorKind()
                     null
                 }
             }
@@ -129,6 +134,6 @@ class ClevelandProvider @Inject constructor(
         {
             next = skip.toString()
         }
-        return PageResult(items,details,next,status,failureReason)
+        return PageResult(items,details,next,status,failureReason,failureKind)
     }
 }

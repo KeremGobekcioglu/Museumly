@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kg.museumly.data.local.FeedPositionSource
 import com.kg.museumly.domain.ArtworkRepository
+import com.kg.museumly.domain.ErrorKind
 import com.kg.museumly.domain.LoadOutcome
 import com.kg.museumly.model.Artwork
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -105,12 +106,12 @@ class ScrollViewModel @Inject constructor(
                 tail.value = when (val outcome = repository.loadMore()) {
                     LoadOutcome.Loaded -> TailState.Idle
                     LoadOutcome.Exhausted -> TailState.Exhausted
-                    is LoadOutcome.Failed -> TailState.Failed(outcome.reason)
+                    is LoadOutcome.Failed -> TailState.Failed(outcome.reason, outcome.kind)
                 }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                tail.value = TailState.Failed(e.message ?: "Couldn't load more artworks")
+                tail.value = TailState.Failed(e.message ?: "Couldn't load more artworks", ErrorKind.UNKNOWN)
             }
         }
     }

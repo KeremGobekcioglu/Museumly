@@ -21,5 +21,6 @@ data class PageResult(
     val details: List<ArtworkDetail>,
     val next: String?,
     val status: PageStatus,
-    val failureReason: String? = null
+    val failureReason: String? = null,
+    val errorKind: ErrorKind? = null
 )

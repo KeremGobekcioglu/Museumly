@@ -12,6 +12,7 @@ import com.kg.museumly.data.local.detail.ArtworkDetailDao
 import com.kg.museumly.data.local.detail.ArtworkDetailEntity
 import com.kg.museumly.domain.ArtworkProvider
 import com.kg.museumly.domain.ArtworkRepository
+import com.kg.museumly.domain.ErrorKind
 import com.kg.museumly.domain.LoadOutcome
 import com.kg.museumly.domain.PageResult
 import com.kg.museumly.domain.PageStatus
@@ -131,6 +132,7 @@ class ArtworkRepositoryImpl @Inject constructor(
         mutex.withLock {
             val ordered : List<ArtworkProvider> = providers.sortedBy { it.id }
             var failureReason: String? = null
+            var failureKind: ErrorKind = ErrorKind.UNKNOWN
             val turn : Int = turnSource.getTurn()
             for(attempt in ordered.indices)
             {
@@ -157,6 +159,7 @@ class ArtworkRepositoryImpl @Inject constructor(
                 Log.d("REPO", "returned ${page.items.size} items, next=${page.next}")
                 if (page.status == PageStatus.FAILED) {
                     failureReason = page.failureReason ?: "${provider.id} failed"
+                    failureKind = page.errorKind ?: ErrorKind.UNKNOWN
                     continue
                 }
                 // If page.next is null, this writes the exhaustion marker, and the
@@ -172,7 +175,7 @@ class ArtworkRepositoryImpl @Inject constructor(
                 }
             }
             if (failureReason != null) {
-                return LoadOutcome.Failed(failureReason)
+                return LoadOutcome.Failed(failureReason, failureKind)
             }
             return LoadOutcome.Exhausted
         }

@@ -3,8 +3,10 @@ package com.kg.museumly.data.remote.met
 import android.util.Log
 import com.kg.museumly.domain.ApiResult
 import com.kg.museumly.domain.ArtworkProvider
+import com.kg.museumly.domain.ErrorKind
 import com.kg.museumly.domain.PageResult
 import com.kg.museumly.domain.PageStatus
+import com.kg.museumly.data.remote.toErrorKind
 import com.kg.museumly.model.Artwork
 import com.kg.museumly.model.ArtworkDetail
 import kotlinx.coroutines.async
@@ -137,14 +139,15 @@ class MetProvider @Inject constructor(
         }
         val allIds = when (idsOutcome) {
             is ApiResult.Success -> idsOutcome.value
-            is ApiResult.Rejected -> return PageResult(emptyList(), emptyList(), cursor, PageStatus.FAILED, idsOutcome.reason)
-            is ApiResult.Failed -> return PageResult(emptyList(), emptyList(), cursor, PageStatus.FAILED, idsOutcome.cause.message ?: "Failed to load Met catalog")
+            is ApiResult.Rejected -> return PageResult(emptyList(), emptyList(), cursor, PageStatus.FAILED, idsOutcome.reason, ErrorKind.UNKNOWN)
+            is ApiResult.Failed -> return PageResult(emptyList(), emptyList(), cursor, PageStatus.FAILED, idsOutcome.cause.message ?: "Failed to load Met catalog", idsOutcome.toErrorKind())
         }
         Log.d("METPROVIDER", "allIds size=${allIds.size}")
         var i = parseCursor(cursor)
         val items : MutableList<Artwork> = ArrayList()
         val details: MutableList<ArtworkDetail> = ArrayList()
         var failureReason: String? = null
+        var failureKind: ErrorKind = ErrorKind.UNKNOWN
         var consecutiveFailures = 0
         // Walk IDs until we have `size` good ones or run out.
         // Rejected records are skipped permanently — they'd fail
@@ -186,6 +189,7 @@ class MetProvider @Inject constructor(
                         Log.d("METPROVIDER", "object $objectId failed (consecutive=$consecutiveFailures): ${result.cause.message}")
                         if (consecutiveFailures >= consecutiveFailureThreshold) {
                             failureReason = result.cause.message ?: "Object $objectId failed"
+                            failureKind = result.toErrorKind()
                             break
                         }
                         i++
@@ -197,7 +201,7 @@ class MetProvider @Inject constructor(
             if (failureReason != null) break
         }
         if (items.isEmpty() && failureReason != null) {
-            return PageResult(emptyList(), emptyList(), cursor, PageStatus.FAILED, failureReason)
+            return PageResult(emptyList(), emptyList(), cursor, PageStatus.FAILED, failureReason, failureKind)
         }
         var status = PageStatus.OK
         var next: String? = null
