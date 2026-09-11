@@ -45,6 +45,12 @@ fun GalleryNotice(
 )
 {
     GalleryWall(modifier = modifier) {
+        PendantLamp(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .fillMaxWidth(0.34f)
+                .fillMaxHeight(),
+        )
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.padding(horizontal = 24.dp)

@@ -30,7 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 private val WallColor = Color(0xFF0D0C0B)
-private val FrameLine = Color(0xFFE8E3D9)
+val FrameLine = Color(0xFFE8E3D9)
 
 /**
  * The gallery wall: warm near-black, with a soft picture-light falling from
@@ -38,31 +38,46 @@ private val FrameLine = Color(0xFFE8E3D9)
  * dark with a light source reads as a room.
  */
 
+//@Composable
+//fun GalleryWall(
+//    modifier: Modifier = Modifier,
+//    // boxscope - box - has align.
+//    content: @Composable BoxScope.() -> Unit
+//)
+//{
+//    Box(
+//        modifier = modifier
+//            .fillMaxSize()
+//            .background(WallColor)
+//            .drawWithCache {
+//                // Centre the light above the middle, where a real picture
+//                // light would sit. Radius is deliberately larger than the
+//                // width so the falloff is gentle rather than a visible disc.
+//                val brush = Brush.radialGradient(
+//                    colors = listOf(
+//                        FrameLine.copy(0.12f),
+//                        Color.Transparent
+//                    ),
+//                    center = Offset(x = size.width / 2f, y = size.height * 0.15f),
+//                    radius = size.width * 1.1f
+//                )
+//                onDrawBehind { drawRect(brush) }
+//            },
+//        contentAlignment = Alignment.Center,
+//        content = content
+//    )
+//}
+
 @Composable
 fun GalleryWall(
     modifier: Modifier = Modifier,
     // boxscope - box - has align.
     content: @Composable BoxScope.() -> Unit
-)
-{
+) {
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(WallColor)
-            .drawWithCache {
-                // Centre the light above the middle, where a real picture
-                // light would sit. Radius is deliberately larger than the
-                // width so the falloff is gentle rather than a visible disc.
-                val brush = Brush.radialGradient(
-                    colors = listOf(
-                        FrameLine.copy(0.07f),
-                        Color.Transparent
-                    ),
-                    center = Offset(x = size.width / 2f, y = size.height * 0.38f),
-                    radius = size.width * 1.1f
-                )
-                onDrawBehind { drawRect(brush) }
-            },
+            .background(WallColor),
         contentAlignment = Alignment.Center,
         content = content
     )
