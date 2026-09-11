@@ -19,14 +19,12 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.kg.museumly.domain.ErrorKind
-import com.kg.museumly.model.Artwork
+import com.kg.museumly.feature.scroll.presentation.components.ArtworkPageWithRespectToAspectRatio
+import com.kg.museumly.feature.scroll.presentation.components.GalleryNotice
 
 private const val TAG = "MuseumlyImages"
 
@@ -34,7 +32,12 @@ private fun TailState.Failed.title(isTail: Boolean): String = when (kind) {
     ErrorKind.NETWORK -> if (isTail) "Lost the connection" else "No connection"
     ErrorKind.UNKNOWN -> if (isTail) "Couldn't reach the next room" else "The gallery didn't open"
 }
-
+private fun TailState.Failed.body(isTail: Boolean): String = when (kind) {
+    ErrorKind.NETWORK -> if (isTail) "The next works couldn't be fetched."
+    else "Check your connection and try again."
+    ErrorKind.UNKNOWN -> if (isTail) "The collection isn't responding right now."
+    else "Something went wrong loading the collection."
+}
 /**
  * Phase 0 spike: the World Wonders question, answered up front. Each page reserves
  * exactly the artwork's true aspect ratio before the image decodes, inside a fixed
@@ -67,33 +70,21 @@ fun ArtworkReelsScreen(
     // first is retryable, and this early-returns before the LaunchedEffect
     // below, so a button is the only way back.
     if (state.artworks.isEmpty()) {
-        Box(
-            modifier = Modifier.fillMaxSize().background(Color.Black),
-            contentAlignment = Alignment.Center
-        ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                val tail = state.tail
-                if (tail is TailState.Failed) {
-                    Text(
-                        text = tail.title(isTail = false),
-                        color = Color.White,
-                        style = MaterialTheme.typography.headlineSmall,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(horizontal = 32.dp),
-                    )
-                    TextButton(onClick = refresh) {
-                        Text("Retry", color = Color.White)
-                    }
-                } else {
-                    Text(
-                        text = "Nothing here yet",
-                        color = Color.White,
-                        style = MaterialTheme.typography.headlineSmall,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(horizontal = 32.dp),
-                    )
-                }
-            }
+        val tail = state.tail
+        if (tail is TailState.Failed) {
+            GalleryNotice(
+                title = tail.title(isTail = false),
+                body = tail.body(isTail = false),
+                actionLabel = "Retry",
+                onAction = refresh,
+            )
+        } else {
+            GalleryNotice(
+                title = "Nothing on the walls",
+                body = "No works came back from the collection.",
+                actionLabel = "Retry",
+                onAction = refresh,
+            )
         }
         return
     }
@@ -130,33 +121,31 @@ fun ArtworkReelsScreen(
             {
                 val artwork = state.artworks.getOrNull(page)
                 if (artwork != null) {
-                    ArtworkPageWithRespectToAspectRatio(artwork = artwork, onDetailPage = onDetailPage)
+                    ArtworkPageWithRespectToAspectRatio(
+                        artwork = artwork,
+                        onDetailPage = onDetailPage
+                    )
                 }
             }
             else
             {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
                     when (val tail = state.tail) {
                         // Idle here means a load just finished right as the user
                         // landed on this page and the next one hasn't been
                         // triggered yet — visually indistinguishable from Loading.
-                        TailState.Loading, TailState.Idle -> CircularProgressIndicator(color = Color.White)
-                        is TailState.Failed -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(
-                                text = tail.title(isTail = true),
-                                color = Color.White,
-                                textAlign = TextAlign.Center,
-                                modifier = Modifier.padding(horizontal = 32.dp),
-                            )
+                        TailState.Loading, TailState.Idle -> Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            CircularProgressIndicator(color = Color.White)
                         }
-                        TailState.Exhausted -> Text(
-                            text = "You're all caught up",
-                            color = Color.White,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.padding(horizontal = 32.dp),
+                        is TailState.Failed -> GalleryNotice(
+                            title = tail.title(isTail = true),
+                            body = tail.body(isTail = true),
+                        )
+                        TailState.Exhausted -> GalleryNotice(
+                            title = "End of the gallery",
+                            body = "You've seen everything here.",
                         )
                     }
                 }
@@ -166,9 +155,7 @@ fun ArtworkReelsScreen(
         if (pagerState.currentPage < state.artworks.size) {
             PageCounter(pagerState = pagerState, total = state.artworks.size)
         }
-    }
 }
-
 @Composable
 private fun PageCounter(pagerState: PagerState, total: Int, modifier: Modifier = Modifier) {
     Box(modifier = modifier.fillMaxWidth().safeDrawingPadding().padding(top = 12.dp)) {
