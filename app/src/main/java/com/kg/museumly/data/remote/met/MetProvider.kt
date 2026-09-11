@@ -26,6 +26,11 @@ class MetProvider @Inject constructor(
     override val id = "met"
     private var cachedIds: List<Int>? = null
     private val idsMutex = Mutex()
+    /**
+     * Consecutive Failed (transient) results, in a row, before we stop
+     * skipping and treat it as an outage instead of one flaky object.
+     */
+    private val consecutiveFailureThreshold = 3
 
     /**
      * Cursor is a plain index into the ID list. Null means start at 0,
@@ -89,8 +94,16 @@ class MetProvider @Inject constructor(
                 val response = api.search(departmentId = 11)
                 val fetched: List<Int>? = response.objectIDs
                 if (fetched == null) {
-                    Log.d("METPROVIDER", "load ids = ids == null.")
-                    return ApiResult.Rejected("Met search returned no object IDs")
+                    if (response.total == 0) {
+                        // The Met returns objectIDs: null, not [], when nothing
+                        // matches. That's a real empty result, not a failure —
+                        // treat it as exhausted, not FAILED-forever.
+                        Log.d("METPROVIDER", "no objects match (total=0)")
+                        cachedIds = emptyList()
+                        return ApiResult.Success(emptyList())
+                    }
+                    Log.d("METPROVIDER", "objectIDs null but total=${response.total}")
+                    return ApiResult.Rejected("Met search returned no object IDs despite total=${response.total}")
                 }
                 Log.d("METPROVIDER", "total=${response.total}, ids=${fetched.size}")
                 cachedIds = fetched
@@ -128,9 +141,16 @@ class MetProvider @Inject constructor(
         var i = parseCursor(cursor)
         val items : MutableList<Artwork> = ArrayList()
         val details: MutableList<ArtworkDetail> = ArrayList()
+        var failureReason: String? = null
+        var consecutiveFailures = 0
         // Walk IDs until we have `size` good ones or run out.
         // Rejected records are skipped permanently — they'd fail
-        // identically next time.
+        // identically next time. An isolated Failed record is also
+        // skipped: stalling the whole page on one flaky object would
+        // mean the user never sees the perfectly good ones right after
+        // it. Only when failures stack up consecutively — a real
+        // outage, not one bad object — do we stop and leave the cursor
+        // pointing at the failing record so the next page retries it.
         while(i < allIds.size && items.size < size)
         {
             val objectId = allIds[i]
@@ -143,15 +163,29 @@ class MetProvider @Inject constructor(
             when(resultPair)
             {
                 is ApiResult.Success -> {
+                    consecutiveFailures = 0
                     items.add(resultPair.value.first)
                     details.add(resultPair.value.second)
+                    i++
                 }
-                is ApiResult.Rejected ->
-                        Log.d("METPROVIDER", "skipping object $objectId: ${resultPair.reason}")
-                is ApiResult.Failed ->
-                        Log.d("METPROVIDER", "giving up on object $objectId after retry: ${resultPair.cause.message}")
+                is ApiResult.Rejected -> {
+                    consecutiveFailures = 0
+                    Log.d("METPROVIDER", "skipping object $objectId: ${resultPair.reason}")
+                    i++
+                }
+                is ApiResult.Failed -> {
+                    consecutiveFailures++
+                    Log.d("METPROVIDER", "object $objectId failed after retry (consecutive=$consecutiveFailures): ${resultPair.cause.message}")
+                    if (consecutiveFailures >= consecutiveFailureThreshold) {
+                        failureReason = resultPair.cause.message ?: "Object $objectId failed after retry"
+                        break
+                    }
+                    i++
+                }
             }
-            i++
+        }
+        if (items.isEmpty() && failureReason != null) {
+            return PageResult(emptyList(), emptyList(), cursor, PageStatus.FAILED, failureReason)
         }
         var status = PageStatus.OK
         var next: String? = null
