@@ -25,9 +25,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.kg.museumly.domain.ErrorKind
 import com.kg.museumly.model.Artwork
 
 private const val TAG = "MuseumlyImages"
+
+private fun TailState.Failed.title(isTail: Boolean): String = when (kind) {
+    ErrorKind.NETWORK -> if (isTail) "Lost the connection" else "No connection"
+    ErrorKind.UNKNOWN -> if (isTail) "Couldn't reach the next room" else "The gallery didn't open"
+}
 
 /**
  * Phase 0 spike: the World Wonders question, answered up front. Each page reserves
@@ -69,7 +75,7 @@ fun ArtworkReelsScreen(
                 val tail = state.tail
                 if (tail is TailState.Failed) {
                     Text(
-                        text = tail.message,
+                        text = tail.title(isTail = false),
                         color = Color.White,
                         style = MaterialTheme.typography.headlineSmall,
                         textAlign = TextAlign.Center,
@@ -140,14 +146,11 @@ fun ArtworkReelsScreen(
                         TailState.Loading, TailState.Idle -> CircularProgressIndicator(color = Color.White)
                         is TailState.Failed -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(
-                                text = tail.message,
+                                text = tail.title(isTail = true),
                                 color = Color.White,
                                 textAlign = TextAlign.Center,
                                 modifier = Modifier.padding(horizontal = 32.dp),
                             )
-                            TextButton(onClick = refresh) {
-                                Text("Retry", color = Color.White)
-                            }
                         }
                         TailState.Exhausted -> Text(
                             text = "You're all caught up",
