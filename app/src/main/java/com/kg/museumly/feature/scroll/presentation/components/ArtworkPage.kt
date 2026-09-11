@@ -1,4 +1,4 @@
-package com.kg.museumly.feature.scroll.presentation
+package com.kg.museumly.feature.scroll.presentation.components
 
 import android.content.ContentValues.TAG
 import android.util.Log
