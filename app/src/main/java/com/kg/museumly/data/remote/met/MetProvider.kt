@@ -7,6 +7,9 @@ import com.kg.museumly.domain.PageResult
 import com.kg.museumly.domain.PageStatus
 import com.kg.museumly.model.Artwork
 import com.kg.museumly.model.ArtworkDetail
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import retrofit2.HttpException
@@ -151,38 +154,47 @@ class MetProvider @Inject constructor(
         // it. Only when failures stack up consecutively — a real
         // outage, not one bad object — do we stop and leave the cursor
         // pointing at the failing record so the next page retries it.
-        while(i < allIds.size && items.size < size)
-        {
-            val objectId = allIds[i]
-            var resultPair = fetchArtwork(objectId)
-            if(resultPair is ApiResult.Failed)
-            {
-                Log.d("METPROVIDER", "retrying object $objectId after transient failure: ${resultPair.cause.message}")
-                resultPair = fetchArtwork(objectId)
+        while (i < allIds.size && items.size < size) {
+            val batch = allIds.subList(i, minOf(i + 2, allIds.size))
+
+            // map launches every async{} immediately (List.map is eager, not lazy),
+            // so all requests are in flight before awaitAll() blocks on them.
+            val results = coroutineScope {
+                batch.map { objectId -> async { fetchArtwork(objectId) } }.awaitAll()
             }
-            when(resultPair)
-            {
-                is ApiResult.Success -> {
-                    consecutiveFailures = 0
-                    items.add(resultPair.value.first)
-                    details.add(resultPair.value.second)
-                    i++
-                }
-                is ApiResult.Rejected -> {
-                    consecutiveFailures = 0
-                    Log.d("METPROVIDER", "skipping object $objectId: ${resultPair.reason}")
-                    i++
-                }
-                is ApiResult.Failed -> {
-                    consecutiveFailures++
-                    Log.d("METPROVIDER", "object $objectId failed after retry (consecutive=$consecutiveFailures): ${resultPair.cause.message}")
-                    if (consecutiveFailures >= consecutiveFailureThreshold) {
-                        failureReason = resultPair.cause.message ?: "Object $objectId failed after retry"
-                        break
+
+            // batch and results are the same length, and results[k] is the
+            // outcome for batch[k] — awaitAll() preserved that order — so we
+            // walk both by the same index instead of pairing them up first.
+            for (index in batch.indices) {
+                val objectId = batch[index]
+                val result = results[index]
+                when (result) {
+                    is ApiResult.Success -> {
+                        consecutiveFailures = 0
+                        items.add(result.value.first)
+                        details.add(result.value.second)
+                        i++
                     }
-                    i++
+                    is ApiResult.Rejected -> {
+                        consecutiveFailures = 0
+                        Log.d("METPROVIDER", "skipping object $objectId: ${result.reason}")
+                        i++
+                    }
+                    is ApiResult.Failed -> {
+                        consecutiveFailures++
+                        Log.d("METPROVIDER", "object $objectId failed (consecutive=$consecutiveFailures): ${result.cause.message}")
+                        if (consecutiveFailures >= consecutiveFailureThreshold) {
+                            failureReason = result.cause.message ?: "Object $objectId failed"
+                            break
+                        }
+                        i++
+                    }
                 }
+                if (items.size >= size) break
             }
+
+            if (failureReason != null) break
         }
         if (items.isEmpty() && failureReason != null) {
             return PageResult(emptyList(), emptyList(), cursor, PageStatus.FAILED, failureReason)
