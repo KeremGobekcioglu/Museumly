@@ -1,6 +1,7 @@
 package com.kg.museumly.feature.scroll.presentation.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Column
@@ -40,8 +41,10 @@ fun GalleryPlacard(
 {
     Column(
         modifier = modifier
-            .widthIn(280.dp)
+            // widthIn(280.dp) set a MINIMUM, which is why the card stretched.
+            .widthIn(max = 280.dp)
             .background(color = PlacardSurface, shape = RoundedCornerShape(2.dp))
+            .border(1.dp, PlacardInk.copy(alpha = 0.12f), RoundedCornerShape(2.dp))
             .padding(horizontal = 20.dp, vertical = 16.dp)
     ) {
 

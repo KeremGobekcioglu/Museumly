@@ -10,7 +10,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import com.kg.museumly.feature.scroll.presentation.components.GalleryNotice
 import com.kg.museumly.feature.scroll.presentation.components.GalleryPlacard
-import com.kg.museumly.feature.scroll.presentation.components.GalleryWall
 
 //@Preview
 //@Composable
