@@ -33,7 +33,7 @@ private val PlacardInk = Color(0xFF1A1713)
 @Composable
 fun GalleryPlacard(
     title: String,
-    body: String,
+    body: String?,
     actionLabel: String? = null,
     modifier: Modifier = Modifier,
     onAction: (() -> Unit)? = null
@@ -55,12 +55,14 @@ fun GalleryPlacard(
             letterSpacing = 0.15.sp
         )
 
-        Text(
-            text = body,
-            color = PlacardInk.copy(0.7f),
-            style = MaterialTheme.typography.bodySmall,
-            modifier = Modifier.padding(top = 6.dp)
-        )
+        body?.let {
+            Text(
+                text = body,
+                color = PlacardInk.copy(0.7f),
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(top = 6.dp)
+            )
+        }
 
         if(actionLabel != null && onAction != null)
         {

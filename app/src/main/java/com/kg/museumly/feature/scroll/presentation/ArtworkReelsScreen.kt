@@ -24,6 +24,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.kg.museumly.domain.ErrorKind
 import com.kg.museumly.feature.scroll.presentation.components.ArtworkPageWithRespectToAspectRatio
+import com.kg.museumly.feature.scroll.presentation.components.GalleryLoading
 import com.kg.museumly.feature.scroll.presentation.components.GalleryNotice
 
 private const val TAG = "MuseumlyImages"
@@ -56,12 +57,7 @@ fun ArtworkReelsScreen(
     // coroutine has had a chance to run), so this covers the very first
     // frame as well as every fetch after that, including a retry.
     if (state.tail == TailState.Loading && state.artworks.isEmpty()) {
-        Box(
-            modifier = Modifier.fillMaxSize().background(Color.Black),
-            contentAlignment = Alignment.Center
-        ) {
-            CircularProgressIndicator(color = Color.White)
-        }
+        GalleryLoading("Hanging the work")
         return
     }
 
@@ -133,12 +129,7 @@ fun ArtworkReelsScreen(
                         // Idle here means a load just finished right as the user
                         // landed on this page and the next one hasn't been
                         // triggered yet — visually indistinguishable from Loading.
-                        TailState.Loading, TailState.Idle -> Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            CircularProgressIndicator(color = Color.White)
-                        }
+                        TailState.Loading, TailState.Idle -> GalleryLoading("Art is worth the wait.")
                         is TailState.Failed -> GalleryNotice(
                             title = tail.title(isTail = true),
                             body = tail.body(isTail = true),

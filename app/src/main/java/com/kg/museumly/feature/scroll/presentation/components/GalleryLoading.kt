@@ -1,5 +1,6 @@
 package com.kg.museumly.feature.scroll.presentation.components
 
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
@@ -10,15 +11,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 
-val WallColor = Color(0xFF0D0C0B)
-
+/**
+ * The loading counterpart to GalleryNotice. Same wall, same lamp, same frame
+ * at the same geometry — the only difference is that the canvas inside the
+ * frame is being painted, and the placard carries no body or action.
+ *
+ * Keeping the geometry shared means the frame doesn't move between loading
+ * and error: the work is either arriving or it isn't, and the wall is the
+ * same wall either way.
+ */
 @Composable
-fun GalleryNotice(
-    title: String,
-    body: String,
+fun GalleryLoading(
+    title: String = "Art is worth the wait.",
     modifier: Modifier = Modifier,
-    actionLabel: String? = null,
-    onAction: (() -> Unit)? = null,
 ) {
     BoxWithConstraints(
         modifier = modifier
@@ -29,9 +34,7 @@ fun GalleryNotice(
 
         PendantLamp(geometry = geometry, modifier = Modifier.fillMaxSize())
 
-        // offset, not padding: padding participates in measurement and would
-        // put these back in a chain with each other.
-        EmptyFrame(
+        PaintingFrame(
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .offset(y = geometry.frameTop)
@@ -40,9 +43,7 @@ fun GalleryNotice(
 
         GalleryPlacard(
             title = title,
-            body = body,
-            actionLabel = actionLabel,
-            onAction = onAction,
+            body = null,
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .offset(y = geometry.placardTop),
