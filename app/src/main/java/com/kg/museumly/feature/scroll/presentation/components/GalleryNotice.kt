@@ -20,6 +20,7 @@ fun GalleryNotice(
     modifier: Modifier = Modifier,
     actionLabel: String? = null,
     onAction: (() -> Unit)? = null,
+    isBusy: Boolean = false,
 ) {
     BoxWithConstraints(
         modifier = modifier
@@ -45,6 +46,7 @@ fun GalleryNotice(
             body = body,
             actionLabel = actionLabel,
             onAction = onAction,
+            isBusy = isBusy,
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .offset(y = geometry.placardTop),

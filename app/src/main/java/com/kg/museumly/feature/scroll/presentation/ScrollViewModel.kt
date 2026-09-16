@@ -11,6 +11,8 @@ import com.kg.museumly.domain.NetworkMonitor
 import com.kg.museumly.model.Artwork
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -20,6 +22,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import kotlin.coroutines.cancellation.CancellationException
+import kotlin.time.Duration.Companion.milliseconds
 
 /***
  * stateIn converts a cold Flow into a hot StateFlow. Cold means each collector
@@ -52,6 +55,11 @@ class ScrollViewModel @Inject constructor(
     private val networkMonitor: NetworkMonitor
 ) : ViewModel()
 {
+
+    private companion object {
+        const val MIN_RETRY_VISIBLE_MS: Long = 600
+    }
+
     private var loadJob: Job? = null
     private val tail = MutableStateFlow<TailState>(TailState.Loading)
     private val initialPage = MutableStateFlow<Int?>(null)
@@ -121,21 +129,68 @@ class ScrollViewModel @Inject constructor(
             return
         }
         loadJob = viewModelScope.launch {
-            tail.value = TailState.Loading
-            try {
-                tail.value = when (val outcome = repository.loadMore()) {
-                    LoadOutcome.Loaded -> TailState.Idle
-                    LoadOutcome.Exhausted -> TailState.Exhausted
-                    is LoadOutcome.Failed -> TailState.Failed(outcome.reason)
-                }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                tail.value = TailState.Failed(e.message ?: "Couldn't load more artworks")
+
+            /**
+             * previous is saved in a val first so both checks use the same value.
+             * Reading tail.value twice could in principle give different answers.
+             * isRetry is saved separately because after the if, tail.value has already changed,
+             * so you couldn't check it again later.
+             *
+             */
+
+            val previous: TailState = tail.value
+            val isRetry: Boolean = previous is TailState.Failed
+
+            if(previous is TailState.Failed)
+            {
+                tail.value = previous.copy(retrying = true)
             }
+            else
+            {
+                tail.value = TailState.Loading
+            }
+            val next: TailState
+            if(isRetry)
+            {
+                /**
+                 * result will come after at lest MIN_RETRY_VISIBLE_MS SECONDS
+                 * IF RETRY İS CALLED. at least.
+                 */
+                next = coroutineScope {
+                    val minimumTimeShouldSpentBeforeVisible : Job =
+                        launch { delay(MIN_RETRY_VISIBLE_MS.milliseconds) }
+
+                    val result : TailState = runLoad()
+                    /**
+                     * minimum.join() suspends until the timer finishes.
+                     * If it already finished, this returns immediately.
+                     */
+                    minimumTimeShouldSpentBeforeVisible.join()
+                    result
+                }
+            }
+            else
+            {
+                next = runLoad()
+            }
+            tail.value = next
         }
     }
 
+    private suspend fun runLoad() : TailState
+    {
+        return try {
+            when (val outcome = repository.loadMore()) {
+                LoadOutcome.Loaded -> TailState.Idle
+                LoadOutcome.Exhausted -> TailState.Exhausted
+                is LoadOutcome.Failed -> TailState.Failed(outcome.reason)
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            TailState.Failed(e.message ?: "Couldn't load more artworks")
+        }
+    }
     fun onPageChanged(page: Int) {
         viewModelScope.launch {
             positionStore.setFrontier(page)

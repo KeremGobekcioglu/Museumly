@@ -4,15 +4,20 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
@@ -36,7 +41,8 @@ fun GalleryPlacard(
     body: String?,
     actionLabel: String? = null,
     modifier: Modifier = Modifier,
-    onAction: (() -> Unit)? = null
+    onAction: (() -> Unit)? = null,
+    isBusy: Boolean = false
 )
 {
     Column(
@@ -67,19 +73,37 @@ fun GalleryPlacard(
         if(actionLabel != null && onAction != null)
         {
             val interactionSource = remember { MutableInteractionSource() }
-            Text(
-                text = actionLabel,
-                color = PlacardInk,
-                style = MaterialTheme.typography.bodySmall,
-                textDecoration = TextDecoration.Underline,
-                modifier = Modifier
-                    .padding(top = 12.dp)
-                    .clickable(
-                        interactionSource = interactionSource,
-                        indication = null,
-                        onClick = onAction
-                    )
+            Box(
+                Modifier.padding(top = 12.dp),
+                contentAlignment = Alignment.CenterStart
             )
+            {
+                // Always laid out, so the placard keeps its size when the
+                // spinner replaces it. Invisible while busy, not removed.
+                Text(
+                    text = actionLabel,
+                    color = PlacardInk,
+                    style = MaterialTheme.typography.bodySmall,
+                    textDecoration = TextDecoration.Underline,
+                    modifier = Modifier
+                        .alpha( if(isBusy) 0f else 1f)
+                        .padding(top = 12.dp)
+                        .clickable(
+                            enabled = !isBusy,
+                            interactionSource = interactionSource,
+                            indication = null,
+                            onClick = onAction
+                        )
+                )
+                if(isBusy)
+                {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(12.dp),
+                        color = PlacardInk,
+                        strokeWidth = 1.5.dp
+                    )
+                }
+            }
         }
     }
 }

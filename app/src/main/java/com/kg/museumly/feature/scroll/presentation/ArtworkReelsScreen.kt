@@ -75,8 +75,9 @@ fun ArtworkReelsScreen(
             GalleryNotice(
                 title = failedTitle(state.isOnline, false),
                 body = failedBody(state.isOnline, false),
-                actionLabel = "Retry",
+                actionLabel = if (state.isOnline) "Retry" else "Try anyway",
                 onAction = refresh,
+                isBusy = tail.retrying
             )
         } else {
             GalleryNotice(
@@ -127,8 +128,9 @@ fun ArtworkReelsScreen(
                     is TailState.Failed -> GalleryNotice(
                         title = failedTitle(state.isOnline, true),
                         body = failedBody(state.isOnline, true),
-                        actionLabel = "Retry",
+                        actionLabel = if (state.isOnline) "Retry" else "Try anyway",
                         onAction = refresh,
+                        isBusy = tail.retrying
                     )
 
                     TailState.Exhausted -> GalleryNotice(

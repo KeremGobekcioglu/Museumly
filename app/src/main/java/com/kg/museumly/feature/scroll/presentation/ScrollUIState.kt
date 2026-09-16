@@ -12,6 +12,6 @@ data class ScrollUiState(
 sealed interface TailState {
     data object Idle : TailState
     data object Loading : TailState
-    data class Failed(val message: String) : TailState
+    data class Failed(val message: String , val retrying: Boolean = false) : TailState
     data object Exhausted : TailState
 }
