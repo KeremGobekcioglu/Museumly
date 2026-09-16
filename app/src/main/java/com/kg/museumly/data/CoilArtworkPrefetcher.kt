@@ -1,4 +1,4 @@
-package com.kg.museumly.data.remote
+package com.kg.museumly.data
 
 import android.content.Context
 import coil3.ImageLoader

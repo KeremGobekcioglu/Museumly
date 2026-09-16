@@ -1,6 +1,6 @@
 package com.kg.museumly.di
 
-import com.kg.museumly.data.remote.CoilArtworkPrefetcher
+import com.kg.museumly.data.CoilArtworkPrefetcher
 import com.kg.museumly.domain.ArtworkPrefetcher
 import dagger.Binds
 import dagger.Module
