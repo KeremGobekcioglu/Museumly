@@ -4,6 +4,7 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kg.museumly.data.local.FeedPositionSource
+import com.kg.museumly.domain.ArtworkPrefetcher
 import com.kg.museumly.domain.ArtworkRepository
 import com.kg.museumly.domain.ErrorKind
 import com.kg.museumly.domain.LoadOutcome
@@ -45,7 +46,8 @@ import kotlin.coroutines.cancellation.CancellationException
 @HiltViewModel
 class ScrollViewModel @Inject constructor(
     private val repository: ArtworkRepository,
-    private val positionStore: FeedPositionSource
+    private val positionStore: FeedPositionSource,
+    private val prefetcher: ArtworkPrefetcher
 ) : ViewModel()
 {
     private var loadJob: Job? = null
@@ -120,5 +122,22 @@ class ScrollViewModel @Inject constructor(
         viewModelScope.launch {
             positionStore.setFrontier(page)
         }
+
+        val artworks = uiState.value.artworks
+        val urls = (1..2).mapNotNull {
+            offset ->
+                artworks.getOrNull(page + offset)?.imageUrl
+        }
+        prefetch(urls)
+        // <= (not <) so landing directly on the tail placeholder page — e.g. a
+        // fast fling that skips past the "within 5 of the end" pages — still
+        // triggers a load instead of leaving tail stuck at Idle with nothing
+        // ever fetching.
+        if(artworks.size - page <= 5)
+        {
+            loadMore()
+        }
     }
+
+    fun prefetch(urls: List<String>) = prefetcher.prefetch(urls)
 }
