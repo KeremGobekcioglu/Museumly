@@ -49,7 +49,7 @@ fun ArtworkReelsScreen(
     state: ScrollUiState,
     refresh: () -> Unit,
     onPageChanged: (Int) -> Unit,
-    onDetailPage: (String) -> Unit
+    onDetailPage: (String) -> Unit,
 ) {
 
     // A fetch is genuinely in flight and we have nothing to show yet.
@@ -99,13 +99,6 @@ fun ArtworkReelsScreen(
 
     LaunchedEffect(pagerState.currentPage, state.artworks.size) {
         onPageChanged(pagerState.currentPage)
-        // <= (not <) so landing directly on the tail placeholder page — e.g. a
-        // fast fling that skips past the "within 5 of the end" pages — still
-        // triggers a load instead of leaving tail stuck at Idle with nothing
-        // ever fetching.
-        if (state.artworks.size - pagerState.currentPage <= 5) {
-            refresh()
-        }
     }
 
     Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
@@ -113,8 +106,7 @@ fun ArtworkReelsScreen(
             state = pagerState,
             modifier = Modifier.fillMaxSize(),
         ) { page ->
-            if(page < state.artworks.size)
-            {
+            if (page < state.artworks.size) {
                 val artwork = state.artworks.getOrNull(page)
                 if (artwork != null) {
                     ArtworkPageWithRespectToAspectRatio(
@@ -122,30 +114,30 @@ fun ArtworkReelsScreen(
                         onDetailPage = onDetailPage
                     )
                 }
-            }
-            else
-            {
-                    when (val tail = state.tail) {
-                        // Idle here means a load just finished right as the user
-                        // landed on this page and the next one hasn't been
-                        // triggered yet — visually indistinguishable from Loading.
-                        TailState.Loading, TailState.Idle -> GalleryLoading("Art is worth the wait.")
-                        is TailState.Failed -> GalleryNotice(
-                            title = tail.title(isTail = true),
-                            body = tail.body(isTail = true),
-                        )
-                        TailState.Exhausted -> GalleryNotice(
-                            title = "End of the gallery",
-                            body = "You've seen everything here.",
-                        )
-                    }
+            } else {
+                when (val tail = state.tail) {
+                    // Idle here means a load just finished right as the user
+                    // landed on this page and the next one hasn't been
+                    // triggered yet — visually indistinguishable from Loading.
+                    TailState.Loading, TailState.Idle -> GalleryLoading("Art is worth the wait.")
+                    is TailState.Failed -> GalleryNotice(
+                        title = tail.title(isTail = true),
+                        body = tail.body(isTail = true),
+                    )
+
+                    TailState.Exhausted -> GalleryNotice(
+                        title = "End of the gallery",
+                        body = "You've seen everything here.",
+                    )
                 }
             }
         }
 
+
         if (pagerState.currentPage < state.artworks.size) {
             PageCounter(pagerState = pagerState, total = state.artworks.size)
         }
+    }
 }
 @Composable
 private fun PageCounter(pagerState: PagerState, total: Int, modifier: Modifier = Modifier) {
