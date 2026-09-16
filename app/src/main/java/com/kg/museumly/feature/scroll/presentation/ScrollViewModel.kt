@@ -6,8 +6,8 @@ import androidx.lifecycle.viewModelScope
 import com.kg.museumly.data.local.FeedPositionSource
 import com.kg.museumly.domain.ArtworkPrefetcher
 import com.kg.museumly.domain.ArtworkRepository
-import com.kg.museumly.domain.ErrorKind
 import com.kg.museumly.domain.LoadOutcome
+import com.kg.museumly.domain.NetworkMonitor
 import com.kg.museumly.model.Artwork
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -47,7 +48,8 @@ import kotlin.coroutines.cancellation.CancellationException
 class ScrollViewModel @Inject constructor(
     private val repository: ArtworkRepository,
     private val positionStore: FeedPositionSource,
-    private val prefetcher: ArtworkPrefetcher
+    private val prefetcher: ArtworkPrefetcher,
+    private val networkMonitor: NetworkMonitor
 ) : ViewModel()
 {
     private var loadJob: Job? = null
@@ -57,13 +59,15 @@ class ScrollViewModel @Inject constructor(
     val uiState: StateFlow<ScrollUiState> = combine(
         repository.artworks(),
         initialPage,
-        tail
+        tail,
+        networkMonitor.isOnline
     ){
-            artworks: List<Artwork>, page: Int?, tailState: TailState ->
+            artworks: List<Artwork>, page: Int?, tailState: TailState, online: Boolean ->
         ScrollUiState(
             artworks = artworks,
             initialPage = page,
-            tail = tailState
+            tail = tailState,
+            isOnline = online
         )
     }.stateIn(
         scope = viewModelScope,
@@ -94,6 +98,20 @@ class ScrollViewModel @Inject constructor(
                 tail.value = TailState.Idle
             }
         }
+
+        viewModelScope.launch {
+            // auto retry
+            networkMonitor.isOnline
+                .drop(1)
+                .collect {
+                    online: Boolean ->
+                        if(online && tail.value is TailState.Failed)
+                        {
+                            Log.d("VM", "back online, retrying")
+                            loadMore()
+                        }
+                }
+        }
     }
     fun loadMore()
     {
@@ -108,12 +126,12 @@ class ScrollViewModel @Inject constructor(
                 tail.value = when (val outcome = repository.loadMore()) {
                     LoadOutcome.Loaded -> TailState.Idle
                     LoadOutcome.Exhausted -> TailState.Exhausted
-                    is LoadOutcome.Failed -> TailState.Failed(outcome.reason, outcome.kind)
+                    is LoadOutcome.Failed -> TailState.Failed(outcome.reason)
                 }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                tail.value = TailState.Failed(e.message ?: "Couldn't load more artworks", ErrorKind.UNKNOWN)
+                tail.value = TailState.Failed(e.message ?: "Couldn't load more artworks")
             }
         }
     }
