@@ -22,21 +22,25 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.kg.museumly.domain.ErrorKind
 import com.kg.museumly.feature.scroll.presentation.components.ArtworkPageWithRespectToAspectRatio
 import com.kg.museumly.feature.scroll.presentation.components.GalleryLoading
 import com.kg.museumly.feature.scroll.presentation.components.GalleryNotice
 
 private const val TAG = "MuseumlyImages"
 
-private fun TailState.Failed.title(isTail: Boolean): String = when (kind) {
-    ErrorKind.NETWORK -> if (isTail) "Lost the connection" else "No connection"
-    ErrorKind.UNKNOWN -> if (isTail) "Couldn't reach the next room" else "The gallery didn't open"
+private fun failedTitle(isOnline: Boolean, isTail: Boolean): String {
+    if (!isOnline) {
+        return if (isTail) "Lost the connection" else "No connection"
+    }
+    return if (isTail) "Couldn't reach the next room" else "The gallery didn't open"
 }
-private fun TailState.Failed.body(isTail: Boolean): String = when (kind) {
-    ErrorKind.NETWORK -> if (isTail) "The next works couldn't be fetched."
-    else "Check your connection and try again."
-    ErrorKind.UNKNOWN -> if (isTail) "The collection isn't responding right now."
+
+private fun failedBody(isOnline: Boolean, isTail: Boolean): String {
+    if (!isOnline) {
+        return if (isTail) "We'll fetch the next works once you're back online."
+        else "We'll pick this back up once you're back online."
+    }
+    return if (isTail) "The collection isn't responding right now."
     else "Something went wrong loading the collection."
 }
 /**
@@ -69,8 +73,8 @@ fun ArtworkReelsScreen(
         val tail = state.tail
         if (tail is TailState.Failed) {
             GalleryNotice(
-                title = tail.title(isTail = false),
-                body = tail.body(isTail = false),
+                title = failedTitle(state.isOnline, false),
+                body = failedBody(state.isOnline, false),
                 actionLabel = "Retry",
                 onAction = refresh,
             )
@@ -121,8 +125,10 @@ fun ArtworkReelsScreen(
                     // triggered yet — visually indistinguishable from Loading.
                     TailState.Loading, TailState.Idle -> GalleryLoading("Art is worth the wait.")
                     is TailState.Failed -> GalleryNotice(
-                        title = tail.title(isTail = true),
-                        body = tail.body(isTail = true),
+                        title = failedTitle(state.isOnline, true),
+                        body = failedBody(state.isOnline, true),
+                        actionLabel = "Retry",
+                        onAction = refresh,
                     )
 
                     TailState.Exhausted -> GalleryNotice(
