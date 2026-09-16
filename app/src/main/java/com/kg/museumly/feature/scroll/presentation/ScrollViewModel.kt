@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -96,6 +97,20 @@ class ScrollViewModel @Inject constructor(
                 // placeholder page would spin forever with no fetch in flight.
                 tail.value = TailState.Idle
             }
+        }
+
+        viewModelScope.launch {
+            // auto retry
+            networkMonitor.isOnline
+                .drop(1)
+                .collect {
+                    online: Boolean ->
+                        if(online && tail.value is TailState.Failed)
+                        {
+                            Log.d("VM", "back online, retrying")
+                            loadMore()
+                        }
+                }
         }
     }
     fun loadMore()
