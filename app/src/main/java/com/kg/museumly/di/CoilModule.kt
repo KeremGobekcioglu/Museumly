@@ -38,6 +38,9 @@ object CoilModule {
                     .build()
             }
             .diskCache {
+                // cacheDir: OS can reclaim this under storage pressure. Once a "saved"
+                // feature exists, saved artworks need a non-evictable location (e.g.
+                // filesDir) instead of relying on this cache staying warm.
                 DiskCache.Builder()
                     .directory(context.cacheDir.resolve("artwork_images"))
                     .maxSizeBytes(256L * 1024 * 1024)
