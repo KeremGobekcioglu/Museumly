@@ -40,8 +40,10 @@ object NetworkModule
         }
         return OkHttpClient.Builder()
             .addInterceptor(logging)
-            .connectTimeout(15, TimeUnit.SECONDS)
-            .readTimeout(15, TimeUnit.SECONDS)
+            .connectTimeout(8, TimeUnit.SECONDS)
+            .readTimeout(8, TimeUnit.SECONDS)
+            // Limit for the whole request.
+            .callTimeout(10, TimeUnit.SECONDS)
             .build()
     }
 

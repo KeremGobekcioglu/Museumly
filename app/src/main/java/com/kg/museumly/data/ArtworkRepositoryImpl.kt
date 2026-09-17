@@ -1,10 +1,12 @@
 package com.kg.museumly.data
 
 import android.util.Log
+import androidx.room.withTransaction
 import com.kg.museumly.data.local.ArtworkDao
 import com.kg.museumly.data.local.ArtworkDetailMapper
 import com.kg.museumly.data.local.ArtworkEntity
 import com.kg.museumly.data.local.ArtworkMapper
+import com.kg.museumly.data.local.MuseumDatabase
 import com.kg.museumly.data.local.ProviderCursor
 import com.kg.museumly.data.local.ProviderCursorDao
 import com.kg.museumly.data.local.ProviderTurnSource
@@ -22,11 +24,13 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withTimeoutOrNull
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
 class ArtworkRepositoryImpl @Inject constructor(
+    private val database: MuseumDatabase,
     private val artworkDao: ArtworkDao,
     private val artworkDetailDao: ArtworkDetailDao,
     private val cursorDao: ProviderCursorDao,
@@ -35,6 +39,16 @@ class ArtworkRepositoryImpl @Inject constructor(
     private val turnSource: ProviderTurnSource
 ) : ArtworkRepository
 {
+    private companion object {
+        // callTimeout (NetworkModule) bounds a single HTTP call. fetchPage
+        // can be several of those in a row — Met especially, one call per
+        // object — so a provider that's merely slow, never erroring, never
+        // tripping a single call's timeout, would otherwise have no ceiling
+        // at all. This is that ceiling, generous relative to the 10s
+        // per-call one since it has to cover the whole page.
+        const val PROVIDER_FETCH_TIMEOUT_MS: Long = 20_000
+    }
+
     /**
      * Only one writer at a time.
      *
@@ -48,11 +62,6 @@ class ArtworkRepositoryImpl @Inject constructor(
      * Mutex, not synchronized, because these functions suspend.
      */
     private val mutex = Mutex()
-
-    /**
-     * provider turns. it wraps.
-     */
-
 
     /**
      * Returns Flow, so the screen subscribes once and gets every future version automatically.
@@ -130,7 +139,7 @@ class ArtworkRepositoryImpl @Inject constructor(
     override suspend fun loadMore(size: Int): LoadOutcome{
         mutex.withLock {
             val ordered : List<ArtworkProvider> = providers.sortedBy { it.id }
-            var failureReason: String? = null
+            val failures: MutableList<String> = ArrayList()
             val turn : Int = turnSource.getTurn()
             for(attempt in ordered.indices)
             {
@@ -153,26 +162,54 @@ class ArtworkRepositoryImpl @Inject constructor(
                 // The provider does everything: rebuilds its ID list if needed, walks
                 // from `cursor`, hydrates each artwork, drops the unusable ones.
                 Log.d("REPO", "calling fetchPage cursor=$cursor")
-                val page: PageResult = provider.fetchPage(cursor,size)
-                Log.d("REPO", "returned ${page.items.size} items, next=${page.next}")
+                val started: Long = System.nanoTime()
+                val page: PageResult? = withTimeoutOrNull(PROVIDER_FETCH_TIMEOUT_MS)
+                {
+                    provider.fetchPage(cursor,size)
+                }
+                val ms: Long = (System.nanoTime() - started) / 1_000_000
+                if (page == null)
+                {
+                    Log.d("REPO", "${provider.id} timed out after ${ms}ms")
+                    failures.add("${provider.id}: timed out")
+                    continue
+                }
+                Log.d("REPO", "${provider.id} took ${ms}ms, ${page.items.size} items, next=${page.next}")
                 if (page.status == PageStatus.FAILED) {
-                    failureReason = page.failureReason ?: "${provider.id} failed"
+                    val reason: String = page.failureReason ?: "failed"
+                    Log.d("REPO", "${provider.id} failed: $reason")
+                    failures.add("${provider.id}: $reason")
                     continue
                 }
                 // If page.next is null, this writes the exhaustion marker, and the
                 // continue check will skip this provider from now on.
-                cursorDao.put(ProviderCursor(provider.id,page.next))
-                Log.d("ARTWORKREPOSITORYIMPL" , "CURSOR = $cursor")
-                if(page.items.isNotEmpty())
-                {
-                    insert(page.items , page.details)
-                    //update turn
+                //
+                // One transaction because a crash between the writes leaves damage
+                // nothing ever repairs:
+                //   cursor moved, artworks not inserted -> that range is never
+                //     requested again; the feed just silently lacks those works
+                //   artworks inserted, details not -> those pages open a blank
+                //     detail screen forever, since nothing refetches what's already
+                //     in Room
+                //
+                // Empty items with status OK is normal (the mapper rejected the whole
+                // batch) and the cursor still has to move — those IDs would be
+                // rejected again next time.
+                database.withTransaction {
+                    if (page.items.isNotEmpty()) {
+                        insert(page.items, page.details)
+                    }
+                    cursorDao.put(ProviderCursor(provider.id, page.next))
+                }
+                // DataStore, not Room, so it can't join the transaction. Only advance
+                // the turn when the provider actually delivered something.
+                if (page.items.isNotEmpty()) {
                     turnSource.setTurn((index + 1) % ordered.size)
                     return LoadOutcome.Loaded
                 }
             }
-            if (failureReason != null) {
-                return LoadOutcome.Failed(failureReason)
+            if (failures.isNotEmpty()) {
+                return LoadOutcome.Failed(failures.joinToString("; "))
             }
             return LoadOutcome.Exhausted
         }

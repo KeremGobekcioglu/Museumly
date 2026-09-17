@@ -1,23 +1,33 @@
 package com.kg.museumly.data.remote.cleveland
 
 import android.util.Log
+import com.kg.museumly.data.remote.worthRetrying
 import com.kg.museumly.domain.ApiResult
 import com.kg.museumly.domain.ArtworkProvider
 import com.kg.museumly.domain.PageResult
 import com.kg.museumly.domain.PageStatus
 import com.kg.museumly.model.Artwork
 import com.kg.museumly.model.ArtworkDetail
+import kotlinx.coroutines.delay
 import retrofit2.HttpException
 import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.coroutines.cancellation.CancellationException
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 
 @Singleton
 class ClevelandProvider @Inject constructor(
     private val api: ClevelandApi
 ) : ArtworkProvider
 {
+
+    private companion object
+    {
+        val RETRY_DELAY: Duration = 500.milliseconds
+    }
+
     override val id: String = "cleveland"
     private fun parseCursor(cursor: String?) : Int
     {
@@ -75,8 +85,9 @@ class ClevelandProvider @Inject constructor(
             // first pass, need is 20. if 13 of items rejected, need will be 13.
             val need = size - items.size
             var outcome = fetchDtos(skip, need)
-            if (outcome is ApiResult.Failed) {
+            if (outcome is ApiResult.Failed && outcome.worthRetrying()) {
                 Log.d("CLEVELANDPROVIDER", "retrying skip=$skip after transient failure: ${outcome.cause.message}")
+                delay(RETRY_DELAY)
                 outcome = fetchDtos(skip, need)
             }
             val dtos = when(outcome)
