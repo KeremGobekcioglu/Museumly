@@ -1,6 +1,7 @@
 package com.kg.museumly.data.remote.met
 
 import android.util.Log
+import com.kg.museumly.data.remote.worthRetrying
 import com.kg.museumly.domain.ApiResult
 import com.kg.museumly.domain.ArtworkProvider
 import com.kg.museumly.domain.PageResult
@@ -10,6 +11,7 @@ import com.kg.museumly.model.ArtworkDetail
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import retrofit2.HttpException
@@ -17,6 +19,8 @@ import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.coroutines.cancellation.CancellationException
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * right now we can only get paintings if it is our query.
@@ -25,6 +29,10 @@ import kotlin.coroutines.cancellation.CancellationException
 class MetProvider @Inject constructor(
     private val api: MetApi
 ): ArtworkProvider {
+
+    private companion object {
+        val RETRY_DELAY: Duration = 500.milliseconds
+    }
 
     override val id = "met"
     private var cachedIds: List<Int>? = null
@@ -131,8 +139,9 @@ class MetProvider @Inject constructor(
     ): PageResult {
         Log.d("METPROVIDER", "fetchPage cursor=$cursor")
         var idsOutcome = loadIds()
-        if (idsOutcome is ApiResult.Failed) {
+        if (idsOutcome is ApiResult.Failed && idsOutcome.worthRetrying()) {
             Log.d("METPROVIDER", "retrying id list load after transient failure: ${idsOutcome.cause.message}")
+            delay(RETRY_DELAY)
             idsOutcome = loadIds()
         }
         val allIds = when (idsOutcome) {

@@ -14,7 +14,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import okhttp3.OkHttpClient
 import javax.inject.Singleton
-
+import java.util.concurrent.TimeUnit
 @Module
 @InstallIn(SingletonComponent::class)
 object CoilModule {
@@ -29,7 +29,14 @@ object CoilModule {
         return ImageLoader.Builder(context)
             .components {
                 add(OkHttpNetworkFetcherFactory(
-                    callFactory = {okHttpClient}
+                    callFactory = {
+                        // Same connection pool as the API client, but images can be
+                        // large, so no total-time limit.
+                        okHttpClient.newBuilder()
+                            .callTimeout(0, TimeUnit.SECONDS)
+                            .readTimeout(15, TimeUnit.SECONDS)
+                            .build()
+                    }
                 ))
             }
             .memoryCache {
