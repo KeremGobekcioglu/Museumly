@@ -42,7 +42,12 @@ fun GalleryPlacard(
     actionLabel: String? = null,
     modifier: Modifier = Modifier,
     onAction: (() -> Unit)? = null,
-    isBusy: Boolean = false
+    isBusy: Boolean = false,
+    // Debug-build-only technical detail (raw exception/HTTP reason). Callers
+    // gate this to BuildConfig.DEBUG — a real user must never see it, so
+    // this component doesn't second-guess that and just renders whatever
+    // it's handed.
+    debugDetail: String? = null,
 )
 {
     Column(
@@ -66,6 +71,15 @@ fun GalleryPlacard(
                 text = body,
                 color = PlacardInk.copy(0.7f),
                 style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(top = 6.dp)
+            )
+        }
+
+        debugDetail?.let {
+            Text(
+                text = "DEBUG: $it",
+                color = PlacardInk.copy(0.4f),
+                style = MaterialTheme.typography.labelSmall,
                 modifier = Modifier.padding(top = 6.dp)
             )
         }

@@ -1,5 +1,6 @@
 package com.kg.museumly.di
 
+import com.kg.museumly.BuildConfig
 import com.kg.museumly.data.remote.cleveland.ClevelandApi
 import com.kg.museumly.data.remote.met.MetApi
 import dagger.Module
@@ -32,7 +33,11 @@ object NetworkModule
     fun provideOkHttpClient() : OkHttpClient
     {
         val logging = HttpLoggingInterceptor()
-        logging.level = HttpLoggingInterceptor.Level.BASIC
+        logging.level = if (BuildConfig.DEBUG) {
+            HttpLoggingInterceptor.Level.BASIC
+        } else {
+            HttpLoggingInterceptor.Level.NONE
+        }
         return OkHttpClient.Builder()
             .addInterceptor(logging)
             .connectTimeout(15, TimeUnit.SECONDS)

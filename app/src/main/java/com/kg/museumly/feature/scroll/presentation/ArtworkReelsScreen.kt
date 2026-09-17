@@ -22,6 +22,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.kg.museumly.BuildConfig
 import com.kg.museumly.feature.scroll.presentation.components.ArtworkPageWithRespectToAspectRatio
 import com.kg.museumly.feature.scroll.presentation.components.GalleryLoading
 import com.kg.museumly.feature.scroll.presentation.components.GalleryNotice
@@ -77,7 +78,8 @@ fun ArtworkReelsScreen(
                 body = failedBody(state.isOnline, false),
                 actionLabel = if (state.isOnline) "Retry" else "Try anyway",
                 onAction = refresh,
-                isBusy = tail.retrying
+                isBusy = tail.retrying,
+                debugDetail = if (BuildConfig.DEBUG) tail.message else null,
             )
         } else {
             GalleryNotice(
@@ -130,7 +132,8 @@ fun ArtworkReelsScreen(
                         body = failedBody(state.isOnline, true),
                         actionLabel = if (state.isOnline) "Retry" else "Try anyway",
                         onAction = refresh,
-                        isBusy = tail.retrying
+                        isBusy = tail.retrying,
+                        debugDetail = if (BuildConfig.DEBUG) tail.message else null,
                     )
 
                     TailState.Exhausted -> GalleryNotice(
