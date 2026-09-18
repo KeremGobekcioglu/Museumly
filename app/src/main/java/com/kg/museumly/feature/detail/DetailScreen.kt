@@ -3,6 +3,7 @@ package com.kg.museumly.feature.detail
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -30,6 +31,7 @@ import coil3.compose.AsyncImage
 import com.kg.museumly.model.Artwork
 import com.kg.museumly.model.ArtworkDetail
 import com.kg.museumly.model.ArtworkWithDetail
+import me.saket.telephoto.zoomable.coil3.ZoomableAsyncImage
 
 @Composable
 fun DetailScreen(
@@ -85,12 +87,13 @@ private fun DetailContent(data: ArtworkWithDetail, modifier: Modifier = Modifier
             .safeDrawingPadding()
             .padding(24.dp),
     ) {
-        AsyncImage(
+        ZoomableAsyncImage(
             model = artwork.imageUrl,
             contentDescription = artwork.title,
             contentScale = ContentScale.Fit,
             modifier = Modifier
                 .fillMaxWidth()
+                .aspectRatio(artwork.aspectRatio ?: 1f)
                 .padding(bottom = 24.dp),
         )
 
