@@ -33,7 +33,11 @@ data class ClevelandCreatorDto(
 
 @Serializable
 data class ClevelandImagesDto(
-    val web: ClevelandImageDto? = null
+    val web: ClevelandImageDto? = null,
+    val print: ClevelandImageDto? = null,
+    // Deliberately no `full` field. It's a multi-hundred-MB .tif with no
+    // Android decoder — do not add it back for "more detail", see
+    // IMAGE_DIMENSION_FINDINGS.md.
 )
 
 @Serializable

@@ -7,6 +7,7 @@ data class ArtworkDetail(
     val creditLine: String?,
     val culture: String?,
     val period: String?,
+    val highResImageUrl: String?,
 )
 
 // domain/ArtworkWithDetail.kt

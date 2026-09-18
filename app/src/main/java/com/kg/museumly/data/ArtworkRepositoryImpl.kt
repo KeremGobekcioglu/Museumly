@@ -120,6 +120,7 @@ class ArtworkRepositoryImpl @Inject constructor(
                     creditLine = detail.creditLine,
                     culture = detail.culture,
                     period = detail.period,
+                    highResImageUrl = detail.highResImageUrl,
                 )
             )
         }

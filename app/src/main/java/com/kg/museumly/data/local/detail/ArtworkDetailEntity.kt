@@ -11,4 +11,5 @@ data class ArtworkDetailEntity(
     val creditLine: String?,
     val culture: String?,
     val period: String?,
+    val highResImageUrl: String?,
 )

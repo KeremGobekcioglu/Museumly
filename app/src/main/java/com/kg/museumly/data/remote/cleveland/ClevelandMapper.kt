@@ -95,6 +95,7 @@ object ClevelandMapper {
             creditLine = dto.creditline,
             culture = cultureJoined,
             period = dto.creationDate,
+            highResImageUrl = dto.images?.print?.url?.takeIf { it.isNotBlank() },
         )
     }
 
