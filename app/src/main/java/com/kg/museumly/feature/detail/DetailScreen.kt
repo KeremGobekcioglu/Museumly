@@ -1,5 +1,6 @@
 package com.kg.museumly.feature.detail
 
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -87,15 +88,26 @@ private fun DetailContent(data: ArtworkWithDetail, modifier: Modifier = Modifier
             .safeDrawingPadding()
             .padding(24.dp),
     ) {
-        ZoomableAsyncImage(
-            model = artwork.imageUrl,
-            contentDescription = artwork.title,
-            contentScale = ContentScale.Fit,
-            modifier = Modifier
-                .fillMaxWidth()
+        Box(
+            modifier = Modifier.fillMaxWidth()
                 .aspectRatio(artwork.aspectRatio ?: 1f)
-                .padding(bottom = 24.dp),
+                .padding(bottom = 24.dp)
         )
+        {
+            Log.d("DETAIL SCREEN" , "HIGHRESIMAGEURL : ${detail.highResImageUrl ?: "IS NOT FOUND"}")
+            AsyncImage(
+                model = artwork.imageUrl,
+                contentDescription = null,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.fillMaxSize()
+            )
+            ZoomableAsyncImage(
+                model = detail.highResImageUrl ?: artwork.imageUrl,
+                contentDescription = artwork.title,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
 
         Text(
             text = artwork.title,
