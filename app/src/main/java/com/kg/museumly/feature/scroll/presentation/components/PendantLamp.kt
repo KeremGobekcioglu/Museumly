@@ -74,7 +74,7 @@ fun PendantLamp(
                     Color.Transparent,
                 ),
                 startY = rimY,
-                endY = geometry.frameBottom.toPx(),
+                endY = geometry.lightEnd.toPx(),
             ),
         )
 

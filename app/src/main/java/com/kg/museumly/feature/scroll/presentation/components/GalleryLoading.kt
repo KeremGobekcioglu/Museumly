@@ -11,14 +11,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 
+// pearl_girl.webp is 800x947 — the frame is shaped to its real ratio so
+// ContentScale.Fit has nothing to letterbox; a generic fixed-box frame left
+// visible gaps on the sides where the placeholder image didn't reach.
+private const val PEARL_GIRL_ASPECT_RATIO: Float = 800f / 947f
+
 /**
- * The loading counterpart to GalleryNotice. Same wall, same lamp, same frame
- * at the same geometry — the only difference is that the canvas inside the
- * frame is being painted, and the placard carries no body or action.
- *
- * Keeping the geometry shared means the frame doesn't move between loading
- * and error: the work is either arriving or it isn't, and the wall is the
- * same wall either way.
+ * The loading counterpart to GalleryNotice. Same wall, same lamp — the frame
+ * is shaped to the placeholder painting's own ratio via hangingGeometry
+ * rather than a generic empty-frame box, and the placard carries no body or
+ * action.
  */
 @Composable
 fun GalleryLoading(
@@ -30,7 +32,11 @@ fun GalleryLoading(
             .fillMaxSize()
             .background(WallColor),
     ) {
-        val geometry = galleryGeometry(width = maxWidth, height = maxHeight)
+        val geometry = hangingGeometry(
+            width = maxWidth,
+            height = maxHeight,
+            aspectRatio = PEARL_GIRL_ASPECT_RATIO,
+        )
 
         PendantLamp(geometry = geometry, modifier = Modifier.fillMaxSize())
 
