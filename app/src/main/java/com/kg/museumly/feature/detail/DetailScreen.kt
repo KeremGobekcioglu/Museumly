@@ -5,6 +5,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector1D
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.InfiniteTransition
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -21,8 +22,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Icon
@@ -35,6 +38,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -42,6 +46,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.memory.MemoryCache
@@ -57,6 +62,7 @@ import com.kg.museumly.feature.scroll.presentation.components.WallColor
 import com.kg.museumly.feature.scroll.presentation.components.hangingGeometry
 import com.kg.museumly.model.Artwork
 import com.kg.museumly.model.ArtworkWithDetail
+import kotlinx.coroutines.launch
 import me.saket.telephoto.zoomable.ZoomableState
 import me.saket.telephoto.zoomable.coil3.ZoomableAsyncImage
 import me.saket.telephoto.zoomable.rememberZoomableImageState
@@ -73,14 +79,11 @@ fun DetailScreen(
     // back onto the wall.
     var inspecting: Boolean by rememberSaveable { mutableStateOf(false) }
 
-    BackHandler(enabled = inspecting) {
-        inspecting = false
-    }
-
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(WallColor),
+            .background(WallColor)
+            .navigationBarsPadding(),
         contentAlignment = Alignment.Center,
     ) {
         when {
@@ -171,15 +174,13 @@ private fun DetailContent(
         }
     }
 
-    // The room fades out behind the inspect overlay rather than being
-    // removed — nothing competes with the artwork once the user has leaned
-    // in, and the room returning on exit is half the pleasure of the
-    // transition.
-    val roomAlpha: Float by animateFloatAsState(
-        targetValue = if (inspecting) 0f else 1f,
-        animationSpec = tween(durationMillis = 250),
-        label = "room",
+    val progress by animateFloatAsState(
+        targetValue = if (inspecting) 1f else 0f,
+        animationSpec = tween(300, easing = FastOutSlowInEasing),
+        label = "walk-up"
     )
+    // i think derived state of should be use here.
+    val arrived = inspecting && progress >= 1f
 
     BoxWithConstraints(
         modifier = modifier
@@ -191,10 +192,28 @@ private fun DetailContent(
             height = maxHeight,
             aspectRatio = ratio ?: 0.8f,
         )
+
+        val currentRatio = ratio ?: 0.8f
+        val fitWidth: Dp
+        val fitHeight: Dp
+        if(currentRatio > maxWidth / maxHeight)
+        {
+            fitWidth = maxWidth
+            fitHeight = maxWidth / currentRatio
+        }
+        else
+        {
+            fitHeight = maxHeight
+            fitWidth = maxHeight * currentRatio
+        }
+
+        val startScale : Float = geometry.frameWidth / fitWidth
+        val frameCenterY : Dp = geometry.frameTop + geometry.frameHeight / 2
+        val startOffsetY : Dp = frameCenterY - maxHeight / 2
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .graphicsLayer { alpha = reveal.value * roomAlpha },
+                .graphicsLayer { alpha = reveal.value * (1f - progress) },
         ) {
             PendantLamp(geometry = geometry, modifier = Modifier.fillMaxSize())
 
@@ -222,7 +241,10 @@ private fun DetailContent(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .offset(y = geometry.frameTop)
-                    .size(width = geometry.frameWidth, height = geometry.frameHeight),
+                    .size(width = geometry.frameWidth, height = geometry.frameHeight)
+                    .graphicsLayer {
+                        alpha = if (progress > 0f) 0f else 1f
+                    }
             )
 
             GalleryPlacard(
@@ -246,16 +268,30 @@ private fun DetailContent(
             }
         }
 
-        AnimatedVisibility(
-            visible = inspecting,
-            enter = fadeIn(animationSpec = tween(durationMillis = 250)),
-            exit = fadeOut(animationSpec = tween(durationMillis = 250)),
-        ) {
+        // image is not ful size yet.
+        if( progress > 0f && !arrived)
+        {
+            WalkUpImage(
+                imageUrl = artwork.imageUrl,
+                placeholderKey = placeholderKey,
+                progress = progress,
+                startScale = startScale,
+                startOffsetY = startOffsetY,
+                fitWidth = fitWidth,
+                fitHeight = fitHeight,
+                modifier = Modifier.align(Alignment.Center),
+            )
+        }
+        if(inspecting)
+        {
             InspectOverlay(
                 imageUrl = data.detail.highResImageUrl ?: artwork.imageUrl,
                 placeholderKey = placeholderKey,
                 contentDescription = artwork.title,
                 onExit = onExit,
+                modifier = Modifier.graphicsLayer{
+                    alpha = if (arrived) 1f else 0f
+                }
             )
         }
     }
@@ -319,6 +355,25 @@ private fun InspectOverlay(
         derivedStateOf { (zoomableState.zoomFraction ?: 0f) > 0.01f }
     }
 
+    val scope = rememberCoroutineScope()
+
+    // Every way out goes through here. If zoomed, zoom back to fit first, so
+// the flying image picks up from exactly where the zoomable image is
+    fun stepBack()
+    {
+        scope.launch {
+            if(zoomed)
+            {
+                zoomableState.resetZoom()
+            }
+            onExit()
+        }
+    }
+
+    BackHandler {
+        stepBack()
+    }
+
     Box(modifier = modifier.fillMaxSize()) {
         ZoomableAsyncImage(
             model = request,
@@ -327,6 +382,13 @@ private fun InspectOverlay(
             modifier = Modifier
                 .fillMaxSize()
                 .background(WallColor),
+            onClick = {
+                _ ->
+                    if(!zoomed)
+                    {
+                        stepBack()
+                    }
+            }
         )
 
         AnimatedVisibility(
@@ -336,7 +398,7 @@ private fun InspectOverlay(
             exit = fadeOut(animationSpec = tween(durationMillis = 200)),
         ) {
             IconButton(
-                onClick = onExit,
+                onClick = { stepBack() },
                 modifier = Modifier
                     .statusBarsPadding()
                     .padding(16.dp)
