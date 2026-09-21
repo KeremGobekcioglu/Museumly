@@ -28,7 +28,7 @@ import com.kg.museumly.feature.scroll.presentation.components.FrameLine
  * the lamp hits it directly — then it darkens toward the bottom edge.
  * Without this a bright painting on a black wall reads as a backlit screen.
  */
-private val LightFalloff: Brush = Brush.verticalGradient(
+internal val LightFalloff: Brush = Brush.verticalGradient(
     0.0f to Color.Transparent,
     0.4f to Color.Transparent,
     1.0f to Color.Black.copy(alpha = 0.22f),
