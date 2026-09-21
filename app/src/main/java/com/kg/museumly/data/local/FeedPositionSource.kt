@@ -20,6 +20,12 @@ class FeedPositionSource @Inject constructor(
 {
     private val frontierKey = intPreferencesKey("frontier")
 
+    // In-memory, not persisted to DataStore: scoped to this process's
+    // lifetime, not forever. A user who hasn't opened the app in weeks has
+    // likely forgotten the gesture exists and should see the hint again —
+    // once per app launch is enough to not be annoying within a session.
+    private var hasInspectedThisSession: Boolean = false
+
     suspend fun getFrontier(): Int
     {
         val prefs : Preferences = context.dataStore.data.first()
@@ -42,5 +48,17 @@ class FeedPositionSource @Inject constructor(
                     prefs[frontierKey] = position
                 }
         }
+    }
+
+    /**
+     * Whether the user has completed a tap/pinch into inspect mode this
+     * session. One-way within the session: once true, InspectHint stops
+     * showing until the app is relaunched.
+     */
+    fun hasInspected(): Boolean = hasInspectedThisSession
+
+    fun setInspected()
+    {
+        hasInspectedThisSession = true
     }
 }

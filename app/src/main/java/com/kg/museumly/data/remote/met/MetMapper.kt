@@ -55,6 +55,7 @@ object MetMapper
             creditLine = dto.creditLine,
             culture = dto.culture,
             period = dto.period,
+            highResImageUrl = dto.primaryImage?.takeIf { it.isNotBlank() },
         )
     }
 }

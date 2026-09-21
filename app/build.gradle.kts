@@ -82,6 +82,9 @@ dependencies {
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)
 
+    // Telephoto — throwaway zoom spike, see ZoomSpikeScreen
+    implementation(libs.telephoto.zoomable.image.coil3)
+
     // Coroutines
     implementation(libs.kotlinx.coroutines.android)
 

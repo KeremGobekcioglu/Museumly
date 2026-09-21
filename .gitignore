@@ -13,3 +13,19 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# IDE
+/.idea/markdown.xml
+
+# Scratch notes / investigation docs
+/IMAGE_DIMENSION_FINDINGS.md
+/INTERVIEW_PREP.md
+/SCROLL_SCREEN_FINDINGS.md
+/SECTION_PROBE_FINDINGS.md
+/SECTION_SELECTION_PLAN.md
+/investigation_findings.txt
+/section_probe.py
+
+# Local test assets
+/girl.jpg
+/harvesters.jpg

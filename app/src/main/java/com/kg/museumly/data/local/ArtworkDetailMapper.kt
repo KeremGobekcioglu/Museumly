@@ -11,6 +11,7 @@ object ArtworkDetailMapper {
             creditLine = entity.creditLine,
             culture = entity.culture,
             period = entity.period,
+            highResImageUrl = entity.highResImageUrl,
         )
     }
 }
