@@ -98,6 +98,7 @@ private fun DetailScreenWidePreview() = WithPreviewImages {
             isLoading = false,
         ),
         onBack = {},
+        onInspected = {},
     )
 }
 
@@ -110,6 +111,7 @@ private fun DetailScreenTallPreview() = WithPreviewImages {
             isLoading = false,
         ),
         onBack = {},
+        onInspected = {},
     )
 }
 
@@ -122,5 +124,6 @@ private fun DetailScreenPortraitPreview() = WithPreviewImages {
             isLoading = false,
         ),
         onBack = {},
+        onInspected = {},
     )
 }

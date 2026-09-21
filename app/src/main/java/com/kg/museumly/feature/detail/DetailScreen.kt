@@ -5,7 +5,12 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector1D
+import androidx.compose.animation.core.InfiniteTransition
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -13,6 +18,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -21,6 +27,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -35,10 +43,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil3.memory.MemoryCache
 import coil3.request.CachePolicy
 import coil3.request.ImageRequest
 import coil3.request.crossfade
+import com.kg.museumly.feature.scroll.presentation.components.FrameLine
 import com.kg.museumly.feature.scroll.presentation.components.GalleryGeometry
 import com.kg.museumly.feature.scroll.presentation.components.GalleryNotice
 import com.kg.museumly.feature.scroll.presentation.components.GalleryPlacard
@@ -56,6 +66,7 @@ import me.saket.telephoto.zoomable.rememberZoomableState
 fun DetailScreen(
     state: DetailUiState,
     onBack: () -> Unit,
+    onInspected: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     // rememberSaveable so a rotation mid-inspection doesn't dump the user
@@ -85,7 +96,11 @@ fun DetailScreen(
             else -> DetailContent(
                 data = state.data,
                 inspecting = inspecting,
-                onInspect = { inspecting = true },
+                showInspectHint = state.showInspectHint,
+                onInspect = {
+                    inspecting = true
+                    onInspected()
+                },
                 onExit = { inspecting = false },
             )
         }
@@ -125,6 +140,7 @@ fun DetailScreen(
 private fun DetailContent(
     data: ArtworkWithDetail,
     inspecting: Boolean,
+    showInspectHint: Boolean,
     onInspect: () -> Unit,
     onExit: () -> Unit,
     modifier: Modifier = Modifier,
@@ -216,6 +232,18 @@ private fun DetailContent(
                     .align(Alignment.TopCenter)
                     .offset(y = geometry.placardTop),
             )
+
+            // Teaches once, then leaves for good — see FeedPositionSource.
+            // hasInspected. A permanent "tap here" label is clutter; one
+            // that disappears after it's learned is onboarding.
+            if (showInspectHint) {
+                InspectHint(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .navigationBarsPadding()
+                        .padding(bottom = 40.dp),
+                )
+            }
         }
 
         AnimatedVisibility(
@@ -231,6 +259,31 @@ private fun DetailContent(
             )
         }
     }
+}
+
+/**
+ * Small caps, wide spacing — reads like museum signage, not an app tooltip.
+ * The slow breathing alpha is what makes it noticeable without shouting.
+ */
+@Composable
+private fun InspectHint(modifier: Modifier = Modifier) {
+    val transition: InfiniteTransition = rememberInfiniteTransition(label = "hint")
+    val alpha: Float by transition.animateFloat(
+        initialValue = 0.35f,
+        targetValue = 0.75f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1600),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "hint-alpha",
+    )
+    Text(
+        text = "TAP THE PAINTING TO STEP CLOSER",
+        color = FrameLine,
+        style = MaterialTheme.typography.labelSmall,
+        letterSpacing = 2.sp,
+        modifier = modifier.graphicsLayer { this.alpha = alpha },
+    )
 }
 
 /**

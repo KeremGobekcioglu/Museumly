@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
+import com.kg.museumly.data.local.FeedPositionSource
 import com.kg.museumly.domain.ArtworkRepository
 import com.kg.museumly.model.ArtworkWithDetail
 import com.kg.museumly.navigation.DetailPage
@@ -17,7 +18,8 @@ import javax.inject.Inject
 @HiltViewModel
 class DetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
-    private val repository: ArtworkRepository
+    private val repository: ArtworkRepository,
+    private val positionStore: FeedPositionSource,
 ) : ViewModel()
 {
     private val route: DetailPage = savedStateHandle.toRoute()
@@ -33,6 +35,7 @@ class DetailViewModel @Inject constructor(
     {
         viewModelScope.launch {
             val result: ArtworkWithDetail? = repository.artworkWithDetail(route.artworkId)
+            val hasInspected: Boolean = positionStore.hasInspected()
             if (result == null) {
                 _uiState.value = DetailUiState(
                     data = null,
@@ -44,8 +47,23 @@ class DetailViewModel @Inject constructor(
                     data = result,
                     isLoading = false,
                     notFound = false,
+                    showInspectHint = !hasInspected,
                 )
             }
         }
+    }
+
+    /**
+     * Called wherever the screen enters inspect mode. Idempotent: once the
+     * hint is off, repeat calls (a pinch fires this every frame of the
+     * gesture) are no-ops.
+     */
+    fun onInspected()
+    {
+        if (!_uiState.value.showInspectHint) {
+            return
+        }
+        _uiState.value = _uiState.value.copy(showInspectHint = false)
+        positionStore.setInspected()
     }
 }

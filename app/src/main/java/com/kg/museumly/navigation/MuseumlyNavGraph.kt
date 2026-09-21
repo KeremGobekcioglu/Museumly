@@ -71,7 +71,8 @@ fun MuseumlyNavGraph(navController: NavHostController)
             val state: DetailUiState by viewmodel.state.collectAsStateWithLifecycle()
             DetailScreen(
                 state = state,
-                onBack = { navController.popBackStack() }
+                onBack = { navController.popBackStack() },
+                onInspected = viewmodel::onInspected,
             )
         }
     }
