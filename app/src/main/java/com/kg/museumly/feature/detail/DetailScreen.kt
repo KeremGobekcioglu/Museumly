@@ -49,9 +49,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil3.SingletonImageLoader
 import coil3.memory.MemoryCache
 import coil3.request.CachePolicy
 import coil3.request.ImageRequest
+import coil3.request.ImageResult
+import coil3.request.SuccessResult
 import coil3.request.crossfade
 import com.kg.museumly.feature.scroll.presentation.components.FrameLine
 import com.kg.museumly.feature.scroll.presentation.components.GalleryGeometry
@@ -161,6 +164,11 @@ private fun DetailContent(
         mutableStateOf(null)
     }
 
+    val context = LocalContext.current
+    val highResUrl : String? = data.detail.highResImageUrl
+    var highResReady: Boolean by remember(artwork.id) {
+        mutableStateOf(false)
+    }
     // Not redundant with the nav fade. The nav fade is timed from the tap;
     // this waits for the aspect ratio. For Met records the ratio arrives
     // after the screen does, and without this the frame is visible at the
@@ -174,6 +182,20 @@ private fun DetailContent(
         }
     }
 
+    // download high resolution image before user clicks the image.
+    LaunchedEffect(highResUrl) {
+        if(highResUrl == null) return@LaunchedEffect
+        val request : ImageRequest = ImageRequest.Builder(context)
+            .data(highResUrl)
+            .memoryCachePolicy(CachePolicy.DISABLED)
+            // Only the download matters here. A tiny decode size keeps this
+            // from decoding a 4000px bitmap nobody is looking at.
+            .size(256)
+            .build()
+        val result : ImageResult = SingletonImageLoader.get(context).execute(request)
+        if(result is SuccessResult)
+            highResReady = true
+    }
     val progress by animateFloatAsState(
         targetValue = if (inspecting) 1f else 0f,
         animationSpec = tween(300, easing = FastOutSlowInEasing),
@@ -282,10 +304,17 @@ private fun DetailContent(
                 modifier = Modifier.align(Alignment.Center),
             )
         }
+        // Composed as soon as inspecting starts, not at `arrived`, on purpose:
+        // the zoomable image uses the 300ms flight to resolve its first frame,
+        // so it's already showing an image when the flight lands. Composing it
+        // at `arrived` risks a blank frame at landing. It does receive touches
+        // while invisible during the flight; with no tap handler, they do nothing.
         if(inspecting)
         {
             InspectOverlay(
-                imageUrl = data.detail.highResImageUrl ?: artwork.imageUrl,
+                lowResUrl = artwork.imageUrl,
+                highResUrl = data.detail.highResImageUrl,
+                highResReady = highResReady,
                 placeholderKey = placeholderKey,
                 contentDescription = artwork.title,
                 onExit = onExit,
@@ -332,22 +361,30 @@ private fun InspectHint(modifier: Modifier = Modifier) {
  */
 @Composable
 private fun InspectOverlay(
-    imageUrl: String,
+    lowResUrl: String,
+    highResUrl: String?,
+    highResReady: Boolean,
     placeholderKey: MemoryCache.Key?,
     contentDescription: String?,
     modifier: Modifier = Modifier,
     onExit: () -> Unit
 ) {
     val context: Context = LocalContext.current
-    val request: ImageRequest = remember(imageUrl, placeholderKey) {
-        ImageRequest.Builder(context)
-            .data(imageUrl)
+    val useHighRes = highResReady && highResUrl != null
+    val model = if (useHighRes) highResUrl else lowResUrl
+
+    val request: ImageRequest = remember(model, placeholderKey) {
+        val builder = ImageRequest.Builder(context)
+            .data(model)
             .placeholderMemoryCacheKey(placeholderKey)
-            // The high-res bitmap must never land in the shared memory
-            // cache — one 4000px original can evict the whole feed.
-            .memoryCachePolicy(CachePolicy.DISABLED)
             .crossfade(300)
-            .build()
+            if(useHighRes)
+            {
+                // The high-res bitmap must never land in the shared memory
+                // cache — one 4000px original can evict the whole feed.
+                builder.memoryCachePolicy(CachePolicy.DISABLED)
+            }
+            builder.build()
     }
 
     val zoomableState: ZoomableState = rememberZoomableState()
@@ -382,13 +419,13 @@ private fun InspectOverlay(
             modifier = Modifier
                 .fillMaxSize()
                 .background(WallColor),
-            onClick = {
-                _ ->
-                    if(!zoomed)
-                    {
-                        stepBack()
-                    }
-            }
+//            onClick = {
+//                _ ->
+//                    if(!zoomed)
+//                    {
+//                        stepBack()
+//                    }
+//            }
         )
 
         AnimatedVisibility(
