@@ -1,5 +1,6 @@
 package com.kg.museumly.feature.detail
 
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,6 +10,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -20,6 +23,16 @@ import com.kg.museumly.model.Artwork
 import com.kg.museumly.model.ArtworkDetail
 
 private val LabelInk: Color = Color(0xFFE8E3D9)
+private const val TAG = "WallLabel"
+
+// Slightly lighter than the wall and brighter at the top: the label is
+// lit from above like the work, just less directly.
+private val PanelSurface: Brush = Brush.verticalGradient(
+    colors = listOf(
+        Color(0xFF1D1B18),
+        Color(0xFF131210),
+    ),
+)
 
 /**
  * The museum's tombstone label, printed straight onto the wall below the
@@ -44,8 +57,12 @@ fun WallLabel(
 
     Column(
         modifier = modifier
+            .background(brush = PanelSurface)
+            .drawBehind { drawFrameEdges(strength = 0.6f) }
+            .padding(24.dp),
     ) {
         attribution?.let {
+            Log.d(TAG, "attribution: $attribution")
             Text(
                 text = attribution.uppercase(),
                 color = LabelInk.copy(alpha = 0.6f),
@@ -54,6 +71,7 @@ fun WallLabel(
             )
         }
 
+        Log.d(TAG, "title: ${artwork.title}")
         Text(
             text = artwork.title,
             color = LabelInk,
@@ -64,6 +82,7 @@ fun WallLabel(
 
         val year = clean(artwork.year)
         year?.let {
+            Log.d(TAG, "year: $year")
             Text(
                 text = year,
                 color = LabelInk.copy(alpha = 0.7f),
@@ -103,6 +122,7 @@ fun LabelLine(
 )
 {
     val text: String = clean(value) ?: return
+    Log.d(TAG, "line: $text")
     Text(
         text = text,
         color = LabelInk.copy(alpha = alpha),
@@ -113,13 +133,15 @@ fun LabelLine(
 
 
 // The APIs return "" for missing fields as often as null.
-private fun clean(value: String?) : String?
-{
-    // returns null if value is null or trimmed is null. else returns trimmed.
-    return value?.let {
-        val trimmed = value.trim()
-        trimmed
+private fun clean(value: String?): String? {
+    if (value == null) {
+        return null
     }
+    val trimmed: String = value.trim()
+    if (trimmed.isEmpty()) {
+        return null
+    }
+    return trimmed
 }
 
 private fun joinClean(first: String? , second: String? ) : String?
