@@ -47,6 +47,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -159,8 +160,12 @@ private fun DetailContent(
     var ratio: Float? by remember(artwork.id) {
         mutableStateOf(artwork.aspectRatio)
     }
+    val isPreview = LocalInspectionMode.current
     val reveal: Animatable<Float, AnimationVector1D> = remember(artwork.id) {
-        Animatable(0f)
+        // Compose Preview renders one static frame and never advances
+        // animation clocks, so animateTo below would never land — start
+        // already revealed instead of showing a permanently blank screen.
+        Animatable(if (isPreview) 1f else 0f)
     }
     val ready: Boolean = ratio != null
     var placeholderKey: MemoryCache.Key? by remember(artwork.id) {
