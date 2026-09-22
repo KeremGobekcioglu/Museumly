@@ -66,11 +66,13 @@ import com.kg.museumly.feature.scroll.presentation.components.WallColor
 import com.kg.museumly.feature.scroll.presentation.components.hangingGeometry
 import com.kg.museumly.model.Artwork
 import com.kg.museumly.model.ArtworkWithDetail
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import me.saket.telephoto.zoomable.ZoomableState
 import me.saket.telephoto.zoomable.coil3.ZoomableAsyncImage
 import me.saket.telephoto.zoomable.rememberZoomableImageState
 import me.saket.telephoto.zoomable.rememberZoomableState
+import kotlin.time.Duration.Companion.milliseconds
 
 @Composable
 fun DetailScreen(
@@ -396,6 +398,13 @@ private fun InspectOverlay(
 
     val scope = rememberCoroutineScope()
 
+    var controlsVisible: Boolean by remember { mutableStateOf(true) }
+
+    LaunchedEffect(Unit) {
+        delay(1500.milliseconds)
+        controlsVisible = false
+    }
+
     // Every way out goes through here. If zoomed, zoom back to fit first, so
 // the flying image picks up from exactly where the zoomable image is
     fun stepBack()
@@ -421,17 +430,13 @@ private fun InspectOverlay(
             modifier = Modifier
                 .fillMaxSize()
                 .background(WallColor),
-//            onClick = {
-//                _ ->
-//                    if(!zoomed)
-//                    {
-//                        stepBack()
-//                    }
-//            }
+            onClick = { _ ->
+                controlsVisible = !controlsVisible
+            },
         )
 
         AnimatedVisibility(
-            visible = !zoomed,
+            visible = controlsVisible && !zoomed,
             modifier = Modifier.align(Alignment.TopStart),
             enter = fadeIn(animationSpec = tween(durationMillis = 200)),
             exit = fadeOut(animationSpec = tween(durationMillis = 200)),
