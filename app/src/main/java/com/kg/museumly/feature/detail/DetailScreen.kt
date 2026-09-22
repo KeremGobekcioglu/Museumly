@@ -19,14 +19,24 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.layout.windowInsetsBottomHeight
+import androidx.compose.foundation.layout.windowInsetsTopHeight
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Icon
@@ -37,6 +47,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -47,6 +58,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -139,11 +152,18 @@ fun DetailScreen(
     }
 }
 
+private const val ROOM_FRACTION: Float = 0.88f
+
 /**
- * The room, with the real artwork where GalleryLoading's PaintingFrame was.
- * No scroll, no zoom yet — this step is only about the room. Zoom comes back
- * behind a tap into a full-screen inspect mode; the catalogue text (medium,
- * dimensions, credit) comes back in a bottom sheet. Both are next steps.
+ * The room, with the label printed on the wall below it.
+ *
+ * The room is a little shorter than the viewport so the top of the label
+ * peeks in at the bottom — that peek is what tells people the page scrolls.
+ *
+ * Two layers:
+ * - a full-bleed scrolling column: the room and the label, which move together
+ * - a viewport layer in the safe area: the flight and the inspect overlay,
+ *   which are screen-sized and must never move with the content
  */
 @Composable
 private fun DetailContent(
@@ -159,8 +179,12 @@ private fun DetailContent(
     var ratio: Float? by remember(artwork.id) {
         mutableStateOf(artwork.aspectRatio)
     }
+    val isPreview = LocalInspectionMode.current
     val reveal: Animatable<Float, AnimationVector1D> = remember(artwork.id) {
-        Animatable(0f)
+        // Compose Preview renders one static frame and never advances
+        // animation clocks, so animateTo below would never land — start
+        // already revealed instead of showing a permanently blank screen.
+        Animatable(if (isPreview) 1f else 0f)
     }
     val ready: Boolean = ratio != null
     var placeholderKey: MemoryCache.Key? by remember(artwork.id) {
@@ -168,7 +192,7 @@ private fun DetailContent(
     }
 
     val context = LocalContext.current
-    val highResUrl : String? = data.detail.highResImageUrl
+    val highResUrl: String? = data.detail.highResImageUrl
     var highResReady: Boolean by remember(artwork.id) {
         mutableStateOf(false)
     }
@@ -187,16 +211,16 @@ private fun DetailContent(
 
     // download high resolution image before user clicks the image.
     LaunchedEffect(highResUrl) {
-        if(highResUrl == null) return@LaunchedEffect
-        val request : ImageRequest = ImageRequest.Builder(context)
+        if (highResUrl == null) return@LaunchedEffect
+        val request: ImageRequest = ImageRequest.Builder(context)
             .data(highResUrl)
             .memoryCachePolicy(CachePolicy.DISABLED)
             // Only the download matters here. A tiny decode size keeps this
             // from decoding a 4000px bitmap nobody is looking at.
             .size(256)
             .build()
-        val result : ImageResult = SingletonImageLoader.get(context).execute(request)
-        if(result is SuccessResult)
+        val result: ImageResult = SingletonImageLoader.get(context).execute(request)
+        if (result is SuccessResult)
             highResReady = true
     }
     val progress by animateFloatAsState(
@@ -207,126 +231,166 @@ private fun DetailContent(
     // i think derived state of should be use here.
     val arrived = inspecting && progress >= 1f
 
+    val scrollState = rememberScrollState()
+    // Where the page was scrolled when the painting was tapped. Written in
+    // the click handler and never read from scrollState in composition, so
+    // scrolling doesn't recompose the room. Scrolling is locked while
+    // inspecting, so it's still correct for the return flight.
+    var scrollAtTap: Int by rememberSaveable(artwork.id) { mutableIntStateOf(0) }
+    val density = LocalDensity.current
+
+
     BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
             .background(WallColor)
-            .safeDrawingPadding(),
     ) {
+        val currentRatio: Float = ratio ?: 0.8f
+        val roomHeight: Dp = maxHeight * ROOM_FRACTION
         val geometry: GalleryGeometry = hangingGeometry(
             width = maxWidth,
-            height = maxHeight,
-            aspectRatio = ratio ?: 0.8f,
+            height = roomHeight,
+            aspectRatio = currentRatio,
         )
 
-        val currentRatio = ratio ?: 0.8f
-        val fitWidth: Dp
-        val fitHeight: Dp
-        if(currentRatio > maxWidth / maxHeight)
-        {
-            fitWidth = maxWidth
-            fitHeight = maxWidth / currentRatio
-        }
-        else
-        {
-            fitHeight = maxHeight
-            fitWidth = maxHeight * currentRatio
-        }
-
-        val startScale : Float = geometry.frameWidth / fitWidth
-        val frameCenterY : Dp = geometry.frameTop + geometry.frameHeight / 2
-        val startOffsetY : Dp = frameCenterY - maxHeight / 2
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
-                .graphicsLayer { alpha = reveal.value * (1f - progress) },
+                .graphicsLayer { alpha = reveal.value * (1f - progress) }
+                .verticalScroll(scrollState, enabled = !inspecting)
         ) {
-            PendantLamp(geometry = geometry, modifier = Modifier.fillMaxSize())
+            // The top inset is a spacer inside the scroll, not padding on it.
+            // verticalScroll clips to its own bounds, so padding the container
+            // would cut the lamp's cord off at the inset again.
+            Spacer(modifier = Modifier.windowInsetsTopHeight(WindowInsets.safeDrawing))
 
-            ArtworkFrame(
-                imageUrl = artwork.imageUrl,
-                contentDescription = artwork.title,
-                onImageLoaded = { width, height, cacheKey ->
-                    placeholderKey = cacheKey
-                    if (ratio == null) {
-                        ratio = width.toFloat() / height.toFloat()
-                    }
-                },
-                onImageFailed = {
-                    if (ratio == null) {
-                        ratio = 0.8f
-                    }
-                },
-                onClick = {
-                    // Stops a tap on the invisible frame before the room
-                    // has revealed.
-                    if (ready) {
-                        onInspect()
-                    }
-                },
+            Box(
                 modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .offset(y = geometry.frameTop)
-                    .size(width = geometry.frameWidth, height = geometry.frameHeight)
-                    .graphicsLayer {
-                        alpha = if (progress > 0f) 0f else 1f
-                    }
-            )
+                    .fillMaxWidth()
+                    .height(roomHeight)
+            ) {
+                PendantLamp(geometry = geometry, modifier = Modifier.fillMaxSize())
 
-            GalleryPlacard(
-                title = artwork.title,
-                body = artwork.artist,
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .offset(y = geometry.placardTop),
-            )
-
-            // Teaches once, then leaves for good — see FeedPositionSource.
-            // hasInspected. A permanent "tap here" label is clutter; one
-            // that disappears after it's learned is onboarding.
-            if (showInspectHint) {
-                InspectHint(
+                ArtworkFrame(
+                    imageUrl = artwork.imageUrl,
+                    contentDescription = artwork.title,
+                    onImageLoaded = { width, height, cacheKey ->
+                        placeholderKey = cacheKey
+                        if (ratio == null) {
+                            ratio = width.toFloat() / height.toFloat()
+                        }
+                    },
+                    onImageFailed = {
+                        if (ratio == null) {
+                            ratio = 0.8f
+                        }
+                    },
+                    onClick = {
+                        // Stops a tap on the invisible frame before the room
+                        // has revealed.
+                        if (ready) {
+                            scrollAtTap = scrollState.value
+                            onInspect()
+                        }
+                    },
                     modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .navigationBarsPadding()
-                        .padding(bottom = 40.dp),
+                        .align(Alignment.TopCenter)
+                        .offset(y = geometry.frameTop)
+                        .size(width = geometry.frameWidth, height = geometry.frameHeight)
+                        .graphicsLayer {
+                            alpha = if (progress > 0f) 0f else 1f
+                        }
+                )
+
+                // Teaches once, then leaves for good — see FeedPositionSource.
+                // hasInspected. A permanent "tap here" label is clutter; one
+                // that disappears after it's learned is onboarding.
+                // Where the placard used to be, directly under the work.
+                if (showInspectHint) {
+                    InspectHint(
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .offset(y = geometry.placardTop),
+                    )
+                }
+//            if (showInspectHint) {
+//                InspectHint(
+//                    modifier = Modifier
+//                        .align(Alignment.BottomCenter)
+//                        .navigationBarsPadding()
+//                        .padding(bottom = 40.dp),
+//                )
+//            }
+            }
+
+            WallLabel(
+                artwork = artwork,
+                detail = data.detail,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 32.dp, end = 32.dp, top = 8.dp, bottom = 64.dp),
+            )
+            Spacer(modifier = Modifier.windowInsetsBottomHeight(WindowInsets.safeDrawing))
+
+        }
+
+        BoxWithConstraints(
+            modifier = Modifier
+                .fillMaxSize()
+                .safeDrawingPadding()
+        ) {
+
+            val fitWidth: Dp
+            val fitHeight: Dp
+            if (currentRatio > maxWidth / maxHeight) {
+                fitWidth = maxWidth
+                fitHeight = maxWidth / currentRatio
+            } else {
+                fitHeight = maxHeight
+                fitWidth = maxHeight * currentRatio
+            }
+
+            val scrollAtTapDp: Dp = with(density) { scrollAtTap.toDp() }
+            val startScale: Float = geometry.frameWidth / fitWidth
+            // The frame's centre on screen, relative to this layer's centre.
+            // The top inset appears on both sides — the spacer above the room
+            // and this layer's padding — so it cancels out.
+            val frameCentreY: Dp = geometry.frameTop + geometry.frameHeight / 2
+            val startOffsetY: Dp = frameCentreY - scrollAtTapDp - maxHeight / 2
+            // image is not ful size yet.
+            if (progress > 0f && !arrived) {
+                WalkUpImage(
+                    imageUrl = artwork.imageUrl,
+                    placeholderKey = placeholderKey,
+                    progress = progress,
+                    startScale = startScale,
+                    startOffsetY = startOffsetY,
+                    fitWidth = fitWidth,
+                    fitHeight = fitHeight,
+                    modifier = Modifier.align(Alignment.Center),
+                )
+            }
+            // Composed as soon as inspecting starts, not at `arrived`, on purpose:
+            // the zoomable image uses the 300ms flight to resolve its first frame,
+            // so it's already showing an image when the flight lands. Composing it
+            // at `arrived` risks a blank frame at landing. It does receive touches
+            // while invisible during the flight; with no tap handler, they do nothing.
+            if (inspecting) {
+                InspectOverlay(
+                    lowResUrl = artwork.imageUrl,
+                    highResUrl = data.detail.highResImageUrl,
+                    highResReady = highResReady,
+                    placeholderKey = placeholderKey,
+                    contentDescription = artwork.title,
+                    onExit = onExit,
+                    modifier = Modifier.graphicsLayer {
+                        alpha = if (arrived) 1f else 0f
+                    }
                 )
             }
         }
 
-        // image is not ful size yet.
-        if( progress > 0f && !arrived)
-        {
-            WalkUpImage(
-                imageUrl = artwork.imageUrl,
-                placeholderKey = placeholderKey,
-                progress = progress,
-                startScale = startScale,
-                startOffsetY = startOffsetY,
-                fitWidth = fitWidth,
-                fitHeight = fitHeight,
-                modifier = Modifier.align(Alignment.Center),
-            )
-        }
-        // Composed as soon as inspecting starts, not at `arrived`, on purpose:
-        // the zoomable image uses the 300ms flight to resolve its first frame,
-        // so it's already showing an image when the flight lands. Composing it
-        // at `arrived` risks a blank frame at landing. It does receive touches
-        // while invisible during the flight; with no tap handler, they do nothing.
-        if(inspecting)
-        {
-            InspectOverlay(
-                lowResUrl = artwork.imageUrl,
-                highResUrl = data.detail.highResImageUrl,
-                highResReady = highResReady,
-                placeholderKey = placeholderKey,
-                contentDescription = artwork.title,
-                onExit = onExit,
-                modifier = Modifier.graphicsLayer{
-                    alpha = if (arrived) 1f else 0f
-                }
-            )
-        }
+
     }
 }
 
@@ -376,19 +440,18 @@ private fun InspectOverlay(
     val context: Context = LocalContext.current
     val useHighRes = highResReady && highResUrl != null
     val model = if (useHighRes) highResUrl else lowResUrl
-    Log.d("DETAIL SCREEN, INSPECT OVERLAY" , "HIGH RESOLUTION IMAGE : $highResReady")
+    Log.d("DETAIL SCREEN, INSPECT OVERLAY", "HIGH RESOLUTION IMAGE : $highResReady")
     val request: ImageRequest = remember(model, placeholderKey) {
         val builder = ImageRequest.Builder(context)
             .data(model)
             .placeholderMemoryCacheKey(placeholderKey)
             .crossfade(300)
-            if(useHighRes)
-            {
-                // The high-res bitmap must never land in the shared memory
-                // cache — one 4000px original can evict the whole feed.
-                builder.memoryCachePolicy(CachePolicy.DISABLED)
-            }
-            builder.build()
+        if (useHighRes) {
+            // The high-res bitmap must never land in the shared memory
+            // cache — one 4000px original can evict the whole feed.
+            builder.memoryCachePolicy(CachePolicy.DISABLED)
+        }
+        builder.build()
     }
 
     val zoomableState: ZoomableState = rememberZoomableState()
@@ -407,11 +470,9 @@ private fun InspectOverlay(
 
     // Every way out goes through here. If zoomed, zoom back to fit first, so
 // the flying image picks up from exactly where the zoomable image is
-    fun stepBack()
-    {
+    fun stepBack() {
         scope.launch {
-            if(zoomed)
-            {
+            if (zoomed) {
                 zoomableState.resetZoom()
             }
             onExit()

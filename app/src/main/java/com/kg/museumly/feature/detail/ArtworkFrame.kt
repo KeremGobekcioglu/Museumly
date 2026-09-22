@@ -98,7 +98,7 @@ fun ArtworkFrame(
     }
 }
 
-private fun DrawScope.drawFrameEdges(lift: Float) {
+internal fun DrawScope.drawFrameEdges(lift: Float = 0f, strength: Float = 1f) {
     val stroke: Float = 1.dp.toPx()
     val half: Float = stroke / 2f
     val width: Float = size.width
@@ -107,7 +107,7 @@ private fun DrawScope.drawFrameEdges(lift: Float) {
     // Top edge faces the lamp — brightest line on the frame, catching more
     // light as the work rises toward it under a press.
     drawLine(
-        color = FrameLine.copy(alpha = 0.55f + 0.30f * lift),
+        color = FrameLine.copy(alpha = (0.55f + 0.30f * lift) * strength),
         start = Offset(0f, half),
         end = Offset(width, half),
         strokeWidth = stroke,
@@ -116,8 +116,8 @@ private fun DrawScope.drawFrameEdges(lift: Float) {
     // Sides catch light at the top and lose it toward the bottom.
     val sideBrush: Brush = Brush.verticalGradient(
         colors = listOf(
-            FrameLine.copy(alpha = 0.35f),
-            FrameLine.copy(alpha = 0.08f),
+            FrameLine.copy(alpha = 0.35f * strength),
+            FrameLine.copy(alpha = 0.08f * strength),
         ),
     )
     drawLine(
@@ -135,7 +135,7 @@ private fun DrawScope.drawFrameEdges(lift: Float) {
 
     // Bottom edge faces away from the light — barely there.
     drawLine(
-        color = FrameLine.copy(alpha = 0.06f),
+        color = FrameLine.copy(alpha = 0.06f * strength),
         start = Offset(0f, height - half),
         end = Offset(width, height - half),
         strokeWidth = stroke,
