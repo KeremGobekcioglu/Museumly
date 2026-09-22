@@ -1,6 +1,7 @@
 package com.kg.museumly.feature.detail
 
 import android.content.Context
+import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
@@ -207,7 +208,8 @@ private fun DetailContent(
     BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
-            .background(WallColor),
+            .background(WallColor)
+            .safeDrawingPadding(),
     ) {
         val geometry: GalleryGeometry = hangingGeometry(
             width = maxWidth,
@@ -372,7 +374,7 @@ private fun InspectOverlay(
     val context: Context = LocalContext.current
     val useHighRes = highResReady && highResUrl != null
     val model = if (useHighRes) highResUrl else lowResUrl
-
+    Log.d("DETAIL SCREEN, INSPECT OVERLAY" , "HIGH RESOLUTION IMAGE : $highResReady")
     val request: ImageRequest = remember(model, placeholderKey) {
         val builder = ImageRequest.Builder(context)
             .data(model)

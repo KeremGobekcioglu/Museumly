@@ -40,7 +40,7 @@ fun PendantLamp(
         // Cord runs off the top edge; a visible upper end reads as floating.
         drawLine(
             color = FrameLine.copy(alpha = 0.35f),
-            start = Offset(cx, 0f),
+            start = Offset(cx, -size.height),
             end = Offset(cx, neckTop),
             strokeWidth = stroke,
         )

@@ -3,8 +3,8 @@ package com.kg.museumly.feature.scroll.presentation.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -27,7 +27,7 @@ fun GalleryNotice(
         modifier = modifier
             .fillMaxSize()
             .background(WallColor)
-            .navigationBarsPadding(),
+            .safeDrawingPadding(),
     ) {
         val geometry = galleryGeometry(width = maxWidth, height = maxHeight)
 

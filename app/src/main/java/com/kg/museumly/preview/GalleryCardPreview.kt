@@ -8,6 +8,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
+import com.kg.museumly.feature.scroll.presentation.components.GalleryLoading
 import com.kg.museumly.feature.scroll.presentation.components.GalleryNotice
 import com.kg.museumly.feature.scroll.presentation.components.GalleryPlacard
 
@@ -48,4 +49,10 @@ private fun GalleryNoticeTailPreview() {
         title = "End of the gallery",
         body = "You've seen everything here.",
     )
+}
+
+@Preview
+@Composable
+private fun GalleryLoadingPreview() {
+    GalleryLoading()
 }
