@@ -1,0 +1,72 @@
+{
+  "info": {
+    "total": 2
+  },
+  "data": [
+    {
+      "id": 2001,
+      "title": "The Ring",
+      "creators": [
+        {
+          "description": "Song Xu (Chinese, 1525-c. 1606)",
+          "role": "artist"
+        }
+      ],
+      "creation_date": "1602",
+      "creation_date_earliest": 1602,
+      "department": "Chinese Art",
+      "type": "Painting",
+      "images": {
+        "web": {
+          "url": "https://openaccess-cdn.clevelandart.org/2001/web.jpg",
+          "width": "956",
+          "height": "1200"
+        },
+        "print": {
+          "url": "https://openaccess-cdn.clevelandart.org/2001/print.jpg",
+          "width": "3000",
+          "height": "4000"
+        }
+      },
+      "share_license_status": "CC0",
+      "tombstone": "Song Xu, The Ring, 1602, hanging scroll",
+      "description": null,
+      "did_you_know": null,
+      "technique": "Hanging scroll, ink and color on silk",
+      "measurements": "Image: 152.4 x 82.6 cm",
+      "culture": ["Chinese"],
+      "url": "https://www.clevelandart.org/art/2001",
+      "creditline": "John L. Severance Fund"
+    },
+    {
+      "id": 2002,
+      "title": "Unattributed Vessel",
+      "creators": [],
+      "creation_date": "circa 100 BC",
+      "creation_date_earliest": -100,
+      "department": "Greek and Roman Art",
+      "type": "Vessel",
+      "images": {
+        "web": {
+          "url": "https://openaccess-cdn.clevelandart.org/2002/web.jpg",
+          "width": "800",
+          "height": "800"
+        },
+        "print": {
+          "url": "https://openaccess-cdn.clevelandart.org/2002/print.jpg",
+          "width": "2400",
+          "height": "2400"
+        }
+      },
+      "share_license_status": "CC0",
+      "tombstone": "Unknown, Unattributed Vessel, circa 100 BC",
+      "description": null,
+      "did_you_know": null,
+      "technique": "Terracotta",
+      "measurements": "Overall: 20 cm",
+      "culture": ["Greek"],
+      "url": "https://www.clevelandart.org/art/2002",
+      "creditline": "Gift of the Hanna Fund"
+    }
+  ]
+}
