@@ -196,6 +196,12 @@ cursor after a failed `loadIds` returned `emptyList()` and made `i < allIds.size
 `List<Int>?` with null meaning failure, so an empty department and a dead network are no
 longer the same value.
 
+A related but separate hole — the cursor advancing even when `insert` throws partway
+through a successful page, leaving a permanent gap with no signal — is also closed:
+`insert()` and `cursorDao.put()` run inside one `database.withTransaction {}` in
+`ArtworkRepositoryImpl.loadMore`, insert first, so a throw there rolls back both instead
+of leaving the cursor ahead of records that never landed.
+
 Still: **clear app data before retesting a provider that failed.** And note Auto Backup
 restores app data on reinstall by default, so a reinstall does *not* clear it — see the
 backup rules below.
@@ -317,11 +323,12 @@ Dependency discipline: everything in `gradle/libs.versions.toml`, never inline i
 5. **Mixed-provider failure is silent.** If Met fails and Cleveland succeeds, the outcome is
    `LOADED`, no error, the page fills — correct for the user, invisible for debugging. The
    repository already computes `anyFailed`; it just doesn't survive the `LOADED` return.
+   Pinned as an `@Ignore`'d regression test (`ArtworkRepositoryImplTest`, see TESTING.md's
+   Known Bugs) — un-ignore once `loadMore()` surfaces the failure some way instead of
+   returning the bare `LoadOutcome.Loaded` singleton.
 6. **Row-count capping** — Room rows are tiny (~500B). Coil's disk cache is the real
    storage consumer and is self-managing.
-7. **Cursor/insert ordering** — the cursor advances before `insert` runs. If `insert`
-   throws, the cursor has moved past records that never landed. Permanent hole, no signal.
-8. **Mutex scope.** The repository lock is held across the entire network fetch — seconds of
+7. **Mutex scope.** The repository lock is held across the entire network fetch — seconds of
    I/O guarding arithmetic that takes microseconds. Narrowing it is the enabler for
    concurrent provider fetches or a background pipeline. Not free: `turn` is shared mutable
    state and each cursor is a read-modify-write, so it needs per-provider serialisation
