@@ -332,3 +332,34 @@ used elsewhere in the suite:
    (`Loading`) that only exists for the duration of a suspended call —
    without Turbine and a real suspension point (`coAnswers { delay(100); ... }`),
    this state is invisible to a test.
+
+---
+
+## CI
+
+`.github/workflows/test.yml` runs on every push to `main` and on every pull
+request. It sets up JDK 21 on `ubuntu-latest` and runs:
+
+```
+./gradlew testDebugUnitTest
+```
+
+It's the same command as locally, so a green local run should mean a green
+CI run. It runs only the debug variant: `./gradlew test` also runs release,
+which gives identical results at double the time.
+
+**When it goes red, check in this order:**
+
+1. **Which step failed.** Open the run in the Actions tab. If it failed
+   before `testDebugUnitTest` (checkout, Java, Gradle setup), the problem is
+   the environment, not the tests.
+2. **The test report.** Every run uploads a `test-report` artifact, including
+   failed runs. Download it and open `index.html` to see which test failed
+   and its stack trace.
+3. **Reproduce locally** with the exact command above. If it passes locally
+   but fails in CI, suspect environment differences: JDK version (CI uses 21,
+   pinned by `gradle/gradle-daemon-jvm.properties`), timezone or locale, or
+   a test that depends on timing.
+
+If runs get slow or flaky with no code change, Robolectric downloading its
+`android-all` jars on a cold cache is the likely culprit.

@@ -1,0 +1,43 @@
+# Runs the JVM unit test suite (JUnit + Robolectric) on every push to main and
+# on every pull request. No emulator or device involved.
+name: Unit tests
+
+on:
+  push:
+    branches: [main]
+  # No branch filter: runs for PRs targeting any branch.
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      # Clone the repo onto the runner so later steps can see the code.
+      - uses: actions/checkout@v7
+
+      # Install JDK 21. It must match gradle/gradle-daemon-jvm.properties
+      # (toolchainVersion=21), which pins the JVM the Gradle daemon runs on.
+      # The app's compileOptions target Java 11. That's the bytecode level it
+      # compiles to, not the JDK that runs the build.
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      # Set up Gradle and cache its dependencies and wrapper download between
+      # runs, so a warm run skips re-downloading AGP, Compose, Room, etc.
+      - uses: gradle/actions/setup-gradle@v6
+
+      # Debug variant only: plain `test` also runs the release variant, which
+      # gives identical results and doubles the runtime.
+      # If this step gets slow or flaky, Robolectric downloading its
+      # android-all jars on a cold cache is the likely culprit.
+      - run: ./gradlew testDebugUnitTest
+
+      # Upload the HTML test report. `if: always()` runs this even when the
+      # step above fails, which is exactly when you need the report.
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: test-report
+          path: app/build/reports/tests/testDebugUnitTest/
