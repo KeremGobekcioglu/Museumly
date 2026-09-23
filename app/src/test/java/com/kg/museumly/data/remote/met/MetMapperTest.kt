@@ -21,6 +21,7 @@ class MetMapperTest {
         isPublicDomain: Boolean = true,
         primaryImageSmall: String? = "https://images.metmuseum.org/1001-small.jpg",
         primaryImage: String? = "https://images.metmuseum.org/1001-full.jpg",
+        artistDisplayBio: String? = null,
     ): MetObjectDto {
         return MetObjectDto(
             objectID = objectID,
@@ -29,6 +30,7 @@ class MetMapperTest {
             isPublicDomain = isPublicDomain,
             primaryImageSmall = primaryImageSmall,
             primaryImage = primaryImage,
+            artistDisplayBio = artistDisplayBio,
         )
     }
 
@@ -91,5 +93,20 @@ class MetMapperTest {
         val detail: ArtworkDetail = MetMapper.toDetail(dto(primaryImage = ""))
 
         assertNull(detail.highResImageUrl)
+    }
+
+    @Test
+    fun `artist display bio maps to artist bio as given`() {
+        val detail: ArtworkDetail = MetMapper.toDetail(dto(artistDisplayBio = "Dutch, Zundert 1853–1890 Auvers-sur-Oise"))
+
+        assertEquals("Dutch, Zundert 1853–1890 Auvers-sur-Oise", detail.artistBio)
+    }
+
+    @Test
+    fun `met has no wall text`() {
+        val detail: ArtworkDetail = MetMapper.toDetail(dto())
+
+        assertNull(detail.description)
+        assertNull(detail.didYouKnow)
     }
 }

@@ -12,6 +12,9 @@ object ArtworkDetailMapper {
             culture = entity.culture,
             period = entity.period,
             highResImageUrl = entity.highResImageUrl,
+            artistBio = entity.artistBio,
+            description = entity.description,
+            didYouKnow = entity.didYouKnow,
         )
     }
 }

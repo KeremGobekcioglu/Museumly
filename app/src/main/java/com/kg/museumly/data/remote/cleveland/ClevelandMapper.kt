@@ -52,10 +52,15 @@ object ClevelandMapper {
     }
 
     private fun artistOf(creators: List<ClevelandCreatorDto>): String? {
+        val description: String = firstCreatorDescription(creators) ?: return null
+        return cleanArtistName(description)
+    }
+
+    private fun firstCreatorDescription(creators: List<ClevelandCreatorDto>): String? {
         for (creator in creators) {
             val description: String? = creator.description
             if (!description.isNullOrBlank()) {
-                return cleanArtistName(description)
+                return description
             }
         }
         return null
@@ -70,6 +75,26 @@ object ClevelandMapper {
             return description.trim()
         }
         return description.substring(0, parenIndex).trim()
+    }
+
+    /**
+     * The other half of cleanArtistName: "Vincent van Gogh (Dutch, 1853–1890)"
+     * gives "Dutch, 1853–1890", the line a wall label prints under the name.
+     * creators[].biography is a multi-page essay, not this — never use it.
+     */
+    private fun artistBioOf(creators: List<ClevelandCreatorDto>): String? {
+        val description: String = firstCreatorDescription(creators) ?: return null
+        val open: Int = description.indexOf('(')
+        val close: Int = description.lastIndexOf(')')
+        if (open <= 0 || close <= open) {
+            return null
+        }
+        val inside: String = description.substring(open + 1, close)
+        val decoded: String = ClevelandTextCleaner.decodeEntities(inside).trim()
+        if (decoded.isEmpty()) {
+            return null
+        }
+        return decoded
     }
 
     private fun aspectRatioOf(image: ClevelandImageDto): Float? {
@@ -96,6 +121,9 @@ object ClevelandMapper {
             culture = cultureJoined,
             period = dto.creationDate,
             highResImageUrl = dto.images?.print?.url?.takeIf { it.isNotBlank() },
+            artistBio = artistBioOf(dto.creators),
+            description = ClevelandTextCleaner.wallText(dto.description),
+            didYouKnow = ClevelandTextCleaner.wallText(dto.didYouKnow),
         )
     }
 

@@ -13,6 +13,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
@@ -68,6 +70,17 @@ fun WallLabel(
                 color = LabelInk.copy(alpha = 0.6f),
                 style = MaterialTheme.typography.labelMedium,
                 letterSpacing = 2.sp,
+            )
+        }
+
+        // Nationality and dates under the name, as a real label prints them.
+        // Only under an artist — never under the culture/period fallback.
+        if (artist != null) {
+            LabelLine(
+                value = detail.artistBio,
+                alpha = 0.45f,
+                style = MaterialTheme.typography.labelSmall,
+                topPadding = 4.dp,
             )
         }
 
@@ -153,4 +166,119 @@ private fun joinClean(first: String? , second: String? ) : String?
     if(first != null)
         return first
     return second
+}
+
+/**
+ * Cleveland's own wall text, hung beside the label as a second panel: the
+ * short fact first, then the longer text. They stay separate blocks. Met
+ * records have neither field, and then nothing is drawn — the label alone
+ * is a finished wall.
+ */
+@Composable
+fun WallText(
+    detail: ArtworkDetail,
+    modifier: Modifier = Modifier,
+)
+{
+    val didYouKnow: String? = clean(detail.didYouKnow)
+    val description: String? = clean(detail.description)
+    if (didYouKnow == null && description == null) {
+        return
+    }
+
+    Column(
+        modifier = modifier
+            .background(brush = PanelSurface)
+            .drawBehind { drawFrameEdges(strength = 0.35f) }
+            .padding(24.dp),
+    ) {
+        if (didYouKnow != null) {
+            Text(
+                text = wallTextToAnnotated(didYouKnow),
+                color = LabelInk.copy(alpha = 0.9f),
+                style = MaterialTheme.typography.titleMedium,
+                fontFamily = FontFamily.Serif,
+                lineHeight = 26.sp,
+            )
+        }
+
+        if (didYouKnow != null && description != null) {
+            Box(
+                modifier = Modifier
+                    .padding(top = 20.dp)
+                    .size(width = 32.dp, height = 1.dp)
+                    .background(LabelInk.copy(alpha = 0.25f)),
+            )
+        }
+
+        if (description != null) {
+            val topPadding: Dp = if (didYouKnow != null) 20.dp else 0.dp
+            Text(
+                text = wallTextToAnnotated(description),
+                color = LabelInk.copy(alpha = 0.75f),
+                style = MaterialTheme.typography.bodyLarge,
+                fontFamily = FontFamily.Serif,
+                lineHeight = 28.sp,
+                modifier = Modifier.padding(top = topPadding),
+            )
+        }
+
+        // Only Cleveland supplies these fields. If another provider ever
+        // does, this line must name the right museum.
+        Text(
+            text = "Text: Cleveland Museum of Art",
+            color = LabelInk.copy(alpha = 0.4f),
+            style = MaterialTheme.typography.labelSmall,
+            modifier = Modifier.padding(top = 20.dp),
+        )
+    }
+}
+
+internal fun hasWallText(detail: ArtworkDetail): Boolean {
+    if (clean(detail.didYouKnow) != null) {
+        return true
+    }
+    return clean(detail.description) != null
+}
+
+/**
+ * The mapper leaves two tags in: <em> for titles and foreign terms, <br> for
+ * breaks. Any other tag is dropped, never printed.
+ */
+private fun wallTextToAnnotated(source: String): AnnotatedString {
+    val builder: AnnotatedString.Builder = AnnotatedString.Builder()
+    var openItalics: Int = 0
+    var index: Int = 0
+    while (index < source.length) {
+        val current: Char = source[index]
+        if (current != '<') {
+            builder.append(current)
+            index += 1
+            continue
+        }
+        val end: Int = source.indexOf('>', index)
+        if (end == -1) {
+            // A '<' with no closing bracket is text, not a tag.
+            builder.append(source.substring(index))
+            break
+        }
+        val tag: String = source.substring(index + 1, end).trim().lowercase()
+        if (tag == "em") {
+            builder.pushStyle(SpanStyle(fontStyle = FontStyle.Italic))
+            openItalics += 1
+        } else if (tag == "/em") {
+            if (openItalics > 0) {
+                builder.pop()
+                openItalics -= 1
+            }
+        } else if (tag == "br" || tag == "br/" || tag == "br /") {
+            builder.append('\n')
+        }
+        index = end + 1
+    }
+    while (openItalics > 0) {
+        builder.pop()
+        openItalics -= 1
+    }
+    return builder.toAnnotatedString()
 }

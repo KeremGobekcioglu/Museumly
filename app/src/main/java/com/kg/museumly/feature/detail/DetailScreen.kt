@@ -323,12 +323,21 @@ private fun DetailContent(
 //            }
             }
 
+            // Tighter under the label only when a wall text hangs beside it;
+            // a Met screen keeps today's spacing exactly.
+            val labelBottom: Dp = if (hasWallText(data.detail)) 24.dp else 64.dp
             WallLabel(
                 artwork = artwork,
                 detail = data.detail,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = 32.dp, end = 32.dp, top = 8.dp, bottom = 64.dp),
+                    .padding(start = 32.dp, end = 32.dp, top = 8.dp, bottom = labelBottom),
+            )
+            WallText(
+                detail = data.detail,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 32.dp, end = 32.dp, bottom = 64.dp),
             )
             Spacer(modifier = Modifier.windowInsetsBottomHeight(WindowInsets.safeDrawing))
 

@@ -19,6 +19,7 @@ data class MetObjectDto(
     val objectID: Int,
     val title: String = "",
     val artistDisplayName: String? = null,
+    val artistDisplayBio: String? = null,
     val objectDate: String? = null,
     val objectBeginDate: Int? = null,
     val primaryImageSmall: String? = null,
