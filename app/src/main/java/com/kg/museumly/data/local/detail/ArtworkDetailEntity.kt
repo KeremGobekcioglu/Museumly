@@ -12,4 +12,7 @@ data class ArtworkDetailEntity(
     val culture: String?,
     val period: String?,
     val highResImageUrl: String?,
+    val artistBio: String?,
+    val description: String?,
+    val didYouKnow: String?,
 )

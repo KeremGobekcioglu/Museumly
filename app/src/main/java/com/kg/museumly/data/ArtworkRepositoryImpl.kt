@@ -121,6 +121,9 @@ class ArtworkRepositoryImpl @Inject constructor(
                     culture = detail.culture,
                     period = detail.period,
                     highResImageUrl = detail.highResImageUrl,
+                    artistBio = detail.artistBio,
+                    description = detail.description,
+                    didYouKnow = detail.didYouKnow,
                 )
             )
         }

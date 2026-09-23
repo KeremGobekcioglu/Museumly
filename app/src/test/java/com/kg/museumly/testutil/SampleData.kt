@@ -22,5 +22,8 @@ fun sampleDetail(): ArtworkDetail {
         culture = null,
         period = null,
         highResImageUrl = null,
+        artistBio = null,
+        description = null,
+        didYouKnow = null,
     )
 }

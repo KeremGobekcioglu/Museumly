@@ -23,6 +23,8 @@ class ClevelandMapperTest {
             print = ClevelandImageDto(url = "https://cdn.example.org/print.jpg", width = "3000", height = "4000"),
         ),
         shareLicenseStatus: String? = "CC0",
+        description: String? = null,
+        didYouKnow: String? = null,
     ): ClevelandArtworkDto {
         return ClevelandArtworkDto(
             id = id,
@@ -30,6 +32,8 @@ class ClevelandMapperTest {
             creators = creators,
             images = images,
             shareLicenseStatus = shareLicenseStatus,
+            description = description,
+            didYouKnow = didYouKnow,
         )
     }
 
@@ -111,5 +115,46 @@ class ClevelandMapperTest {
         val detail: ArtworkDetail = ClevelandMapper.toDetail(dto())
 
         assertEquals("https://cdn.example.org/print.jpg", detail.highResImageUrl)
+    }
+
+    @Test
+    fun `artist bio is the bracketed part of the creator description`() {
+        val creator = ClevelandCreatorDto(description = "Vincent van Gogh (Dutch, 1853–1890)", role = "artist")
+
+        val detail: ArtworkDetail = ClevelandMapper.toDetail(dto(creators = listOf(creator)))
+
+        assertEquals("Dutch, 1853–1890", detail.artistBio)
+    }
+
+    @Test
+    fun `creator description without brackets gives a null artist bio`() {
+        val creator = ClevelandCreatorDto(description = "Unknown maker", role = "artist")
+
+        val detail: ArtworkDetail = ClevelandMapper.toDetail(dto(creators = listOf(creator)))
+
+        assertNull(detail.artistBio)
+    }
+
+    @Test
+    fun `brackets with no name before them give a null artist bio`() {
+        // Same rule cleanArtistName uses: a bracket at index 0 is not "name (bio)".
+        val creator = ClevelandCreatorDto(description = "(Dutch, 1853–1890)", role = "artist")
+
+        val detail: ArtworkDetail = ClevelandMapper.toDetail(dto(creators = listOf(creator)))
+
+        assertNull(detail.artistBio)
+    }
+
+    @Test
+    fun `description and did you know pass through the cleaner`() {
+        val detail: ArtworkDetail = ClevelandMapper.toDetail(
+            dto(
+                description = "  Marks &amp; <em>stola</em>.  ",
+                didYouKnow = "Similar armors are displayed nearby.",
+            )
+        )
+
+        assertEquals("Marks & <em>stola</em>.", detail.description)
+        assertNull(detail.didYouKnow)
     }
 }

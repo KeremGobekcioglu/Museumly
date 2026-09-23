@@ -56,6 +56,11 @@ object MetMapper
             culture = dto.culture,
             period = dto.period,
             highResImageUrl = dto.primaryImage?.takeIf { it.isNotBlank() },
+            artistBio = dto.artistDisplayBio,
+            // The Met API has no wall text. Left empty on purpose; not filled
+            // from Wikipedia or anywhere else.
+            description = null,
+            didYouKnow = null,
         )
     }
 }

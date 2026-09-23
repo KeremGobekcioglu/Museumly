@@ -47,6 +47,9 @@ private fun previewArtwork(
         culture = null,
         period = null,
         highResImageUrl = null,
+        artistBio = null,
+        description = null,
+        didYouKnow = null,
     )
     return ArtworkWithDetail(artwork = artwork, detail = detail)
 }
