@@ -43,6 +43,14 @@ android {
             // Robolectric-backed tests (Room, Compose) need real resources
             // (themes, strings) merged in, not just the stub SDK jar.
             isIncludeAndroidResources = true
+
+            all {
+                // Conscrypt, which Robolectric installs as a security provider,
+                // lowercases os.name with the default locale. Under tr-TR
+                // "Windows" becomes "wındows" (dotless i), so the bundled
+                // native library never resolves. Pin the test JVM to en-US.
+                it.jvmArgs("-Duser.language=en", "-Duser.country=US")
+            }
         }
     }
 }
