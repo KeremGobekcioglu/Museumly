@@ -167,18 +167,6 @@ class MetProvider @Inject constructor(
         size: Int
     ): PageResult {
         Log.d("METPROVIDER", "fetchPage cursor=$cursor")
-        var idsOutcome = loadIds()
-        if (idsOutcome is ApiResult.Failed && idsOutcome.worthRetrying()) {
-            Log.d("METPROVIDER", "retrying id list load after transient failure: ${idsOutcome.cause.message}")
-            delay(RETRY_DELAY)
-            idsOutcome = loadIds()
-        }
-        val allIds = when (idsOutcome) {
-            is ApiResult.Success -> idsOutcome.value
-            is ApiResult.Rejected -> return PageResult(emptyList(), emptyList(), cursor, PageStatus.FAILED, idsOutcome.reason)
-            is ApiResult.Failed -> return PageResult(emptyList(), emptyList(), cursor, PageStatus.FAILED, idsOutcome.cause.message ?: "Failed to load Met catalog")
-        }
-        Log.d("METPROVIDER", "allIds size=${allIds.size}")
         var i = parseCursor(cursor)
         val items : MutableList<Artwork> = ArrayList()
         val details: MutableList<ArtworkDetail> = ArrayList()
@@ -192,9 +180,35 @@ class MetProvider @Inject constructor(
         // it. Only when failures stack up consecutively — a real
         // outage, not one bad object — do we stop and leave the cursor
         // pointing at the failing record so the next page retries it.
-        while (i < allIds.size && items.size < size) {
-            val batch = allIds.subList(i, minOf(i + 2, allIds.size))
+        while (items.size < size)
+        {
+            // The cursor walked past the IDs we have so far. Fetch the
+            // next ID page from v1.1 before hydrating anything else.
+            if( i >= cachedIds.size)
+            {
+                val idsOutcome = ensureIdsWithRetry( i + 1)
+                if(idsOutcome is ApiResult.Rejected)
+                {
+                    failureReason = idsOutcome.reason
+                    break
+                }
+                if (idsOutcome is ApiResult.Failed) {
+                    failureReason = idsOutcome.cause.message ?: "Failed to load Met IDs"
+                    break
+                }
+                // Fetched fine but nothing new arrived: end of the query,
+                // or we hit the 10k ceiling.
+                if( i>= cachedIds.size)
+                {
+                    break
+                }
+            }
+            Log.d("METPROVIDER", "cachedIds size=${cachedIds.size}")
 
+            // toList() copies the two IDs. A plain subList is a view over
+            // cachedIds, and if cachedIds grows while we're suspended below,
+            // reading that view throws ConcurrentModificationException.
+            val batch = cachedIds.subList(i, minOf(i + 2, cachedIds.size)).toList()
             // map launches every async{} immediately (List.map is eager, not lazy),
             // so all requests are in flight before awaitAll() blocks on them.
             val results = coroutineScope {
@@ -204,49 +218,61 @@ class MetProvider @Inject constructor(
             // batch and results are the same length, and results[k] is the
             // outcome for batch[k] — awaitAll() preserved that order — so we
             // walk both by the same index instead of pairing them up first.
-            for (index in batch.indices) {
+            for(index in batch.indices)
+            {
                 val objectId = batch[index]
                 val result = results[index]
-                when (result) {
+
+                when(result)
+                {
                     is ApiResult.Success -> {
                         consecutiveFailures = 0
                         items.add(result.value.first)
-                        details.add(result.value.second)
+                        details.add((result.value.second))
                         i++
                     }
-                    is ApiResult.Rejected -> {
+                    is ApiResult.Rejected ->
+                    {
                         consecutiveFailures = 0
                         Log.d("METPROVIDER", "skipping object $objectId: ${result.reason}")
                         i++
                     }
-                    is ApiResult.Failed -> {
+                    is ApiResult.Failed ->
+                    {
                         consecutiveFailures++
                         Log.d("METPROVIDER", "object $objectId failed (consecutive=$consecutiveFailures): ${result.cause.message}")
-                        if (consecutiveFailures >= consecutiveFailureThreshold) {
+                        if(consecutiveFailures >= consecutiveFailureThreshold)
+                        {
                             failureReason = result.cause.message ?: "Object $objectId failed"
                             break
                         }
                         i++
                     }
                 }
-                if (items.size >= size) break
+                if(items.size >= size) break
+            }
+            if(failureReason != null)
+            {
+                break
             }
 
-            if (failureReason != null) break
         }
-        if (items.isEmpty() && failureReason != null) {
-            return PageResult(emptyList(), emptyList(), cursor, PageStatus.FAILED, failureReason)
+        if(items.isEmpty() && failureReason != null)
+        {
+            return PageResult(emptyList(),emptyList(),cursor, PageStatus.FAILED, failureReason)
         }
         var status = PageStatus.OK
         var next: String? = null
-        if(i < allIds.size)
+        val cap: Int? = reachable()
+        if(cap != null && i >= cap)
+        {
+            status = PageStatus.EXHAUSTED
+        }
+        else
         {
             next = i.toString()
         }
-        else {
-            status = PageStatus.EXHAUSTED
-        }
-        return PageResult(items, details, next, status)
+        return PageResult(items,details,next,status)
     }
 
 }
