@@ -70,7 +70,7 @@ object NetworkModule
     fun provideMetApi(okHttpClient: OkHttpClient, json: Json) : MetApi
     {
         val retrofit: Retrofit = buildRetrofit(
-            "https://collectionapi.metmuseum.org/public/collection/v1/",
+            "https://collectionapi.metmuseum.org/public/collection/",
             okHttpClient,
             json
         )
