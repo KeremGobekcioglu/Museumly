@@ -10,16 +10,17 @@ interface MetApi {
      * later isOnView can be added to see which artworks are
      * actually showed in the museum now.
      */
-    @GET("search")
+    @GET("v1.1/search")
     suspend fun search(
         @Query("departmentId") departmentId: Int,
-        @Query("q") query: String = "*",
         //@Query("isHighlight") isHighlight: Boolean = true,
         @Query("hasImages") hasImages: Boolean = true,
+        @Query("offset") offset: Int,
+        @Query("limit") limit: Int
         //@Query("isOnView") isOnView: Boolean = true
     ) : MetSearchDto
 
-    @GET("objects/{objectId}")
+    @GET("v1/objects/{objectId}")
     suspend fun getObject(
         @Path("objectId") objectId: Int
     ) : MetObjectDto
