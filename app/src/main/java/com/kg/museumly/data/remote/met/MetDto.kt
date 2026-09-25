@@ -33,3 +33,15 @@ data class MetObjectDto(
     val culture: String? = null,
     val period: String? = null,
 )
+
+
+@Serializable
+data class MetDepartmentsDto(
+    val departments: List<MetDepartmentDto> = emptyList()
+)
+
+@Serializable
+data class MetDepartmentDto(
+    val departmentId: Int,
+    val displayName: String = ""
+)

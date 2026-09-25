@@ -3,7 +3,7 @@ package com.kg.museumly.data.remote.met
 import com.kg.museumly.data.local.detail.ArtworkDetailEntity
 import com.kg.museumly.model.Artwork
 import com.kg.museumly.model.ArtworkDetail
-
+import com.kg.museumly.model.MetDepartment
 object MetMapper
 {
     fun toDomain(dto: MetObjectDto) : Artwork?
@@ -61,6 +61,20 @@ object MetMapper
             // from Wikipedia or anywhere else.
             description = null,
             didYouKnow = null,
+        )
+    }
+}
+
+object MetDepartmentMapper {
+
+    fun toDomain(dto : MetDepartmentDto) : MetDepartment?
+    {
+        val name = dto.displayName.trim()
+        if (name.isBlank())
+            return null
+        return MetDepartment(
+            id = dto.departmentId,
+            name = name
         )
     }
 }

@@ -24,4 +24,7 @@ interface MetApi {
     suspend fun getObject(
         @Path("objectId") objectId: Int
     ) : MetObjectDto
+
+    @GET("v1/departments")
+    suspend fun getDepartments() : MetDepartmentsDto
 }
