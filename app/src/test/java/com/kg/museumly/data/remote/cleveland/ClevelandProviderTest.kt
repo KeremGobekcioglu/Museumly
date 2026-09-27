@@ -77,7 +77,7 @@ class ClevelandProviderTest {
     fun `empty data array is the only exhaustion signal`() = runTest {
         server.enqueue(MockResponse().setBody("""{"info": {"total": 0}, "data": []}"""))
 
-        val page: PageResult = provider.fetchPage(cursor = "40", size = 20)
+        val page: PageResult = provider.fetchPage(cursor = "40", size = 20, department = "Chinese Art")
 
         assertEquals(PageStatus.EXHAUSTED, page.status)
         assertNull(page.next)
@@ -89,7 +89,7 @@ class ClevelandProviderTest {
         server.enqueue(MockResponse().setResponseCode(500))
         server.enqueue(MockResponse().setResponseCode(500))
 
-        val page: PageResult = provider.fetchPage(cursor = "40", size = 20)
+        val page: PageResult = provider.fetchPage(cursor = "40", size = 20, department = "Chinese Art")
 
         assertEquals(PageStatus.FAILED, page.status)
         assertTrue(page.items.isEmpty())
@@ -112,7 +112,7 @@ class ClevelandProviderTest {
         // size = 2 so the two accepted records (101, 103) already satisfy
         // the page and no second request is issued — isolates this to one
         // batch of 3 raw records.
-        val page: PageResult = provider.fetchPage(cursor = "0", size = 2)
+        val page: PageResult = provider.fetchPage(cursor = "0", size = 2, department = "Chinese Art")
 
         assertEquals(2, page.items.size)
         // 3 raw records consumed, not 2 accepted ones — otherwise record 102
@@ -125,10 +125,20 @@ class ClevelandProviderTest {
         server.enqueue(MockResponse().setResponseCode(503))
         server.enqueue(MockResponse().setBody("""{"info": {"total": 1}, "data": [${record(id = 201)}]}"""))
 
-        val page: PageResult = provider.fetchPage(cursor = "0", size = 1)
+        val page: PageResult = provider.fetchPage(cursor = "0", size = 1, department = "Chinese Art")
 
         assertEquals(PageStatus.OK, page.status)
         assertEquals(1, page.items.size)
         assertEquals(2, server.requestCount)
+    }
+
+    @Test
+    fun `the department is sent to the search API`() = runTest {
+        server.enqueue(MockResponse().setBody("""{"info": {"total": 1}, "data": [${record(id = 301)}]}"""))
+
+        provider.fetchPage(cursor = "0", size = 1, department = "Chinese Art")
+
+        val request = server.takeRequest()
+        assertEquals("Chinese Art", request.requestUrl?.queryParameter("department"))
     }
 }

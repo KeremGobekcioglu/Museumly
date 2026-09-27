@@ -7,13 +7,19 @@ import com.kg.museumly.testutil.FakeArtworkPrefetcher
 import com.kg.museumly.testutil.FakeArtworkRepository
 import com.kg.museumly.testutil.FakeNetworkMonitor
 import com.kg.museumly.testutil.MainDispatcherRule
+import com.kg.museumly.model.Section
 import com.kg.museumly.testutil.sampleArtwork
 import io.mockk.Runs
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.just
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -60,8 +66,8 @@ class ScrollViewModelTest {
         repository = FakeArtworkRepository()
 
         positionStore = mockk()
-        coEvery { positionStore.getFrontier() } returns 0
-        coEvery { positionStore.setFrontier(any()) } just Runs
+        coEvery { positionStore.getFrontier(any()) } returns 0
+        coEvery { positionStore.setFrontier(any(), any()) } just Runs
 
         prefetcher = FakeArtworkPrefetcher()
         networkMonitor = FakeNetworkMonitor(initiallyOnline = true)
@@ -69,6 +75,14 @@ class ScrollViewModelTest {
 
     private fun buildViewModel(): ScrollViewModel {
         return ScrollViewModel(repository, positionStore, prefetcher, networkMonitor)
+    }
+
+    // uiState is WhileSubscribed — keep a collector alive for the whole test
+    // so .value reflects settled state and onPageChanged reads the real section.
+    private fun TestScope.collect(viewModel: ScrollViewModel) {
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            viewModel.uiState.collect {}
+        }
     }
 
     @Test
@@ -166,7 +180,7 @@ class ScrollViewModelTest {
     )
     fun `frontier restore clamps to the existing artwork count, not just to zero`() = runTest {
         val artworks = listOf(sampleArtwork("met:1"))
-        coEvery { positionStore.getFrontier() } returns 100
+        coEvery { positionStore.getFrontier(any()) } returns 100
         repository.countValue = 1
         repository.setArtworks(artworks)
 
@@ -180,5 +194,81 @@ class ScrollViewModelTest {
                 initialPage != null && initialPage <= artworks.size - 1,
             )
         }
+    }
+
+    @Test
+    fun `selecting a section loads that section`() = runTest {
+        repository.countValue = 0
+
+        val viewModel = buildViewModel()
+        advanceUntilIdle()
+        viewModel.selectSection(Section.ASIA)
+        advanceUntilIdle()
+
+        assertEquals(listOf(Section.EUROPEAN, Section.ASIA), repository.loadMoreSections)
+    }
+
+    @Test
+    fun `selecting the section already on screen does nothing`() = runTest {
+        repository.countValue = 0
+
+        val viewModel = buildViewModel()
+        advanceUntilIdle()
+        viewModel.selectSection(Section.EUROPEAN)
+        advanceUntilIdle()
+
+        assertEquals(listOf(Section.EUROPEAN), repository.loadMoreSections)
+    }
+
+    @Test
+    fun `switching sections cancels the old section's in-flight load`() = runTest {
+        repository.countValue = 0
+        repository.loadMoreDelayMs = 200
+
+        val viewModel = buildViewModel()
+        runCurrent()
+        // European's load is mid-delay. Without the cancel in selectSection,
+        // the overlap guard would drop Asia's load as "already loading".
+        viewModel.selectSection(Section.ASIA)
+        advanceUntilIdle()
+
+        assertEquals(listOf(Section.EUROPEAN, Section.ASIA), repository.loadMoreSections)
+    }
+
+    @Test
+    fun `initialPage is only exposed alongside the section it was computed for`() = runTest {
+        repository.countValue = 5
+        coEvery { positionStore.getFrontier(Section.EUROPEAN) } returns 12
+        coEvery { positionStore.getFrontier(Section.ASIA) } returns 0
+
+        val viewModel = buildViewModel()
+        collect(viewModel)
+        advanceUntilIdle()
+        assertEquals(Section.EUROPEAN, viewModel.uiState.value.section)
+        assertEquals(10, viewModel.uiState.value.initialPage)
+
+        viewModel.selectSection(Section.ASIA)
+        advanceUntilIdle()
+
+        // Never European's 10 on Asia's list.
+        assertEquals(Section.ASIA, viewModel.uiState.value.section)
+        assertEquals(0, viewModel.uiState.value.initialPage)
+    }
+
+    @Test
+    fun `frontier is saved against the section on screen`() = runTest {
+        repository.countValue = 5
+
+        val viewModel = buildViewModel()
+        collect(viewModel)
+        advanceUntilIdle()
+        viewModel.selectSection(Section.ASIA)
+        advanceUntilIdle()
+
+        viewModel.onPageChanged(3)
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { positionStore.setFrontier(Section.ASIA, 3) }
+        coVerify(exactly = 0) { positionStore.setFrontier(Section.EUROPEAN, any()) }
     }
 }

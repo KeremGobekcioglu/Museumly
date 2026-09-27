@@ -12,6 +12,7 @@ import com.kg.museumly.domain.ArtworkProvider
 import com.kg.museumly.domain.LoadOutcome
 import com.kg.museumly.domain.PageResult
 import com.kg.museumly.domain.PageStatus
+import com.kg.museumly.model.Section
 import com.kg.museumly.testutil.FakeArtworkProvider
 import com.kg.museumly.testutil.sampleArtwork
 import com.kg.museumly.testutil.sampleDetail
@@ -20,6 +21,7 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.just
 import io.mockk.mockk
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -109,7 +111,7 @@ class ArtworkRepositoryImplTest {
         // cleveland first, since @IntoSet gives no ordering guarantee.
         val repository = repository(linkedSetOf(met, cleveland))
 
-        val outcome: LoadOutcome = repository.loadMore(size = 20)
+        val outcome: LoadOutcome = repository.loadMore(Section.EUROPEAN, size = 20)
 
         assertEquals(LoadOutcome.Loaded, outcome)
         assertEquals(1, cleveland.callCount)
@@ -124,7 +126,7 @@ class ArtworkRepositoryImplTest {
         val met = provider("met", metSucceeded)
 
         val repository = repository(setOf(cleveland, met))
-        val outcome: LoadOutcome = repository.loadMore(size = 20)
+        val outcome: LoadOutcome = repository.loadMore(Section.EUROPEAN, size = 20)
 
         assertEquals(LoadOutcome.Loaded, outcome)
         // met is index 1 in the sorted [cleveland, met] list, so the next
@@ -141,7 +143,7 @@ class ArtworkRepositoryImplTest {
         val met = provider("met", emptyOkPage)
 
         val repository = repository(setOf(cleveland, met))
-        val outcome: LoadOutcome = repository.loadMore(size = 20)
+        val outcome: LoadOutcome = repository.loadMore(Section.EUROPEAN, size = 20)
 
         assertEquals(LoadOutcome.Exhausted, outcome)
         coVerify(exactly = 0) { turnSource.setTurn(any()) }
@@ -155,7 +157,7 @@ class ArtworkRepositoryImplTest {
         val met = provider("met", metFailed)
 
         val repository = repository(setOf(cleveland, met))
-        val outcome: LoadOutcome = repository.loadMore(size = 20)
+        val outcome: LoadOutcome = repository.loadMore(Section.EUROPEAN, size = 20)
 
         assertTrue(outcome is LoadOutcome.Failed)
         val reason = (outcome as LoadOutcome.Failed).reason
@@ -164,13 +166,13 @@ class ArtworkRepositoryImplTest {
 
     @Test
     fun `an already-exhausted provider is skipped and never fetched`() = runTest {
-        cursorDao.put(ProviderCursor(providerId = "cleveland", next = null))
+        cursorDao.put(ProviderCursor(providerId = "cleveland:all", next = null))
         val metPage = PageResult(listOf(sampleArtwork("met:1")), listOf(sampleDetail()), next = "1", status = PageStatus.OK)
         val cleveland = provider("cleveland", metPage)
         val met = provider("met", metPage)
 
         val repository = repository(setOf(cleveland, met))
-        val outcome: LoadOutcome = repository.loadMore(size = 20)
+        val outcome: LoadOutcome = repository.loadMore(Section.EUROPEAN, size = 20)
 
         assertEquals(LoadOutcome.Loaded, outcome)
         assertEquals(0, cleveland.callCount)
@@ -182,11 +184,11 @@ class ArtworkRepositoryImplTest {
         val met = provider("met", failed)
 
         val repository = repository(setOf(met))
-        repository.loadMore(size = 20)
+        repository.loadMore(Section.EUROPEAN, size = 20)
 
         // ProviderCursor(id, null) is the exhaustion marker. A FAILED page
         // must never write it, or the provider is skipped forever.
-        assertNull(cursorDao.get("met"))
+        assertNull(cursorDao.get("met:all"))
     }
 
     @Test
@@ -198,7 +200,7 @@ class ArtworkRepositoryImplTest {
         val repository = repository(setOf(met), artworkDaoOverride = throwingDao)
 
         try {
-            repository.loadMore(size = 20)
+            repository.loadMore(Section.EUROPEAN, size = 20)
             fail("expected insertAll's exception to propagate")
         } catch (e: IllegalStateException) {
             // expected — insertAll() throws by design in this test double.
@@ -207,8 +209,81 @@ class ArtworkRepositoryImplTest {
         // If insert() and cursorDao.put() weren't in one transaction, the
         // cursor write (which runs after insert in source order) could
         // still have landed even though the insert above threw.
+        assertNull(cursorDao.get("met:all"))
+        assertEquals(0, artworkDao.count(Section.EUROPEAN.id))
+    }
+
+    @Test
+    fun `sources are sorted by provider, then by department order within a provider`() = runTest {
+        // sources = [cleveland:a, cleveland:b, met:11]; turn = 1 lands on cleveland:b.
+        coEvery { turnSource.getTurn() } returns 1
+        val page = PageResult(listOf(sampleArtwork("cleveland:1")), listOf(sampleDetail()), next = "1", status = PageStatus.OK)
+        val cleveland = FakeArtworkProvider("cleveland") { listOf("a", "b") }
+        cleveland.enqueue(page)
+        val met = FakeArtworkProvider("met") { listOf("11") }
+
+        val repository = repository(linkedSetOf(met, cleveland))
+        val outcome: LoadOutcome = repository.loadMore(Section.EUROPEAN, size = 20)
+
+        assertEquals(LoadOutcome.Loaded, outcome)
+        assertEquals(listOf("b"), cleveland.requestedDepartments)
+        assertEquals(0, met.callCount)
+        // cleveland:b is index 1 of 3, so the next turn is 2 (met:11).
+        coVerify(exactly = 1) { turnSource.setTurn(2) }
+    }
+
+    @Test
+    fun `an exhausted department skips only itself, not its provider's other departments`() = runTest {
+        cursorDao.put(ProviderCursor(providerId = "met:11", next = null))
+        val met = FakeArtworkProvider("met") { listOf("11", "12") }
+        met.enqueue(PageResult(listOf(sampleArtwork("met:1")), listOf(sampleDetail()), next = "1", status = PageStatus.OK))
+
+        val repository = repository(setOf(met))
+        val outcome: LoadOutcome = repository.loadMore(Section.EUROPEAN, size = 20)
+
+        assertEquals(LoadOutcome.Loaded, outcome)
+        assertEquals(listOf("12"), met.requestedDepartments)
+    }
+
+    @Test
+    fun `cursor is stored under provider-colon-department, one row per department`() = runTest {
+        val met = FakeArtworkProvider("met") { listOf("11") }
+        met.enqueue(PageResult(listOf(sampleArtwork("met:1")), listOf(sampleDetail()), next = "7", status = PageStatus.OK))
+
+        val repository = repository(setOf(met))
+        repository.loadMore(Section.EUROPEAN, size = 20)
+
+        assertEquals("7", cursorDao.get("met:11")?.next)
+        // The old per-provider key must not be written anymore.
         assertNull(cursorDao.get("met"))
-        assertEquals(0, artworkDao.count())
+    }
+
+    @Test
+    fun `a section no provider covers is exhausted without fetching anything`() = runTest {
+        val met = FakeArtworkProvider("met") { emptyList() }
+
+        val repository = repository(setOf(met))
+        val outcome: LoadOutcome = repository.loadMore(Section.EUROPEAN, size = 20)
+
+        assertEquals(LoadOutcome.Exhausted, outcome)
+        assertEquals(0, met.callCount)
+    }
+
+    @Test
+    fun `positions count within a section, so each section starts at zero`() = runTest {
+        val met = FakeArtworkProvider("met") { section -> listOf(section.id) }
+        met.enqueue(PageResult(listOf(sampleArtwork("met:1"), sampleArtwork("met:2")), listOf(sampleDetail(), sampleDetail()), next = "2", status = PageStatus.OK))
+        met.enqueue(PageResult(listOf(sampleArtwork("met:3")), listOf(sampleDetail()), next = "1", status = PageStatus.OK))
+
+        val repository = repository(setOf(met))
+        repository.loadMore(Section.EUROPEAN, size = 20)
+        repository.loadMore(Section.ASIA, size = 20)
+
+        val european = artworkDao.observeBySection(Section.EUROPEAN.id).first()
+        val asia = artworkDao.observeBySection(Section.ASIA.id).first()
+        assertEquals(listOf(0, 1), european.map { it.position })
+        assertEquals(listOf(0), asia.map { it.position })
+        assertEquals(listOf("met:3"), asia.map { it.id })
     }
 
     @Test
@@ -231,7 +306,7 @@ class ArtworkRepositoryImplTest {
         val cleveland = provider("cleveland", PageResult(listOf(sampleArtwork("cleveland:1")), listOf(sampleDetail()), next = "1", status = PageStatus.OK))
 
         val repository = repository(setOf(cleveland, met))
-        val outcome: LoadOutcome = repository.loadMore(size = 20)
+        val outcome: LoadOutcome = repository.loadMore(Section.EUROPEAN, size = 20)
 
         // Correct behavior: met's failure must be observable somehow, even
         // though cleveland's success means the user still sees new

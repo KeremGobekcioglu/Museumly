@@ -4,35 +4,45 @@ import com.kg.museumly.domain.ArtworkRepository
 import com.kg.museumly.domain.LoadOutcome
 import com.kg.museumly.model.Artwork
 import com.kg.museumly.model.ArtworkWithDetail
+import com.kg.museumly.model.Section
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 
 /**
  * Hand-written ArtworkRepository test double for ScrollViewModelTest. Holds
- * real, inspectable state (a backing StateFlow, a call counter) instead of
- * stubbed expectations. loadMoreDelayMs/loadMoreThrows let a test put a real
- * suspension point in loadMore() — needed to observe TailState.Loading,
- * which only exists for the duration of a suspended call.
+ * real, inspectable state (a backing StateFlow per section, a call log)
+ * instead of stubbed expectations. loadMoreDelayMs/loadMoreThrows let a test
+ * put a real suspension point in loadMore() — needed to observe
+ * TailState.Loading, which only exists for the duration of a suspended call.
+ *
+ * loadMoreSections records the section of every loadMore() that started,
+ * in call order — including ones later cancelled mid-delay.
  */
 class FakeArtworkRepository : ArtworkRepository {
 
-    private val artworksFlow = MutableStateFlow<List<Artwork>>(emptyList())
+    private val artworksFlows: MutableMap<Section, MutableStateFlow<List<Artwork>>> = HashMap()
 
     var countValue: Int = 0
     var loadMoreOutcome: LoadOutcome = LoadOutcome.Loaded
     var loadMoreDelayMs: Long = 0
     var loadMoreThrows: Throwable? = null
 
-    var loadMoreCallCount: Int = 0
-        private set
+    val loadMoreSections: MutableList<Section> = ArrayList()
 
-    fun setArtworks(items: List<Artwork>) {
-        artworksFlow.value = items
+    val loadMoreCallCount: Int
+        get() = loadMoreSections.size
+
+    private fun flowFor(section: Section): MutableStateFlow<List<Artwork>> {
+        return artworksFlows.getOrPut(section) { MutableStateFlow(emptyList()) }
     }
 
-    override fun artworks(): Flow<List<Artwork>> {
-        return artworksFlow
+    fun setArtworks(items: List<Artwork>, section: Section = Section.EUROPEAN) {
+        flowFor(section).value = items
+    }
+
+    override fun artworks(section: Section): Flow<List<Artwork>> {
+        return flowFor(section)
     }
 
     override suspend fun artworkWithDetail(id: String): ArtworkWithDetail? {
@@ -43,8 +53,8 @@ class FakeArtworkRepository : ArtworkRepository {
         return null
     }
 
-    override suspend fun loadMore(size: Int): LoadOutcome {
-        loadMoreCallCount += 1
+    override suspend fun loadMore(section: Section, size: Int): LoadOutcome {
+        loadMoreSections.add(section)
         if (loadMoreDelayMs > 0) {
             delay(loadMoreDelayMs)
         }
@@ -55,7 +65,7 @@ class FakeArtworkRepository : ArtworkRepository {
         return loadMoreOutcome
     }
 
-    override suspend fun count(): Int {
+    override suspend fun count(section: Section): Int {
         return countValue
     }
 }

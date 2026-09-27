@@ -3,7 +3,10 @@ package com.kg.museumly.feature.scroll.presentation
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import com.kg.museumly.model.Section
 import com.kg.museumly.testutil.sampleArtwork
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -41,10 +44,35 @@ class ArtworkReelsScreenPageCounterTest {
                 refresh = {},
                 onPageChanged = {},
                 onDetailPage = {},
+                onSectionSelected = {},
             )
         }
 
         composeRule.onNodeWithText("End of the gallery").assertIsDisplayed()
         composeRule.onNodeWithText("${artworks.size} / ${artworks.size}").assertDoesNotExist()
+    }
+
+    @Test
+    fun `section picker stays reachable on the empty loading state and reports a selection`() {
+        // No artworks and tail Loading is ReelsContent's early-return path —
+        // the picker is drawn outside it, so it must still be there.
+        val state = ScrollUiState(section = Section.EUROPEAN, artworks = emptyList(), tail = TailState.Loading)
+        var selected: Section? = null
+
+        composeRule.setContent {
+            ArtworkReelsScreen(
+                state = state,
+                refresh = {},
+                onPageChanged = {},
+                onDetailPage = {},
+                onSectionSelected = { selected = it },
+            )
+        }
+
+        composeRule.onNodeWithText("European").assertIsDisplayed().performClick()
+        composeRule.onNodeWithText("Asia").performClick()
+        composeRule.waitForIdle()
+
+        assertEquals(Section.ASIA, selected)
     }
 }
