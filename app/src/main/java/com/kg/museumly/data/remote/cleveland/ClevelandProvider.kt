@@ -162,7 +162,7 @@ class ClevelandProvider @Inject constructor(
             Section.ISLAMIC -> listOf("Islamic Art")
             Section.MEDIEVAL -> listOf("Medieval Art")
             Section.EUROPEAN -> listOf("European Painting and Sculpture", "Modern European Painting and Sculpture")
-            Section.ASIA -> listOf("Chinese Art", "Japanese Art", "Korean Art", "Indian and South East Asian Art")
+            Section.ASIA -> listOf("Chinese Art", "Japanese Art", "Korean Art", "Indian and Southeast Asian Art")
             Section.AFRICA_OCEANIA_AMERICAS -> listOf("African Art", "Oceania", "Art of the Americas")
         }
     }
