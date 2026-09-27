@@ -56,8 +56,10 @@ internal fun ArtworkPageWithoutAspectRatio(
             contentScale = ContentScale.Fit
         )
         Text(
-            text = artwork.providerId,
+            text = sourceLabel(artwork),
             color = Color.White,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
             modifier = Modifier.align(Alignment.TopEnd).padding(16.dp)
         )
         if (loadFailed) {
@@ -98,8 +100,10 @@ internal fun ArtworkPageWithRestrainedBox(
         )
 
         Text(
-            text = artwork.providerId,
+            text = sourceLabel(artwork),
             color = Color.White,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
             modifier = Modifier.align(Alignment.TopEnd).padding(16.dp)
         )
 
@@ -135,8 +139,10 @@ internal fun ArtworkPageWithRespectToAspectRatio(
 
             var loadFailed by remember(artwork.id) { mutableStateOf(false) }
             Text(
-                text = artwork.providerId,
+                text = sourceLabel(artwork),
                 color = Color.White,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .padding(16.dp)
@@ -206,6 +212,17 @@ private fun ArtworkCaption(artwork: Artwork, modifier: Modifier = Modifier) {
             )
         }
     }
+}
+
+/**
+ * "cleveland: Indian and Southeast Asian Art", "met: Asian Art".
+ * department is the museum's own field on the record, so for the Met it's the
+ * display name, not the numeric id in the cursor key. Just the provider when
+ * the record has no department.
+ */
+private fun sourceLabel(artwork: Artwork): String {
+    val department: String = artwork.department ?: return artwork.providerId
+    return "${artwork.providerId}: $department"
 }
 
 private fun captionLine(artist: String?, year: String?): String? {
