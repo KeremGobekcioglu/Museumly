@@ -2,14 +2,26 @@ package com.kg.museumly.domain
 
 import com.kg.museumly.model.Artwork
 import com.kg.museumly.model.ArtworkWithDetail
+import com.kg.museumly.model.Section
 import kotlinx.coroutines.flow.Flow
 
 interface ArtworkRepository {
 
-    fun artworks(): Flow<List<Artwork>>
+    /**
+     * artworks should be served section by section.
+     */
+    fun artworks(section: Section): Flow<List<Artwork>>
     suspend fun artworkWithDetail(id: String): ArtworkWithDetail?
     suspend fun byId( id: String) : Artwork?
-    suspend fun loadMore(size: Int = 20) : LoadOutcome
 
-    suspend fun count(): Int
+    /**
+     * LoadMore takes section becasue it needs to know which
+     * department artwork it ll load.
+     */
+    suspend fun loadMore(section: Section, size: Int = 20) : LoadOutcome
+
+    /**
+     * now count tracks section by section.
+     */
+    suspend fun count(section: Section): Int
 }

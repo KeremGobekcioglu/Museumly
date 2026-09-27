@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.kg.museumly.model.Section
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.first
 import javax.inject.Inject
@@ -18,18 +19,20 @@ class FeedPositionSource @Inject constructor(
     @ApplicationContext private val context: Context
 )
 {
-    private val frontierKey = intPreferencesKey("frontier")
-
+    private fun frontierKey(section: Section): Preferences.Key<Int>
+    {
+        return intPreferencesKey("frontier_" + section.id)
+    }
     // In-memory, not persisted to DataStore: scoped to this process's
     // lifetime, not forever. A user who hasn't opened the app in weeks has
     // likely forgotten the gesture exists and should see the hint again —
     // once per app launch is enough to not be annoying within a session.
     private var hasInspectedThisSession: Boolean = false
 
-    suspend fun getFrontier(): Int
+    suspend fun getFrontier(section: Section): Int
     {
-        val prefs : Preferences = context.dataStore.data.first()
-        val stored: Int = prefs[frontierKey] ?: return 0
+        val prefs: Preferences = context.dataStore.data.first()
+        val stored: Int = prefs[frontierKey(section)] ?: return 0
         return stored
     }
     /**
@@ -38,15 +41,14 @@ class FeedPositionSource @Inject constructor(
      * want 30. Going backwards is free; going forwards is the thing worth
      * remembering.
      */
-    suspend fun setFrontier(position: Int)
+    suspend fun setFrontier(section: Section, position: Int)
     {
-        context.dataStore.edit {
-            prefs ->
-                val current : Int? = prefs[frontierKey]
-                if(current == null || position > current)
-                {
-                    prefs[frontierKey] = position
-                }
+        context.dataStore.edit { prefs ->
+            val key: Preferences.Key<Int> = frontierKey(section)
+            val current: Int? = prefs[key]
+            if (current == null || position > current) {
+                prefs[key] = position
+            }
         }
     }
 

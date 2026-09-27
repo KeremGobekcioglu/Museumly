@@ -8,6 +8,7 @@ import com.kg.museumly.domain.PageResult
 import com.kg.museumly.domain.PageStatus
 import com.kg.museumly.model.Artwork
 import com.kg.museumly.model.ArtworkDetail
+import com.kg.museumly.model.Section
 import kotlinx.coroutines.delay
 import retrofit2.HttpException
 import java.io.IOException
@@ -36,14 +37,14 @@ class ClevelandProvider @Inject constructor(
         val parsed = cursor.toIntOrNull() ?: return 0
         return parsed
     }
-    private suspend fun fetchDtos(skip: Int, limit: Int) : ApiResult<List<ClevelandArtworkDto>>
+    private suspend fun fetchDtos(skip: Int, limit: Int, department: String) : ApiResult<List<ClevelandArtworkDto>>
     {
         return try {
             val response = api.searchArtworks(
                 hasImage = 1,
                 skip = skip,
                 limit = limit,
-                department = null,
+                department = department,
                 fields = null
             )
             ApiResult.Success(response.data)
@@ -61,7 +62,16 @@ class ClevelandProvider @Inject constructor(
         }
         catch (e: IOException) {
             ApiResult.Failed(e)
-        } catch (e: Exception) {
+        }
+        // KNOWN RISK (left as-is for now): anything reaching here isn't a network
+        // error (IOException/HTTP are caught above) — most likely the mapper choking
+        // on an odd record. That's permanent, but labelled Failed, so 3 in a row form
+        // a streak → rewind → same records → department stuck FAILED forever.
+        //
+        // Fix when needed: return Rejected here and use Log.e.
+        // Consequence: a mapper bug that hits EVERY record would then skip through the
+        // whole department to EXHAUSTED — clear app data after fixing mapper bugs.
+        catch (e: Exception) {
             Log.d("CLEVELANDPROVIDER", "unexpected error for skip=$skip: ${e.message}")
             ApiResult.Failed(e)
         }
@@ -69,7 +79,8 @@ class ClevelandProvider @Inject constructor(
 
     override suspend fun fetchPage(
         cursor: String?,
-        size: Int
+        size: Int,
+        department: String
     ): PageResult {
         // we do get some items and skip them to not get again( move cursor)
         var skip : Int = parseCursor(cursor)
@@ -84,11 +95,11 @@ class ClevelandProvider @Inject constructor(
         {
             // first pass, need is 20. if 13 of items rejected, need will be 13.
             val need = size - items.size
-            var outcome = fetchDtos(skip, need)
+            var outcome = fetchDtos(skip, need, department)
             if (outcome is ApiResult.Failed && outcome.worthRetrying()) {
                 Log.d("CLEVELANDPROVIDER", "retrying skip=$skip after transient failure: ${outcome.cause.message}")
                 delay(RETRY_DELAY)
-                outcome = fetchDtos(skip, need)
+                outcome = fetchDtos(skip, need, department)
             }
             val dtos = when(outcome)
             {
@@ -141,5 +152,18 @@ class ClevelandProvider @Inject constructor(
             next = skip.toString()
         }
         return PageResult(items,details,next,status,failureReason)
+    }
+
+    override fun departmentsFor(section: Section): List<String>
+    {
+        return when (section) {
+            Section.EGYPT_NEAR_EAST -> listOf("Egyptian and Ancient Near Eastern Art")
+            Section.GREEK_ROMAN -> listOf("Greek and Roman Art")
+            Section.ISLAMIC -> listOf("Islamic Art")
+            Section.MEDIEVAL -> listOf("Medieval Art")
+            Section.EUROPEAN -> listOf("European Painting and Sculpture", "Modern European Painting and Sculpture")
+            Section.ASIA -> listOf("Chinese Art", "Japanese Art", "Korean Art", "Indian and South East Asian Art")
+            Section.AFRICA_OCEANIA_AMERICAS -> listOf("African Art", "Oceania", "Art of the Americas")
+        }
     }
 }

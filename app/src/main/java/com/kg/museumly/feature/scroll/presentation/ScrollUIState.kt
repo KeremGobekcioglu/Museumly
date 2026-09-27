@@ -1,8 +1,10 @@
 package com.kg.museumly.feature.scroll.presentation
 
 import com.kg.museumly.model.Artwork
+import com.kg.museumly.model.Section
 
 data class ScrollUiState(
+    val section: Section = Section.EUROPEAN,     // ← new
     val artworks: List<Artwork> = emptyList(),
     val initialPage: Int? = null,
     val tail: TailState = TailState.Loading,

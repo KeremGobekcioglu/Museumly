@@ -20,6 +20,7 @@ import com.kg.museumly.domain.PageStatus
 import com.kg.museumly.model.Artwork
 import com.kg.museumly.model.ArtworkDetail
 import com.kg.museumly.model.ArtworkWithDetail
+import com.kg.museumly.model.Section
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
@@ -27,6 +28,17 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.time.Duration.Companion.milliseconds
+
+/**
+ * One department of one provider. The repository rotates over these
+ * exactly the way it used to rotate over providers.
+ * key is what the cursor is stored under: "cleveland:Chinese Art", "met:6".
+ */
+private class Source(val provider: ArtworkProvider, val department: String)
+{
+    val key = provider.id + ":" + department
+}
 
 @Singleton
 class ArtworkRepositoryImpl @Inject constructor(
@@ -50,6 +62,31 @@ class ArtworkRepositoryImpl @Inject constructor(
     }
 
     /**
+     * Departments differ by provider. SO they need
+     * their own naming logic. see departmentsFor, it s overriden for both.
+     * Eventually, user and domain/presenttion packages have one unified name for
+     * each department.
+     * This function create sources, for example:
+     * if user wants to see european artworks, providers can have multiple
+     * european department and this function combines them, european paintings, scultpure for
+     * one provider, european paintings for other provider and returns 3 source that is
+     * usable. later on, loadMore will take turn on these sources.
+     */
+    private fun sourcesFor(section: Section) : List<Source>
+    {
+        val sources : MutableList<Source> = ArrayList()
+        val ordered : List<ArtworkProvider> = providers.sortedBy { it.id }
+        for(provider in ordered)
+        {
+            for(department in provider.departmentsFor(section))
+            {
+                sources.add(Source(provider,department))
+            }
+        }
+        return sources
+    }
+
+    /**
      * Only one writer at a time.
      *
      * insert() reads maxPosition(), then writes. Without this lock, two
@@ -66,8 +103,8 @@ class ArtworkRepositoryImpl @Inject constructor(
     /**
      * Returns Flow, so the screen subscribes once and gets every future version automatically.
      */
-    override fun artworks(): Flow<List<Artwork>> {
-        return artworkDao.observeAll().map {
+    override fun artworks(section: Section): Flow<List<Artwork>> {
+        return artworkDao.observeBySection(section.id).map {
             rows: List<ArtworkEntity> ->
                 val result : MutableList<Artwork> = ArrayList()
                 for(row in rows)
@@ -103,15 +140,15 @@ class ArtworkRepositoryImpl @Inject constructor(
      * One insertAll for the whole list, not one per artwork, so Room
      * notifies the screen once instead of twenty times.
      */
-    private suspend fun insert(items: List<Artwork>, details: List<ArtworkDetail>) {
-        var position: Int = artworkDao.maxPosition()
+    private suspend fun insert(items: List<Artwork>, details: List<ArtworkDetail>, section: Section) {
+        var position: Int = artworkDao.maxPosition(section.id)
         val entities : MutableList<ArtworkEntity> = ArrayList()
         val detailEntities: MutableList<ArtworkDetailEntity> = ArrayList()
         for (i in items.indices) {
             position += 1
             val artwork: Artwork = items[i]
             val detail: ArtworkDetail = details[i]
-            entities.add(ArtworkMapper.toEntity(artwork, position))
+            entities.add(ArtworkMapper.toEntity(artwork, position, section.id))
             detailEntities.add(
                 ArtworkDetailEntity(
                     id = artwork.id,
@@ -140,17 +177,22 @@ class ArtworkRepositoryImpl @Inject constructor(
 //        }
 //    }
 
-    override suspend fun loadMore(size: Int): LoadOutcome{
+    override suspend fun loadMore(section: Section, size: Int): LoadOutcome
+    {
         mutex.withLock {
-            val ordered : List<ArtworkProvider> = providers.sortedBy { it.id }
+            val sources = sourcesFor(section)
+            if(sources.isEmpty())
+            {
+                return LoadOutcome.Exhausted
+            }
             val failures: MutableList<String> = ArrayList()
             val turn : Int = turnSource.getTurn()
-            for(attempt in ordered.indices)
+            for(attempt in sources.indices)
             {
-                val index : Int = (turn + attempt) % ordered.size
-                val provider: ArtworkProvider = ordered[index]
+                val index : Int = (turn + attempt) % sources.size
+                val source: Source = sources[index]
                 Log.d("ARTWORKREPOSITORYIMPL" , "LOAD MORE.")
-                val saved: ProviderCursor? = cursorDao.get(provider.id)
+                val saved: ProviderCursor? = cursorDao.get(source.key)
                 // we need to check exhaustion for providers
                 if(saved != null && saved.next == null)
                 {
@@ -167,22 +209,22 @@ class ArtworkRepositoryImpl @Inject constructor(
                 // from `cursor`, hydrates each artwork, drops the unusable ones.
                 Log.d("REPO", "calling fetchPage cursor=$cursor")
                 val started: Long = System.nanoTime()
-                val page: PageResult? = withTimeoutOrNull(PROVIDER_FETCH_TIMEOUT_MS)
+                val page: PageResult? = withTimeoutOrNull(PROVIDER_FETCH_TIMEOUT_MS.milliseconds)
                 {
-                    provider.fetchPage(cursor,size)
+                    source.provider.fetchPage(cursor,size,source.department)
                 }
                 val ms: Long = (System.nanoTime() - started) / 1_000_000
                 if (page == null)
                 {
-                    Log.d("REPO", "${provider.id} timed out after ${ms}ms")
-                    failures.add("${provider.id}: timed out")
+                    Log.d("REPO", "${source.key} timed out after ${ms}ms")
+                    failures.add("${source.key}: timed out")
                     continue
                 }
-                Log.d("REPO", "${provider.id} took ${ms}ms, ${page.items.size} items, next=${page.next}")
+                Log.d("REPO", "${source.key} took ${ms}ms, ${page.items.size} items, next=${page.next}")
                 if (page.status == PageStatus.FAILED) {
                     val reason: String = page.failureReason ?: "failed"
-                    Log.d("REPO", "${provider.id} failed: $reason")
-                    failures.add("${provider.id}: $reason")
+                    Log.d("REPO", "${source.key} failed: $reason")
+                    failures.add("${source.key}: $reason")
                     continue
                 }
                 // If page.next is null, this writes the exhaustion marker, and the
@@ -201,14 +243,14 @@ class ArtworkRepositoryImpl @Inject constructor(
                 // rejected again next time.
                 database.withTransaction {
                     if (page.items.isNotEmpty()) {
-                        insert(page.items, page.details)
+                        insert(page.items, page.details, section)
                     }
-                    cursorDao.put(ProviderCursor(provider.id, page.next))
+                    cursorDao.put(ProviderCursor(source.key, page.next))
                 }
                 // DataStore, not Room, so it can't join the transaction. Only advance
                 // the turn when the provider actually delivered something.
                 if (page.items.isNotEmpty()) {
-                    turnSource.setTurn((index + 1) % ordered.size)
+                    turnSource.setTurn((index + 1) % sources.size)
                     return LoadOutcome.Loaded
                 }
             }
@@ -219,8 +261,8 @@ class ArtworkRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun count(): Int {
-        return artworkDao.count()
+    override suspend fun count(section: Section): Int {
+        return artworkDao.count(section.id)
     }
 
 }
