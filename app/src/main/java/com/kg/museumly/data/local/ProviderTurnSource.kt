@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.kg.museumly.model.Section
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.first
 import javax.inject.Inject
@@ -25,19 +26,22 @@ class ProviderTurnSource @Inject constructor(
     @ApplicationContext private val context: Context
 )
 {
-    private val turnKey = intPreferencesKey("turn")
-
-    suspend fun getTurn(): Int
+    private fun turnKey(section: Section) : Preferences.Key<Int>
     {
-        val prefs = context.dataStore.data.first()
-        return prefs[turnKey] ?: 0
+        return intPreferencesKey("turn_" + section.id)
     }
 
-    suspend fun setTurn(turnValue: Int)
+    suspend fun getTurn(section: Section): Int
+    {
+        val prefs = context.dataStore.data.first()
+        return prefs[turnKey(section)] ?: 0
+    }
+
+    suspend fun setTurn(turnValue: Int, section: Section)
     {
         context.dataStore.edit {
             prefs ->
-                prefs[turnKey] = turnValue
+                prefs[turnKey(section)] = turnValue
         }
     }
 }
