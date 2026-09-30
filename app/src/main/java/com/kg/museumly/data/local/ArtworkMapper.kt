@@ -19,7 +19,7 @@ object ArtworkMapper {
         )
     }
 
-    fun toEntity(artwork: Artwork, position: Int): ArtworkEntity {
+    fun toEntity(artwork: Artwork, position: Int, sectionId: String): ArtworkEntity {
         return ArtworkEntity(
             id = artwork.id,
             providerId = artwork.providerId,
@@ -31,7 +31,8 @@ object ArtworkMapper {
             aspectRatio = artwork.aspectRatio,
             position = position,
             classification = artwork.classification,
-            department = artwork.department
+            department = artwork.department,
+            sectionId = sectionId
         )
     }
 }

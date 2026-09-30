@@ -20,6 +20,7 @@ import com.kg.museumly.domain.PageStatus
 import com.kg.museumly.model.Artwork
 import com.kg.museumly.model.ArtworkDetail
 import com.kg.museumly.model.ArtworkWithDetail
+import com.kg.museumly.model.Section
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
@@ -27,6 +28,17 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.time.Duration.Companion.milliseconds
+
+/**
+ * One department of one provider. The repository rotates over these
+ * exactly the way it used to rotate over providers.
+ * key is what the cursor is stored under: "cleveland:Chinese Art", "met:6".
+ */
+private class Source(val provider: ArtworkProvider, val department: String)
+{
+    val key = provider.id + ":" + department
+}
 
 @Singleton
 class ArtworkRepositoryImpl @Inject constructor(
@@ -50,6 +62,64 @@ class ArtworkRepositoryImpl @Inject constructor(
     }
 
     /**
+     * Builds the rotation list for a section.
+     *
+     * Each provider names its own departments (see departmentsFor), so one
+     * section can be several departments per provider. Two rules:
+     *
+     * - Live only: a department whose cursor row says exhausted (next == null)
+     *   gets no slot. Otherwise its dead slot would hand its turn to whatever
+     *   comes next and tilt the balance toward the other museum.
+     * - Alternate museums: each provider cycles through its own live departments,
+     *   and providers take turns. A provider with fewer departments repeats them,
+     *   so every museum gets an equal share of pages.
+     *
+     * Asia: Chinese, met:6, Japanese, met:6, Korean, met:6, Indian, met:6
+     *
+     * A department can appear more than once; loadMore tries each key once per call.
+     * Must be called under the mutex — it reads cursor rows loadMore may write.
+     */
+    private suspend fun sourcesFor(section: Section) : List<Source>
+    {
+        val ordered : List<ArtworkProvider> = providers.sortedBy { it.id }
+
+        val perProvider : MutableList<List<String>> = ArrayList()
+        var longest = 0
+        for(provider in ordered)
+        {
+            val live : MutableList<String> = ArrayList()
+            for(department in provider.departmentsFor(section))
+            {
+                val saved = cursorDao.get(Source(provider,department).key)
+                // we need to check exhaustion for providers
+                if(saved != null && saved.next == null) // try next provider, this is finished.
+                    continue // exhausted: no slot
+                live.add(department)
+            }
+            perProvider.add(live)
+            if (live.size > longest)
+            {
+                longest = live.size
+            }
+        }
+
+        val sources : MutableList<Source> = ArrayList()
+
+        for(round in 0 until longest)
+        {
+            for(p in ordered.indices)
+            {
+                val departments = perProvider[p]
+                if(departments.isEmpty())
+                    continue
+                val department = departments[round % departments.size]
+                sources.add(Source((ordered[p]), department))
+            }
+        }
+        return sources
+    }
+
+    /**
      * Only one writer at a time.
      *
      * insert() reads maxPosition(), then writes. Without this lock, two
@@ -66,8 +136,8 @@ class ArtworkRepositoryImpl @Inject constructor(
     /**
      * Returns Flow, so the screen subscribes once and gets every future version automatically.
      */
-    override fun artworks(): Flow<List<Artwork>> {
-        return artworkDao.observeAll().map {
+    override fun artworks(section: Section): Flow<List<Artwork>> {
+        return artworkDao.observeBySection(section.id).map {
             rows: List<ArtworkEntity> ->
                 val result : MutableList<Artwork> = ArrayList()
                 for(row in rows)
@@ -103,15 +173,15 @@ class ArtworkRepositoryImpl @Inject constructor(
      * One insertAll for the whole list, not one per artwork, so Room
      * notifies the screen once instead of twenty times.
      */
-    private suspend fun insert(items: List<Artwork>, details: List<ArtworkDetail>) {
-        var position: Int = artworkDao.maxPosition()
+    private suspend fun insert(items: List<Artwork>, details: List<ArtworkDetail>, section: Section) {
+        var position: Int = artworkDao.maxPosition(section.id)
         val entities : MutableList<ArtworkEntity> = ArrayList()
         val detailEntities: MutableList<ArtworkDetailEntity> = ArrayList()
         for (i in items.indices) {
             position += 1
             val artwork: Artwork = items[i]
             val detail: ArtworkDetail = details[i]
-            entities.add(ArtworkMapper.toEntity(artwork, position))
+            entities.add(ArtworkMapper.toEntity(artwork, position, section.id))
             detailEntities.add(
                 ArtworkDetailEntity(
                     id = artwork.id,
@@ -140,53 +210,63 @@ class ArtworkRepositoryImpl @Inject constructor(
 //        }
 //    }
 
-    override suspend fun loadMore(size: Int): LoadOutcome{
+    override suspend fun loadMore(section: Section, size: Int): LoadOutcome
+    {
         mutex.withLock {
-            val ordered : List<ArtworkProvider> = providers.sortedBy { it.id }
-            val failures: MutableList<String> = ArrayList()
-            val turn : Int = turnSource.getTurn()
-            for(attempt in ordered.indices)
+            val sources = sourcesFor(section)
+            if(sources.isEmpty())
             {
-                val index : Int = (turn + attempt) % ordered.size
-                val provider: ArtworkProvider = ordered[index]
-                Log.d("ARTWORKREPOSITORYIMPL" , "LOAD MORE.")
-                val saved: ProviderCursor? = cursorDao.get(provider.id)
-                // we need to check exhaustion for providers
+                // every department in this section is exhausted
+                return LoadOutcome.Exhausted
+            }
+            val failures: MutableList<String> = ArrayList()
+            // the same department can sit in the list several times;
+            // try each one at most once per call
+            val tried: MutableSet<String> = HashSet()
+            val turn : Int = turnSource.getTurn(section = section)
+            for(attempt in sources.indices)
+            {
+                val index : Int = (turn + attempt) % sources.size
+                val source: Source = sources[index]
+                if(!tried.add(source.key))
+                {
+                    continue
+                }
+                val saved: ProviderCursor? = cursorDao.get(source.key)
+                // Safety net: sourcesFor already drops exhausted departments.
                 if(saved != null && saved.next == null)
                 {
-                    // try next provider, this is finished.
                     Log.d("REPO", "exhausted, skipping")
                     continue
                 }
-
+                // No row means this source has never been fetched: start at the beginning.
                 var cursor: String? = null
                 if(saved != null)
                     cursor = saved.next
-                // if saved is null, it means we are at 0, at the beginning.
                 // The provider does everything: rebuilds its ID list if needed, walks
                 // from `cursor`, hydrates each artwork, drops the unusable ones.
-                Log.d("REPO", "calling fetchPage cursor=$cursor")
+                Log.d("REPO", "calling ${source.key} cursor=$cursor")
                 val started: Long = System.nanoTime()
-                val page: PageResult? = withTimeoutOrNull(PROVIDER_FETCH_TIMEOUT_MS)
+                val page: PageResult? = withTimeoutOrNull(PROVIDER_FETCH_TIMEOUT_MS.milliseconds)
                 {
-                    provider.fetchPage(cursor,size)
+                    source.provider.fetchPage(cursor,size,source.department)
                 }
                 val ms: Long = (System.nanoTime() - started) / 1_000_000
                 if (page == null)
                 {
-                    Log.d("REPO", "${provider.id} timed out after ${ms}ms")
-                    failures.add("${provider.id}: timed out")
+                    Log.d("REPO", "${source.key} timed out after ${ms}ms")
+                    failures.add("${source.key}: timed out")
                     continue
                 }
-                Log.d("REPO", "${provider.id} took ${ms}ms, ${page.items.size} items, next=${page.next}")
+                Log.d("REPO", "${source.key} took ${ms}ms, ${page.items.size} items, next=${page.next}")
                 if (page.status == PageStatus.FAILED) {
                     val reason: String = page.failureReason ?: "failed"
-                    Log.d("REPO", "${provider.id} failed: $reason")
-                    failures.add("${provider.id}: $reason")
+                    Log.d("REPO", "${source.key} failed: $reason")
+                    failures.add("${source.key}: $reason")
                     continue
                 }
-                // If page.next is null, this writes the exhaustion marker, and the
-                // continue check will skip this provider from now on.
+                // If page.next is null, this writes the exhaustion marker, and
+                // sourcesFor leaves this department out from now on.
                 //
                 // One transaction because a crash between the writes leaves damage
                 // nothing ever repairs:
@@ -201,14 +281,14 @@ class ArtworkRepositoryImpl @Inject constructor(
                 // rejected again next time.
                 database.withTransaction {
                     if (page.items.isNotEmpty()) {
-                        insert(page.items, page.details)
+                        insert(page.items, page.details, section)
                     }
-                    cursorDao.put(ProviderCursor(provider.id, page.next))
+                    cursorDao.put(ProviderCursor(source.key, page.next))
                 }
                 // DataStore, not Room, so it can't join the transaction. Only advance
-                // the turn when the provider actually delivered something.
+                // the turn when the source actually delivered something.
                 if (page.items.isNotEmpty()) {
-                    turnSource.setTurn((index + 1) % ordered.size)
+                    turnSource.setTurn((index + 1) % sources.size, section)
                     return LoadOutcome.Loaded
                 }
             }
@@ -219,8 +299,8 @@ class ArtworkRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun count(): Int {
-        return artworkDao.count()
+    override suspend fun count(section: Section): Int {
+        return artworkDao.count(section.id)
     }
 
 }

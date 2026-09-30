@@ -26,10 +26,11 @@ class ArtworkDaoTest {
     private lateinit var database: MuseumDatabase
     private lateinit var dao: ArtworkDao
 
-    private fun entity(id: String, providerId: String, position: Int): ArtworkEntity {
+    private fun entity(id: String, providerId: String, position: Int, sectionId: String = "european"): ArtworkEntity {
         return ArtworkEntity(
             id = id,
             providerId = providerId,
+            sectionId = sectionId,
             title = "Title $id",
             artist = null,
             year = null,
@@ -57,10 +58,10 @@ class ArtworkDaoTest {
     }
 
     @Test
-    fun `insertAll then observeAll returns rows ordered by position`() = runTest {
+    fun `insertAll then observeBySection returns rows ordered by position`() = runTest {
         dao.insertAll(listOf(entity("met:3", "met", position = 2), entity("met:1", "met", position = 0), entity("met:2", "met", position = 1)))
 
-        val rows: List<ArtworkEntity> = dao.observeAll().first()
+        val rows: List<ArtworkEntity> = dao.observeBySection("european").first()
 
         assertEquals(listOf("met:1", "met:2", "met:3"), rows.map { it.id })
     }
@@ -83,14 +84,39 @@ class ArtworkDaoTest {
 
             assertEquals("met", metRow?.providerId)
             assertEquals("cleveland", clevelandRow?.providerId)
-            assertEquals(2, dao.count())
+            assertEquals(2, dao.count("european"))
         }
     }
 
     @Test
     fun `maxPosition returns negative one on an empty table so the first position lands on zero`() = runTest {
-        val max: Int = dao.maxPosition()
+        val max: Int = dao.maxPosition("european")
 
         assertEquals(-1, max)
+    }
+
+    @Test
+    fun `observeBySection and count only see their own section`() = runTest {
+        dao.insertAll(
+            listOf(
+                entity("met:1", "met", position = 0, sectionId = "european"),
+                entity("met:2", "met", position = 0, sectionId = "asia"),
+                entity("met:3", "met", position = 1, sectionId = "asia"),
+            ),
+        )
+
+        val asia: List<ArtworkEntity> = dao.observeBySection("asia").first()
+
+        assertEquals(listOf("met:2", "met:3"), asia.map { it.id })
+        assertEquals(1, dao.count("european"))
+        assertEquals(2, dao.count("asia"))
+    }
+
+    @Test
+    fun `maxPosition is per section, so a new section still starts at zero`() = runTest {
+        dao.insertAll(listOf(entity("met:1", "met", position = 0), entity("met:2", "met", position = 1)))
+
+        assertEquals(1, dao.maxPosition("european"))
+        assertEquals(-1, dao.maxPosition("asia"))
     }
 }

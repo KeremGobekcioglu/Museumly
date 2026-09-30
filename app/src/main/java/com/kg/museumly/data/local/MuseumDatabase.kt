@@ -7,7 +7,7 @@ import com.kg.museumly.data.local.detail.ArtworkDetailEntity
 
 @Database(
     entities = [ArtworkEntity::class , ProviderCursor::class, ArtworkDetailEntity::class],
-    version = 5,
+    version = 6,
     exportSchema = true
 )
 abstract class MuseumDatabase : RoomDatabase()

@@ -30,3 +30,4 @@ local.properties
 # Local test assets
 /girl.jpg
 /harvesters.jpg
+.idea/deploymentTargetSelector.xml

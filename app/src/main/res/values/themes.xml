@@ -1,5 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <style name="Theme.Museumly" parent="android:Theme.Material.Light.NoActionBar" />
+    <!--
+        Dark parent and a black window background: the system splash and the
+        window take their colour from this theme before Compose draws anything.
+        With a light theme they paint near-white, and the jump to the black
+        gallery reads as a flash on every launch.
+    -->
+    <style name="Theme.Museumly" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@android:color/black</item>
+    </style>
 </resources>

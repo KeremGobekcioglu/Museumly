@@ -9,15 +9,22 @@ import com.kg.museumly.domain.ArtworkRepository
 import com.kg.museumly.domain.LoadOutcome
 import com.kg.museumly.domain.NetworkMonitor
 import com.kg.museumly.model.Artwork
+import com.kg.museumly.model.Section
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -62,18 +69,36 @@ class ScrollViewModel @Inject constructor(
 
     private var loadJob: Job? = null
     private val tail = MutableStateFlow<TailState>(TailState.Loading)
-    private val initialPage = MutableStateFlow<Int?>(null)
+    private val initialPage = MutableStateFlow<Pair<Section, Int>?>(null)
+    private val section = MutableStateFlow<Section?>(null)
 
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private val feed: Flow<Pair<Section, List<Artwork>>> = section
+        .filterNotNull()
+        .flatMapLatest {
+        current: Section ->
+            repository.artworks(current).map {
+                list: List<Artwork> ->
+                Pair(current,list)
+            }
+    }
     val uiState: StateFlow<ScrollUiState> = combine(
-        repository.artworks(),
+        feed,
         initialPage,
         tail,
         networkMonitor.isOnline
     ){
-            artworks: List<Artwork>, page: Int?, tailState: TailState, online: Boolean ->
+        feedValue: Pair<Section, List<Artwork>>, page: Pair<Section, Int>?, tailState: TailState, online: Boolean ->
+        val feedSection: Section = feedValue.first
+        var matchedPage: Int?= null
+        if(page != null && page.first == feedSection)
+        {
+            matchedPage = page.second
+        }
         ScrollUiState(
-            artworks = artworks,
-            initialPage = page,
+            section = feedSection,
+            artworks = feedValue.second,
+            initialPage = matchedPage,
             tail = tailState,
             isOnline = online
         )
@@ -85,28 +110,15 @@ class ScrollViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            val stored: Int = positionStore.getFrontier()
-            var start: Int = stored - 2
-            if (start < 0) {
-                start = 0
-            }
-            initialPage.value = start
-        }
-
-        viewModelScope.launch {
-            // Ask the database directly. A Flow's first emission can't tell
-            // "empty because loading" from "empty because empty" — a count query can.
-            val existing: Int = repository.count()
-            if (existing == 0) {
-                loadMore()
-            } else {
-                // Cache already has data and nothing is pending. Without this,
-                // tail stays stuck at its Loading default and the tail
-                // placeholder page would spin forever with no fetch in flight.
-                tail.value = TailState.Idle
+            val restoredSection = positionStore.getLastSection()
+            // Defensive: nothing should set section before this. The section pill
+            // only appears once section is set, so the user can't tap first.
+            if(section.value == null)
+            {
+                section.value = restoredSection
+                enter(restoredSection)
             }
         }
-
         viewModelScope.launch {
             // auto retry
             networkMonitor.isOnline
@@ -121,6 +133,60 @@ class ScrollViewModel @Inject constructor(
                 }
         }
     }
+
+    private var enterJob: Job? = null
+
+    private fun enter(target: Section)
+    {
+        enterJob?.cancel()
+        enterJob = viewModelScope.launch {
+
+                val stored: Int = positionStore.getFrontier(target)
+                var start: Int = stored - 2
+                if (start < 0) {
+                    start = 0
+                }
+                initialPage.value = Pair(target,start)
+
+                // Start the landing page's image now, before the pager is even
+                // composed. By the time AsyncImage asks for it, it's in the memory
+                // cache, so the page draws with its image instead of empty.
+                val landing: Artwork? = repository.artworks(target).first().getOrNull(start)
+                if (landing != null) {
+                    prefetch(listOf(landing.imageUrl))
+                }
+
+                // Ask the database directly. A Flow's first emission can't tell
+                // "empty because loading" from "empty because empty" — a count query can.
+                val existing: Int = repository.count(target)
+                if (existing == 0) {
+                    loadMore()
+                } else {
+                    // Cache already has data and nothing is pending. Without this,
+                    // tail stays stuck at its Loading default and the tail
+                    // placeholder page would spin forever with no fetch in flight.
+                    tail.value = TailState.Idle
+                }
+
+        }
+    }
+
+    fun selectSection(target: Section)
+    {
+        if(target == section.value)
+        {
+            return
+        }
+
+        loadJob?.cancel()              // an Asia load in flight is Asia's business now
+        initialPage.value = null       // pager must not build until the new page is known
+        tail.value = TailState.Loading
+        section.value = target
+        enter(target)
+        viewModelScope.launch {
+            positionStore.setLastSection(target)
+        }
+    }
     fun loadMore()
     {
         Log.d("VM", "loadMore called, active=${loadJob?.isActive}")
@@ -128,6 +194,8 @@ class ScrollViewModel @Inject constructor(
             Log.d("VM", "skipped, already loading")
             return
         }
+        val target: Section = section.value ?: return
+
         loadJob = viewModelScope.launch {
 
             /**
@@ -160,7 +228,7 @@ class ScrollViewModel @Inject constructor(
                     val minimumTimeShouldSpentBeforeVisible : Job =
                         launch { delay(MIN_RETRY_VISIBLE_MS.milliseconds) }
 
-                    val result : TailState = runLoad()
+                    val result : TailState = runLoad(target)
                     /**
                      * minimum.join() suspends until the timer finishes.
                      * If it already finished, this returns immediately.
@@ -171,16 +239,16 @@ class ScrollViewModel @Inject constructor(
             }
             else
             {
-                next = runLoad()
+                next = runLoad(target)
             }
             tail.value = next
         }
     }
 
-    private suspend fun runLoad() : TailState
+    private suspend fun runLoad(target: Section) : TailState
     {
         return try {
-            when (val outcome = repository.loadMore()) {
+            when (val outcome = repository.loadMore(target)) {
                 LoadOutcome.Loaded -> TailState.Idle
                 LoadOutcome.Exhausted -> TailState.Exhausted
                 is LoadOutcome.Failed -> TailState.Failed(outcome.reason)
@@ -192,12 +260,16 @@ class ScrollViewModel @Inject constructor(
         }
     }
     fun onPageChanged(page: Int) {
+        val shown = uiState.value.section ?: return
         viewModelScope.launch {
-            positionStore.setFrontier(page)
+            positionStore.setFrontier(shown, page)
         }
 
         val artworks = uiState.value.artworks
-        val urls = (1..2).mapNotNull {
+        // Offset 0 keeps the current page in the list. The prefetcher cancels
+        // anything not in the latest list, and enter() may have just started
+        // this page's image — dropping it would throw that head start away.
+        val urls = (0..2).mapNotNull {
             offset ->
                 artworks.getOrNull(page + offset)?.imageUrl
         }

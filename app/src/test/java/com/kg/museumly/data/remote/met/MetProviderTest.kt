@@ -2,6 +2,7 @@ package com.kg.museumly.data.remote.met
 
 import com.kg.museumly.domain.PageResult
 import com.kg.museumly.domain.PageStatus
+import com.kg.museumly.model.Section
 import com.kg.museumly.testutil.Fixtures
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.test.runTest
@@ -98,11 +99,17 @@ class MetProviderTest {
     private fun RecordedRequest.limit(): Int? =
         requestUrl?.queryParameter("limit")?.toIntOrNull()
 
+    private fun RecordedRequest.departmentId(): Int? =
+        requestUrl?.queryParameter("departmentId")?.toIntOrNull()
+
+    private fun RecordedRequest.objectId(): Int =
+        path!!.substringAfterLast("/").toInt()
+
     @Test
     fun `search returning null ids with zero total marks the provider exhausted, not failed`() = runTest {
         server.enqueue(MockResponse().setBody("""{"total": 0, "objectIDs": null}"""))
 
-        val page: PageResult = provider.fetchPage(cursor = null, size = 20)
+        val page: PageResult = provider.fetchPage(cursor = null, size = 20, department = "11")
 
         assertEquals(PageStatus.EXHAUSTED, page.status)
         assertTrue(page.items.isEmpty())
@@ -115,7 +122,7 @@ class MetProviderTest {
         server.enqueue(MockResponse().setResponseCode(500))
         server.enqueue(MockResponse().setResponseCode(500))
 
-        val firstPage: PageResult = provider.fetchPage(cursor = null, size = 20)
+        val firstPage: PageResult = provider.fetchPage(cursor = null, size = 20, department = "11")
         assertEquals(PageStatus.FAILED, firstPage.status)
 
         // A second call must hit /search again from offset=0 — if the
@@ -124,7 +131,7 @@ class MetProviderTest {
         server.enqueue(MockResponse().setBody(searchResponse(listOf(1001))))
         server.enqueue(MockResponse().setBody(objectResponse(1001)))
 
-        val secondPage: PageResult = provider.fetchPage(cursor = null, size = 20)
+        val secondPage: PageResult = provider.fetchPage(cursor = null, size = 20, department = "11")
 
         assertEquals(PageStatus.EXHAUSTED, secondPage.status)
         assertEquals(1, secondPage.items.size)
@@ -149,7 +156,7 @@ class MetProviderTest {
             }
         }
 
-        val page: PageResult = provider.fetchPage(cursor = null, size = 20)
+        val page: PageResult = provider.fetchPage(cursor = null, size = 20, department = "11")
 
         assertEquals(PageStatus.EXHAUSTED, page.status)
         assertEquals(listOf("met:2001", "met:2003"), page.items.map { it.id })
@@ -169,7 +176,7 @@ class MetProviderTest {
             }
         }
 
-        val page: PageResult = provider.fetchPage(cursor = null, size = 20)
+        val page: PageResult = provider.fetchPage(cursor = null, size = 20, department = "11")
 
         assertEquals(PageStatus.FAILED, page.status)
         assertTrue(page.items.isEmpty())
@@ -195,7 +202,7 @@ class MetProviderTest {
             }
         }
 
-        val page: PageResult = provider.fetchPage(cursor = null, size = 20)
+        val page: PageResult = provider.fetchPage(cursor = null, size = 20, department = "11")
 
         assertEquals(listOf("met:4001", "met:4002"), page.items.map { it.id })
     }
@@ -231,7 +238,7 @@ class MetProviderTest {
 
         // Ask for one item starting right at the boundary — id 500 only
         // exists in the second page, so this can't be served without the loop.
-        val page: PageResult = provider.fetchPage(cursor = "500", size = 1)
+        val page: PageResult = provider.fetchPage(cursor = "500", size = 1, department = "11")
 
         assertEquals(PageStatus.EXHAUSTED, page.status)
         assertEquals(listOf("met:500"), page.items.map { it.id })
@@ -249,7 +256,7 @@ class MetProviderTest {
         server.enqueue(MockResponse().setBody(objectResponse(5002)))
         server.enqueue(MockResponse().setBody(objectResponse(5003)))
 
-        val page: PageResult = provider.fetchPage(cursor = null, size = 20)
+        val page: PageResult = provider.fetchPage(cursor = null, size = 20, department = "11")
 
         assertEquals(PageStatus.OK, page.status)
         assertEquals("3", page.next)
@@ -284,11 +291,127 @@ class MetProviderTest {
         }
 
         // Cursor already at 9999 — one id left in reach (9999), then done.
-        val page: PageResult = provider.fetchPage(cursor = "9999", size = 5)
+        val page: PageResult = provider.fetchPage(cursor = "9999", size = 5, department = "11")
 
         assertEquals(PageStatus.EXHAUSTED, page.status)
         assertEquals(listOf("met:9999"), page.items.map { it.id })
         assertEquals((0..9_500 step 500).toList(), searchOffsets)
         assertEquals(List(20) { 500 }, searchLimits)
+    }
+
+    @Test
+    fun `a non-numeric department fails the page without calling the API`() = runTest {
+        // The Met ignores a bad departmentId and searches the whole
+        // collection, so a malformed value must never reach the network.
+        val page: PageResult = provider.fetchPage(cursor = "12", size = 20, department = "European Paintings")
+
+        assertEquals(PageStatus.FAILED, page.status)
+        assertEquals("12", page.next)
+        assertEquals(0, server.requestCount)
+    }
+
+    @Test
+    fun `the department is sent to search as departmentId`() = runTest {
+        val searchDepartments = mutableListOf<Int?>()
+        server.dispatcher = object : Dispatcher() {
+            override fun dispatch(request: RecordedRequest): MockResponse {
+                val path = request.path ?: ""
+                return if (path.startsWith("/v1.1/search")) {
+                    searchDepartments.add(request.departmentId())
+                    MockResponse().setBody(searchResponse(listOf(1001)))
+                } else {
+                    MockResponse().setBody(objectResponse(request.objectId()))
+                }
+            }
+        }
+
+        provider.fetchPage(cursor = null, size = 20, department = "6")
+
+        assertEquals(listOf<Int?>(6), searchDepartments)
+    }
+
+    @Test
+    fun `each department keeps its own id cache`() = runTest {
+        val searchDepartments = mutableListOf<Int?>()
+        server.dispatcher = object : Dispatcher() {
+            override fun dispatch(request: RecordedRequest): MockResponse {
+                val path = request.path ?: ""
+                return if (path.startsWith("/v1.1/search")) {
+                    val department = request.departmentId()
+                    searchDepartments.add(department)
+                    val ids = if (department == 11) listOf(7001, 7002) else listOf(8001, 8002)
+                    MockResponse().setBody(searchResponse(ids))
+                } else {
+                    MockResponse().setBody(objectResponse(request.objectId()))
+                }
+            }
+        }
+
+        val european: PageResult = provider.fetchPage(cursor = null, size = 1, department = "11")
+        val modern: PageResult = provider.fetchPage(cursor = null, size = 1, department = "12")
+        // Department 11 again, from its own cursor — must come from its own
+        // cache, not department 12's list and not a fresh search.
+        val europeanNext: PageResult = provider.fetchPage(cursor = european.next, size = 1, department = "11")
+
+        assertEquals(listOf("met:7001"), european.items.map { it.id })
+        assertEquals(listOf("met:8001"), modern.items.map { it.id })
+        assertEquals(listOf("met:7002"), europeanNext.items.map { it.id })
+        assertEquals(listOf<Int?>(11, 12), searchDepartments)
+    }
+
+    @Test
+    fun `unparseable objects are rejected, so three in a row are not an outage`() = runTest {
+        server.dispatcher = object : Dispatcher() {
+            override fun dispatch(request: RecordedRequest): MockResponse {
+                val path = request.path ?: ""
+                return when {
+                    path.startsWith("/v1.1/search") -> MockResponse().setBody(searchResponse(listOf(9001, 9002, 9003, 9004)))
+                    path.contains("objects/9004") -> MockResponse().setBody(objectResponse(9004))
+                    // 200 with a body the converter can't decode -> SerializationException.
+                    else -> MockResponse().setBody("{not json")
+                }
+            }
+        }
+
+        val page: PageResult = provider.fetchPage(cursor = null, size = 20, department = "11")
+
+        assertEquals(PageStatus.EXHAUSTED, page.status)
+        assertEquals(listOf("met:9004"), page.items.map { it.id })
+    }
+
+    @Test
+    fun `an outage after some successes rewinds the cursor to the first failure of the streak`() = runTest {
+        server.dispatcher = object : Dispatcher() {
+            override fun dispatch(request: RecordedRequest): MockResponse {
+                val path = request.path ?: ""
+                return when {
+                    path.startsWith("/v1.1/search") -> MockResponse().setBody(searchResponse(listOf(6001, 6002, 6003, 6004, 6005)))
+                    path.contains("objects/6001") -> MockResponse().setBody(objectResponse(6001))
+                    // 6002, 6003, 6004 fail in a row -> outage on 6004.
+                    else -> MockResponse().setResponseCode(500)
+                }
+            }
+        }
+
+        val page: PageResult = provider.fetchPage(cursor = null, size = 20, department = "11")
+
+        // 6001 was delivered, so this is a normal page — but the cursor must
+        // point at 6002 (index 1), not at 6004, or 6002 and 6003 are lost.
+        assertEquals(PageStatus.OK, page.status)
+        assertEquals(listOf("met:6001"), page.items.map { it.id })
+        assertEquals("1", page.next)
+    }
+
+    @Test
+    fun `every section maps to numeric Met department ids`() {
+        // fetchPage parses the department back with toIntOrNull; a
+        // non-numeric entry here would fail that department on every page.
+        for (section in Section.entries) {
+            val departments: List<String> = provider.departmentsFor(section)
+            assertTrue("$section has no Met departments", departments.isNotEmpty())
+            for (department in departments) {
+                assertTrue("$section maps to non-numeric '$department'", department.toIntOrNull() != null)
+            }
+        }
     }
 }

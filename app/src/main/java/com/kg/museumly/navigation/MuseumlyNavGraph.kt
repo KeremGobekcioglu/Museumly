@@ -52,7 +52,8 @@ fun MuseumlyNavGraph(navController: NavHostController)
                 state = state,
                 refresh = viewModel::loadMore,
                 onPageChanged = viewModel::onPageChanged,
-                onDetailPage = { id -> navController.navigate(DetailPage(id)) }
+                onDetailPage = { id -> navController.navigate(DetailPage(id)) },
+                onSectionSelected = viewModel::selectSection
             )
         }
 
