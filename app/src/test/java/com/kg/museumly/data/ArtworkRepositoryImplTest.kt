@@ -77,8 +77,8 @@ class ArtworkRepositoryImplTest {
         cursorDao = database.cursorDao()
 
         turnSource = mockk()
-        coEvery { turnSource.getTurn() } returns 0
-        coEvery { turnSource.setTurn(any()) } just Runs
+        coEvery { turnSource.getTurn(any()) } returns 0
+        coEvery { turnSource.setTurn(any(), any()) } just Runs
     }
 
     @After
@@ -131,7 +131,7 @@ class ArtworkRepositoryImplTest {
         assertEquals(LoadOutcome.Loaded, outcome)
         // met is index 1 in the sorted [cleveland, met] list, so the next
         // turn should be (1 + 1) % 2 = 0, not 2 or unchanged.
-        coVerify(exactly = 1) { turnSource.setTurn(0) }
+        coVerify(exactly = 1) { turnSource.setTurn(0 , Section.EUROPEAN) }
     }
 
     @Test
@@ -146,7 +146,7 @@ class ArtworkRepositoryImplTest {
         val outcome: LoadOutcome = repository.loadMore(Section.EUROPEAN, size = 20)
 
         assertEquals(LoadOutcome.Exhausted, outcome)
-        coVerify(exactly = 0) { turnSource.setTurn(any()) }
+        coVerify(exactly = 0) { turnSource.setTurn(any() , any()) }
     }
 
     @Test
@@ -214,9 +214,9 @@ class ArtworkRepositoryImplTest {
     }
 
     @Test
-    fun `sources are sorted by provider, then by department order within a provider`() = runTest {
-        // sources = [cleveland:a, cleveland:b, met:11]; turn = 1 lands on cleveland:b.
-        coEvery { turnSource.getTurn() } returns 1
+    fun `sources alternate providers, each walking its own departments in order`() = runTest {
+        // sources interleave per round: [cleveland:a, met:11, cleveland:b, met:11]; turn = 2 lands on cleveland:b.
+        coEvery { turnSource.getTurn(Section.EUROPEAN) } returns 2
         val page = PageResult(listOf(sampleArtwork("cleveland:1")), listOf(sampleDetail()), next = "1", status = PageStatus.OK)
         val cleveland = FakeArtworkProvider("cleveland") { listOf("a", "b") }
         cleveland.enqueue(page)
@@ -228,8 +228,93 @@ class ArtworkRepositoryImplTest {
         assertEquals(LoadOutcome.Loaded, outcome)
         assertEquals(listOf("b"), cleveland.requestedDepartments)
         assertEquals(0, met.callCount)
-        // cleveland:b is index 1 of 3, so the next turn is 2 (met:11).
-        coVerify(exactly = 1) { turnSource.setTurn(2) }
+        // cleveland:b is index 2 of 4, so the next turn is 3 (met:11).
+        coVerify(exactly = 1) { turnSource.setTurn(3, Section.EUROPEAN) }
+    }
+
+    @Test
+    fun `museums get equal turns even when one has fewer departments`() = runTest {
+        rememberTurns()
+        val cleveland = FakeArtworkProvider("cleveland") { listOf("a", "b") }
+        val met = FakeArtworkProvider("met") { listOf("11") }
+        repeat(2) {
+            cleveland.enqueue(PageResult(listOf(sampleArtwork("cleveland:$it")), listOf(sampleDetail()), next = "1", status = PageStatus.OK))
+            met.enqueue(PageResult(listOf(sampleArtwork("met:$it")), listOf(sampleDetail()), next = "1", status = PageStatus.OK))
+        }
+
+        val repository = repository(setOf(cleveland, met))
+        repeat(4) { repository.loadMore(Section.EUROPEAN, size = 20) }
+
+        // Met repeats its one department instead of Cleveland getting 2 of every 3 pages.
+        assertEquals(listOf("a", "b"), cleveland.requestedDepartments)
+        assertEquals(listOf("11", "11"), met.requestedDepartments)
+    }
+
+    @Test
+    fun `an exhausted department gets no slot, so it can't pass its turn to the other museum`() = runTest {
+        // Live list is [cleveland:b, met:11]. If cleveland:a still held a
+        // slot, the list would be [cleveland:a, met:11, cleveland:b, met:11]
+        // and met:11 at index 1 would hand the turn to 2 instead of 0.
+        cursorDao.put(ProviderCursor(providerId = "cleveland:a", next = null))
+        coEvery { turnSource.getTurn(Section.EUROPEAN) } returns 1
+        val cleveland = FakeArtworkProvider("cleveland") { listOf("a", "b") }
+        val met = FakeArtworkProvider("met") { listOf("11") }
+        met.enqueue(PageResult(listOf(sampleArtwork("met:1")), listOf(sampleDetail()), next = "1", status = PageStatus.OK))
+
+        val repository = repository(setOf(cleveland, met))
+        val outcome: LoadOutcome = repository.loadMore(Section.EUROPEAN, size = 20)
+
+        assertEquals(LoadOutcome.Loaded, outcome)
+        assertEquals(listOf("11"), met.requestedDepartments)
+        coVerify(exactly = 1) { turnSource.setTurn(0, Section.EUROPEAN) }
+    }
+
+    @Test
+    fun `a department listed twice is fetched only once per call`() = runTest {
+        // sources = [cleveland:a, met:11, cleveland:b, met:11]; every fetch fails.
+        val failed = PageResult(emptyList(), emptyList(), next = null, status = PageStatus.FAILED, failureReason = "down")
+        val cleveland = FakeArtworkProvider("cleveland") { listOf("a", "b") }
+        cleveland.enqueue(failed)
+        cleveland.enqueue(failed)
+        val met = FakeArtworkProvider("met") { listOf("11") }
+        met.enqueue(failed)
+
+        val repository = repository(setOf(cleveland, met))
+        val outcome: LoadOutcome = repository.loadMore(Section.EUROPEAN, size = 20)
+
+        assertTrue(outcome is LoadOutcome.Failed)
+        // A failing department must cost one timeout per load, not one per slot.
+        assertEquals(1, met.callCount)
+        assertEquals(listOf("a", "b"), cleveland.requestedDepartments)
+    }
+
+    @Test
+    fun `each section keeps its own turn`() = runTest {
+        rememberTurns()
+        val cleveland = FakeArtworkProvider("cleveland") { section -> listOf(section.id) }
+        val met = FakeArtworkProvider("met") { section -> listOf(section.id) }
+        cleveland.enqueue(PageResult(listOf(sampleArtwork("cleveland:1")), listOf(sampleDetail()), next = "1", status = PageStatus.OK))
+        cleveland.enqueue(PageResult(listOf(sampleArtwork("cleveland:2")), listOf(sampleDetail()), next = "1", status = PageStatus.OK))
+
+        val repository = repository(setOf(cleveland, met))
+        repository.loadMore(Section.EUROPEAN, size = 20)
+        repository.loadMore(Section.ASIA, size = 20)
+
+        // European moved its turn to met; Asia still starts at its own 0 (cleveland).
+        assertEquals(listOf(Section.EUROPEAN.id, Section.ASIA.id), cleveland.requestedDepartments)
+        assertEquals(0, met.callCount)
+        coVerify(exactly = 1) { turnSource.setTurn(1, Section.EUROPEAN) }
+        coVerify(exactly = 1) { turnSource.setTurn(1, Section.ASIA) }
+    }
+
+    /**
+     * Makes turnSource behave like the real per-section store, so a test can
+     * run several loadMore() calls and see the rotation carry over.
+     */
+    private fun rememberTurns() {
+        val turns: MutableMap<Section, Int> = HashMap()
+        coEvery { turnSource.getTurn(any()) } answers { turns[firstArg<Section>()] ?: 0 }
+        coEvery { turnSource.setTurn(any(), any()) } answers { turns[secondArg<Section>()] = firstArg<Int>() }
     }
 
     @Test
@@ -301,7 +386,7 @@ class ArtworkRepositoryImplTest {
     fun `a provider failure is not silently lost when a later provider succeeds in the same call`() = runTest {
         // sorted = [cleveland, met]; turn = 1 starts the round at met, so
         // met fails first and cleveland succeeds second, in that order.
-        coEvery { turnSource.getTurn() } returns 1
+        coEvery { turnSource.getTurn(Section.EUROPEAN) } returns 1
         val met = provider("met", PageResult(emptyList(), emptyList(), next = null, status = PageStatus.FAILED, failureReason = "met down"))
         val cleveland = provider("cleveland", PageResult(listOf(sampleArtwork("cleveland:1")), listOf(sampleDetail()), next = "1", status = PageStatus.OK))
 
