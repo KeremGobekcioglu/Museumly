@@ -265,10 +265,11 @@ class MetProvider @Inject constructor(
             }
             Log.d("METPROVIDER", "cachedIds size=${ids.size}")
 
-            // toList() copies the two IDs. A plain subList is a view over
+            // toList() copies the batch's IDs. A plain subList is a view over
             // cachedIds, and if cachedIds grows while we're suspended below,
             // reading that view throws ConcurrentModificationException.
-            val batch = ids.subList(i, minOf(i + 2, ids.size)).toList()
+            // Batch of 4 stays under OkHttp's default maxRequestsPerHost (5).
+            val batch = ids.subList(i, minOf(i + 4, ids.size)).toList()
             // map launches every async{} immediately (List.map is eager, not lazy),
             // so all requests are in flight before awaitAll() blocks on them.
             val results = coroutineScope {

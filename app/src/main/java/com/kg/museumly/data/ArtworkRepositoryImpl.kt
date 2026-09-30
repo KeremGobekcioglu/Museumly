@@ -186,7 +186,7 @@ class ArtworkRepositoryImpl @Inject constructor(
                 return LoadOutcome.Exhausted
             }
             val failures: MutableList<String> = ArrayList()
-            val turn : Int = turnSource.getTurn()
+            val turn : Int = turnSource.getTurn(section = section)
             for(attempt in sources.indices)
             {
                 val index : Int = (turn + attempt) % sources.size
@@ -250,7 +250,7 @@ class ArtworkRepositoryImpl @Inject constructor(
                 // DataStore, not Room, so it can't join the transaction. Only advance
                 // the turn when the provider actually delivered something.
                 if (page.items.isNotEmpty()) {
-                    turnSource.setTurn((index + 1) % sources.size)
+                    turnSource.setTurn((index + 1) % sources.size, section)
                     return LoadOutcome.Loaded
                 }
             }
