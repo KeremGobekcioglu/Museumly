@@ -21,6 +21,8 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -68,10 +70,12 @@ class ScrollViewModel @Inject constructor(
     private var loadJob: Job? = null
     private val tail = MutableStateFlow<TailState>(TailState.Loading)
     private val initialPage = MutableStateFlow<Pair<Section, Int>?>(null)
-    private val section = MutableStateFlow(Section.EUROPEAN)
+    private val section = MutableStateFlow<Section?>(null)
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    private val feed: Flow<Pair<Section, List<Artwork>>> = section.flatMapLatest {
+    private val feed: Flow<Pair<Section, List<Artwork>>> = section
+        .filterNotNull()
+        .flatMapLatest {
         current: Section ->
             repository.artworks(current).map {
                 list: List<Artwork> ->
@@ -105,7 +109,16 @@ class ScrollViewModel @Inject constructor(
     )
 
     init {
-        enter(section.value)
+        viewModelScope.launch {
+            val restoredSection = positionStore.getLastSection()
+            // Defensive: nothing should set section before this. The section pill
+            // only appears once section is set, so the user can't tap first.
+            if(section.value == null)
+            {
+                section.value = restoredSection
+                enter(restoredSection)
+            }
+        }
         viewModelScope.launch {
             // auto retry
             networkMonitor.isOnline
@@ -135,7 +148,13 @@ class ScrollViewModel @Inject constructor(
                 }
                 initialPage.value = Pair(target,start)
 
-
+                // Start the landing page's image now, before the pager is even
+                // composed. By the time AsyncImage asks for it, it's in the memory
+                // cache, so the page draws with its image instead of empty.
+                val landing: Artwork? = repository.artworks(target).first().getOrNull(start)
+                if (landing != null) {
+                    prefetch(listOf(landing.imageUrl))
+                }
 
                 // Ask the database directly. A Flow's first emission can't tell
                 // "empty because loading" from "empty because empty" — a count query can.
@@ -164,6 +183,9 @@ class ScrollViewModel @Inject constructor(
         tail.value = TailState.Loading
         section.value = target
         enter(target)
+        viewModelScope.launch {
+            positionStore.setLastSection(target)
+        }
     }
     fun loadMore()
     {
@@ -172,7 +194,7 @@ class ScrollViewModel @Inject constructor(
             Log.d("VM", "skipped, already loading")
             return
         }
-        val target: Section = section.value
+        val target: Section = section.value ?: return
 
         loadJob = viewModelScope.launch {
 
@@ -238,13 +260,16 @@ class ScrollViewModel @Inject constructor(
         }
     }
     fun onPageChanged(page: Int) {
-        val shown = uiState.value.section
+        val shown = uiState.value.section ?: return
         viewModelScope.launch {
             positionStore.setFrontier(shown, page)
         }
 
         val artworks = uiState.value.artworks
-        val urls = (1..2).mapNotNull {
+        // Offset 0 keeps the current page in the list. The prefetcher cancels
+        // anything not in the latest list, and enter() may have just started
+        // this page's image — dropping it would throw that head start away.
+        val urls = (0..2).mapNotNull {
             offset ->
                 artworks.getOrNull(page + offset)?.imageUrl
         }

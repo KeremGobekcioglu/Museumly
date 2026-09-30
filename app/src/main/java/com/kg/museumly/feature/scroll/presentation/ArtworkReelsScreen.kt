@@ -1,5 +1,11 @@
 package com.kg.museumly.feature.scroll.presentation
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -73,6 +79,26 @@ private fun failedBody(isOnline: Boolean, isTail: Boolean): String {
     return if (isTail) "The collection isn't responding right now."
     else "Something went wrong loading the collection."
 }
+
+/**
+ * Which top-level screen ReelsContent shows. The transition animates on
+ * this, not on ScrollUiState, so new artworks or page changes don't
+ * restart the fade or rebuild the pager.
+ */
+private enum class ReelsMode { Loading, Notice, Waiting, Pager }
+
+private fun ScrollUiState.mode(): ReelsMode = when {
+    // A fetch is in flight and there's nothing to show yet. tail defaults to
+    // Loading at construction, so this covers the very first frame as well
+    // as every fetch after it, including a retry.
+    tail == TailState.Loading && artworks.isEmpty() -> ReelsMode.Loading
+    // Nothing in Room and nothing loading: failed, or genuinely empty.
+    artworks.isEmpty() -> ReelsMode.Notice
+    // Don't build the pager until we know the start position.
+    initialPage == null -> ReelsMode.Waiting
+    else -> ReelsMode.Pager
+}
+
 /**
  * Phase 0 spike: the World Wonders question, answered up front. Each page reserves
  * exactly the artwork's true aspect ratio before the image decodes, inside a fixed
@@ -94,11 +120,21 @@ fun ArtworkReelsScreen(
             onPageChanged = onPageChanged,
             onDetailPage = onDetailPage
         )
-        SectionPicker(
-            selected = state.section,
-            onSectionSelected = onSectionSelected,
+        // Same 300 ms as the gallery crossfade, so the pill and the
+        // artwork appear together instead of the pill popping in on its own.
+        AnimatedVisibility(
+            visible = state.section != null,
+            enter = fadeIn(tween(300)),
+            exit = fadeOut(),
             modifier = Modifier.align(Alignment.TopCenter)
-        )
+        ) {
+            state.section?.let { section ->
+                SectionPicker(
+                    selected = section,
+                    onSectionSelected = onSectionSelected
+                )
+            }
+        }
     }
 }
 
@@ -192,6 +228,16 @@ private fun SectionPicker(
     }
 }
 
+/**
+ * Switching screens with a plain if/return is a hard cut: loading screen on
+ * one frame, full pager on the next. AnimatedContent crossfades instead.
+ * contentKey = mode() means only a change of screen animates, and the
+ * screen fading out keeps the state it last had instead of the newest one.
+ *
+ * Waiting (initialPage == null, mid section switch) stays a plain black
+ * screen. Showing GalleryLoading there would flash the gallery wall on
+ * every cached switch.
+ */
 @Composable
 private fun ReelsContent(
     state: ScrollUiState,
@@ -199,59 +245,65 @@ private fun ReelsContent(
     onPageChanged: (Int) -> Unit,
     onDetailPage: (String) -> Unit
 ) {
-
-    /**
-     * During a switch, if the screen does catch the null gap, the initialPage == null
-     * branch returns nothing and you get a plain black frame, not the gallery loading screen.
-     * On a cached section it lasts a frame or two. If it bothers you, that return could show
-     * GalleryLoading instead, but then cached switches will flash the gallery wall. That's your UI call.
-     */
-
-    // A fetch is genuinely in flight and we have nothing to show yet.
-    // tail defaults to Loading at construction (before the launched
-    // coroutine has had a chance to run), so this covers the very first
-    // frame as well as every fetch after that, including a retry.
-    if (state.tail == TailState.Loading && state.artworks.isEmpty()) {
-        GalleryLoading("Hanging the work")
-        return
-    }
-
-    // Nothing in Room and nothing loading. Two different situations:
-    // the fetch failed, or every provider is genuinely empty. Only the
-    // first is retryable, and this early-returns before the LaunchedEffect
-    // below, so a button is the only way back.
-    if (state.artworks.isEmpty()) {
-        val tail = state.tail
-        if (tail is TailState.Failed) {
-            GalleryNotice(
-                title = failedTitle(state.isOnline, false),
-                body = failedBody(state.isOnline, false),
-                actionLabel = if (state.isOnline) "Retry" else "Try anyway",
-                onAction = refresh,
-                isBusy = tail.retrying,
-                debugDetail = if (BuildConfig.DEBUG) tail.message else null,
-            )
-        } else {
-            GalleryNotice(
-                title = "Nothing on the walls",
-                body = "No works came back from the collection.",
-                actionLabel = "Retry",
-                onAction = refresh,
+    AnimatedContent(
+        targetState = state,
+        contentKey = { it.mode() },        // only animate when the mode changes
+        transitionSpec = { fadeIn(tween(300)) togetherWith fadeOut(tween(300)) },
+        label = "reels-mode",
+    ) { slotState: ScrollUiState ->
+        when (slotState.mode()) {
+            ReelsMode.Loading -> GalleryLoading("Hanging the work")
+            ReelsMode.Notice -> ReelsNotice(state = slotState, refresh = refresh)
+            ReelsMode.Waiting -> Box(modifier = Modifier.fillMaxSize())
+            ReelsMode.Pager -> ReelsPager(
+                state = slotState,
+                refresh = refresh,
+                onPageChanged = onPageChanged,
+                onDetailPage = onDetailPage
             )
         }
-        return
     }
+}
 
-    // Don't build the pager until we know the start position.
-    // rememberPagerState reads initialPage exactly once — if it's created
-    // against an empty list, the position clamps to 0 and never corrects.
-    if (state.initialPage == null) {
-        return
+// Nothing in Room and nothing loading. Two different situations:
+// the fetch failed, or every provider is genuinely empty. Only the
+// first is retryable, and the pager (with its LaunchedEffect) isn't
+// built here, so a button is the only way back.
+@Composable
+private fun ReelsNotice(state: ScrollUiState, refresh: () -> Unit) {
+    val tail = state.tail
+    if (tail is TailState.Failed) {
+        GalleryNotice(
+            title = failedTitle(state.isOnline, false),
+            body = failedBody(state.isOnline, false),
+            actionLabel = if (state.isOnline) "Retry" else "Try anyway",
+            onAction = refresh,
+            isBusy = tail.retrying,
+            debugDetail = if (BuildConfig.DEBUG) tail.message else null,
+        )
+    } else {
+        GalleryNotice(
+            title = "Nothing on the walls",
+            body = "No works came back from the collection.",
+            actionLabel = "Retry",
+            onAction = refresh,
+        )
     }
+}
 
+@Composable
+private fun ReelsPager(
+    state: ScrollUiState,
+    refresh: () -> Unit,
+    onPageChanged: (Int) -> Unit,
+    onDetailPage: (String) -> Unit
+) {
     key(state.section) {
         val pagerState = rememberPagerState(
-            initialPage = state.initialPage,
+            // rememberPagerState reads initialPage exactly once, which is why
+            // mode() only picks Pager once it's known. initialPage is always set
+            // here; ?: 0 only satisfies the nullable type.
+            initialPage = state.initialPage ?: 0,
             pageCount = { state.artworks.size + 1 /*loading page*/ }
         )
 

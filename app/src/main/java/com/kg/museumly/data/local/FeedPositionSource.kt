@@ -5,6 +5,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.kg.museumly.model.Section
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -19,6 +20,7 @@ class FeedPositionSource @Inject constructor(
     @ApplicationContext private val context: Context
 )
 {
+    private val lastSectionKey = stringPreferencesKey("last_section")
     private fun frontierKey(section: Section): Preferences.Key<Int>
     {
         return intPreferencesKey("frontier_" + section.id)
@@ -28,6 +30,27 @@ class FeedPositionSource @Inject constructor(
     // likely forgotten the gesture exists and should see the hint again —
     // once per app launch is enough to not be annoying within a session.
     private var hasInspectedThisSession: Boolean = false
+
+    // always returns a valid section.
+    suspend fun getLastSection() : Section
+    {
+        // open datastore
+        val prefs = context.dataStore.data.first()
+        // first launch empty so return european
+        val storedId: String = prefs[lastSectionKey] ?: return Section.EUROPEAN
+        val match : Section? = Section.entries.firstOrNull {
+            it.id == storedId
+        }
+        return match ?: Section.EUROPEAN
+    }
+
+    suspend fun setLastSection(section: Section)
+    {
+        context.dataStore.edit {
+            prefs ->
+                prefs[lastSectionKey] = section.id
+        }
+    }
 
     suspend fun getFrontier(section: Section): Int
     {
