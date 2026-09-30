@@ -62,25 +62,58 @@ class ArtworkRepositoryImpl @Inject constructor(
     }
 
     /**
-     * Departments differ by provider. SO they need
-     * their own naming logic. see departmentsFor, it s overriden for both.
-     * Eventually, user and domain/presenttion packages have one unified name for
-     * each department.
-     * This function create sources, for example:
-     * if user wants to see european artworks, providers can have multiple
-     * european department and this function combines them, european paintings, scultpure for
-     * one provider, european paintings for other provider and returns 3 source that is
-     * usable. later on, loadMore will take turn on these sources.
+     * Builds the rotation list for a section.
+     *
+     * Each provider names its own departments (see departmentsFor), so one
+     * section can be several departments per provider. Two rules:
+     *
+     * - Live only: a department whose cursor row says exhausted (next == null)
+     *   gets no slot. Otherwise its dead slot would hand its turn to whatever
+     *   comes next and tilt the balance toward the other museum.
+     * - Alternate museums: each provider cycles through its own live departments,
+     *   and providers take turns. A provider with fewer departments repeats them,
+     *   so every museum gets an equal share of pages.
+     *
+     * Asia: Chinese, met:6, Japanese, met:6, Korean, met:6, Indian, met:6
+     *
+     * A department can appear more than once; loadMore tries each key once per call.
+     * Must be called under the mutex — it reads cursor rows loadMore may write.
      */
-    private fun sourcesFor(section: Section) : List<Source>
+    private suspend fun sourcesFor(section: Section) : List<Source>
     {
-        val sources : MutableList<Source> = ArrayList()
         val ordered : List<ArtworkProvider> = providers.sortedBy { it.id }
+
+        val perProvider : MutableList<List<String>> = ArrayList()
+        var longest = 0
         for(provider in ordered)
         {
+            val live : MutableList<String> = ArrayList()
             for(department in provider.departmentsFor(section))
             {
-                sources.add(Source(provider,department))
+                val saved = cursorDao.get(Source(provider,department).key)
+                // we need to check exhaustion for providers
+                if(saved != null && saved.next == null) // try next provider, this is finished.
+                    continue // exhausted: no slot
+                live.add(department)
+            }
+            perProvider.add(live)
+            if (live.size > longest)
+            {
+                longest = live.size
+            }
+        }
+
+        val sources : MutableList<Source> = ArrayList()
+
+        for(round in 0 until longest)
+        {
+            for(p in ordered.indices)
+            {
+                val departments = perProvider[p]
+                if(departments.isEmpty())
+                    continue
+                val department = departments[round % departments.size]
+                sources.add(Source((ordered[p]), department))
             }
         }
         return sources
@@ -183,31 +216,36 @@ class ArtworkRepositoryImpl @Inject constructor(
             val sources = sourcesFor(section)
             if(sources.isEmpty())
             {
+                // every department in this section is exhausted
                 return LoadOutcome.Exhausted
             }
             val failures: MutableList<String> = ArrayList()
+            // the same department can sit in the list several times;
+            // try each one at most once per call
+            val tried: MutableSet<String> = HashSet()
             val turn : Int = turnSource.getTurn(section = section)
             for(attempt in sources.indices)
             {
                 val index : Int = (turn + attempt) % sources.size
                 val source: Source = sources[index]
-                Log.d("ARTWORKREPOSITORYIMPL" , "LOAD MORE.")
+                if(!tried.add(source.key))
+                {
+                    continue
+                }
                 val saved: ProviderCursor? = cursorDao.get(source.key)
-                // we need to check exhaustion for providers
+                // Safety net: sourcesFor already drops exhausted departments.
                 if(saved != null && saved.next == null)
                 {
-                    // try next provider, this is finished.
                     Log.d("REPO", "exhausted, skipping")
                     continue
                 }
-
+                // No row means this source has never been fetched: start at the beginning.
                 var cursor: String? = null
                 if(saved != null)
                     cursor = saved.next
-                // if saved is null, it means we are at 0, at the beginning.
                 // The provider does everything: rebuilds its ID list if needed, walks
                 // from `cursor`, hydrates each artwork, drops the unusable ones.
-                Log.d("REPO", "calling fetchPage cursor=$cursor")
+                Log.d("REPO", "calling ${source.key} cursor=$cursor")
                 val started: Long = System.nanoTime()
                 val page: PageResult? = withTimeoutOrNull(PROVIDER_FETCH_TIMEOUT_MS.milliseconds)
                 {
@@ -227,8 +265,8 @@ class ArtworkRepositoryImpl @Inject constructor(
                     failures.add("${source.key}: $reason")
                     continue
                 }
-                // If page.next is null, this writes the exhaustion marker, and the
-                // continue check will skip this provider from now on.
+                // If page.next is null, this writes the exhaustion marker, and
+                // sourcesFor leaves this department out from now on.
                 //
                 // One transaction because a crash between the writes leaves damage
                 // nothing ever repairs:
@@ -248,7 +286,7 @@ class ArtworkRepositoryImpl @Inject constructor(
                     cursorDao.put(ProviderCursor(source.key, page.next))
                 }
                 // DataStore, not Room, so it can't join the transaction. Only advance
-                // the turn when the provider actually delivered something.
+                // the turn when the source actually delivered something.
                 if (page.items.isNotEmpty()) {
                     turnSource.setTurn((index + 1) % sources.size, section)
                     return LoadOutcome.Loaded
