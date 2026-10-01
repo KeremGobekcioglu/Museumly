@@ -35,8 +35,7 @@ import kotlin.time.Duration.Companion.milliseconds
  * exactly the way it used to rotate over providers.
  * key is what the cursor is stored under: "cleveland:Chinese Art", "met:6".
  */
-private class Source(val provider: ArtworkProvider, val department: String)
-{
+private class Source(val provider: ArtworkProvider, val department: String) {
     val key = provider.id + ":" + department
 }
 
@@ -49,8 +48,7 @@ class ArtworkRepositoryImpl @Inject constructor(
     private val providers: Set<@JvmSuppressWildcards ArtworkProvider>,
     private val seedSource: SeedSource,
     private val turnSource: ProviderTurnSource
-) : ArtworkRepository
-{
+) : ArtworkRepository {
     private companion object {
         // callTimeout (NetworkModule) bounds a single HTTP call. fetchPage
         // can be several of those in a row — Met especially, one call per
@@ -79,38 +77,32 @@ class ArtworkRepositoryImpl @Inject constructor(
      * A department can appear more than once; loadMore tries each key once per call.
      * Must be called under the mutex — it reads cursor rows loadMore may write.
      */
-    private suspend fun sourcesFor(section: Section) : List<Source>
-    {
-        val ordered : List<ArtworkProvider> = providers.sortedBy { it.id }
+    private suspend fun sourcesFor(section: Section): List<Source> {
+        val ordered: List<ArtworkProvider> = providers.sortedBy { it.id }
 
-        val perProvider : MutableList<List<String>> = ArrayList()
+        val perProvider: MutableList<List<String>> = ArrayList()
         var longest = 0
-        for(provider in ordered)
-        {
-            val live : MutableList<String> = ArrayList()
-            for(department in provider.departmentsFor(section))
-            {
-                val saved = cursorDao.get(Source(provider,department).key)
+        for (provider in ordered) {
+            val live: MutableList<String> = ArrayList()
+            for (department in provider.departmentsFor(section)) {
+                val saved = cursorDao.get(Source(provider, department).key)
                 // we need to check exhaustion for providers
-                if(saved != null && saved.next == null) // try next provider, this is finished.
+                if (saved != null && saved.next == null) // try next provider, this is finished.
                     continue // exhausted: no slot
                 live.add(department)
             }
             perProvider.add(live)
-            if (live.size > longest)
-            {
+            if (live.size > longest) {
                 longest = live.size
             }
         }
 
-        val sources : MutableList<Source> = ArrayList()
+        val sources: MutableList<Source> = ArrayList()
 
-        for(round in 0 until longest)
-        {
-            for(p in ordered.indices)
-            {
+        for (round in 0 until longest) {
+            for (p in ordered.indices) {
                 val departments = perProvider[p]
-                if(departments.isEmpty())
+                if (departments.isEmpty())
                     continue
                 val department = departments[round % departments.size]
                 sources.add(Source((ordered[p]), department))
@@ -137,13 +129,11 @@ class ArtworkRepositoryImpl @Inject constructor(
      * Returns Flow, so the screen subscribes once and gets every future version automatically.
      */
     override fun artworks(section: Section): Flow<List<Artwork>> {
-        return artworkDao.observeBySection(section.id).map {
-            rows: List<ArtworkEntity> ->
-                val result : MutableList<Artwork> = ArrayList()
-                for(row in rows)
-                {
-                    result.add(ArtworkMapper.toDomain(row))
-                }
+        return artworkDao.observeBySection(section.id).map { rows: List<ArtworkEntity> ->
+            val result: MutableList<Artwork> = ArrayList()
+            for (row in rows) {
+                result.add(ArtworkMapper.toDomain(row))
+            }
             result
         }
     }
@@ -153,12 +143,15 @@ class ArtworkRepositoryImpl @Inject constructor(
         val artworkEntity = artworkDao.byId(id) ?: return null
         val artworkDetailEntity = artworkDetailDao.getById(id) ?: return null
         Log.d("REPOSITORY ARTWORKWITHDETAIL", "STILL NOT NULL")
-        return ArtworkWithDetail(ArtworkMapper.toDomain(artworkEntity), ArtworkDetailMapper.toDomain(artworkDetailEntity))
+        return ArtworkWithDetail(
+            ArtworkMapper.toDomain(artworkEntity),
+            ArtworkDetailMapper.toDomain(artworkDetailEntity)
+        )
     }
 
     override suspend fun byId(id: String): Artwork? {
-        val entity : ArtworkEntity? = artworkDao.byId(id)
-        if(entity == null)
+        val entity: ArtworkEntity? = artworkDao.byId(id)
+        if (entity == null)
             return null
         return ArtworkMapper.toDomain(entity)
     }
@@ -173,9 +166,13 @@ class ArtworkRepositoryImpl @Inject constructor(
      * One insertAll for the whole list, not one per artwork, so Room
      * notifies the screen once instead of twenty times.
      */
-    private suspend fun insert(items: List<Artwork>, details: List<ArtworkDetail>, section: Section) {
+    private suspend fun insert(
+        items: List<Artwork>,
+        details: List<ArtworkDetail>,
+        section: Section
+    ) {
         var position: Int = artworkDao.maxPosition(section.id)
-        val entities : MutableList<ArtworkEntity> = ArrayList()
+        val entities: MutableList<ArtworkEntity> = ArrayList()
         val detailEntities: MutableList<ArtworkDetailEntity> = ArrayList()
         for (i in items.indices) {
             position += 1
@@ -201,21 +198,33 @@ class ArtworkRepositoryImpl @Inject constructor(
         artworkDetailDao.insertAll(detailEntities)
     }
 
-//    override suspend fun seedIfEmpty() {
-//        mutex.withLock {
-//            val existing: Int = artworkDao.count()
-//            if(existing > 0)
-//                return@withLock
-//            insert(seedSource.artworks())
-//        }
-//    }
-
-    override suspend fun loadMore(section: Section, size: Int): LoadOutcome
-    {
+        //    override suspend fun seedIfEmpty() {
+    //        mutex.withLock {
+    //            val existing: Int = artworkDao.count()
+    //            if(existing > 0)
+    //                return@withLock
+    //            insert(seedSource.artworks())
+    //        }
+    //    }
+    // TODO total deadline for loadMore (slow-but-alive network): each source
+    // can take up to PROVIDER_FETCH_TIMEOUT_MS, one after another, so a section
+    // with several sources can sit on the loading screen for minutes.
+    //
+    // Tried and reverted: withTimeoutOrNull around the whole loop.
+    //  - It also covers Room work. Under runTest, Room runs on a real thread,
+    //    the test scheduler idles and jumps virtual time to the deadline, so
+    //    it fires instantly (broke ~15 repository tests).
+    //  - It can fire after the transaction commits: artworks saved, load
+    //    reported Failed.
+    //
+    // Plan: a budget, not a wrapper. deadline = timeSource.markNow() + total;
+    // before each source, stop if passed, else fetch with
+    // withTimeoutOrNull(min(PROVIDER_FETCH_TIMEOUT_MS, time left)).
+    // Only fetchPage is ever timed. Tests swap timeSource for testTimeSource.
+    override suspend fun loadMore(section: Section, size: Int): LoadOutcome {
         mutex.withLock {
             val sources = sourcesFor(section)
-            if(sources.isEmpty())
-            {
+            if (sources.isEmpty()) {
                 // every department in this section is exhausted
                 return LoadOutcome.Exhausted
             }
@@ -223,25 +232,22 @@ class ArtworkRepositoryImpl @Inject constructor(
             // the same department can sit in the list several times;
             // try each one at most once per call
             val tried: MutableSet<String> = HashSet()
-            val turn : Int = turnSource.getTurn(section = section)
-            for(attempt in sources.indices)
-            {
-                val index : Int = (turn + attempt) % sources.size
+            val turn: Int = turnSource.getTurn(section = section)
+            for (attempt in sources.indices) {
+                val index: Int = (turn + attempt) % sources.size
                 val source: Source = sources[index]
-                if(!tried.add(source.key))
-                {
+                if (!tried.add(source.key)) {
                     continue
                 }
                 val saved: ProviderCursor? = cursorDao.get(source.key)
                 // Safety net: sourcesFor already drops exhausted departments.
-                if(saved != null && saved.next == null)
-                {
+                if (saved != null && saved.next == null) {
                     Log.d("REPO", "exhausted, skipping")
                     continue
                 }
                 // No row means this source has never been fetched: start at the beginning.
                 var cursor: String? = null
-                if(saved != null)
+                if (saved != null)
                     cursor = saved.next
                 // The provider does everything: rebuilds its ID list if needed, walks
                 // from `cursor`, hydrates each artwork, drops the unusable ones.
@@ -249,16 +255,18 @@ class ArtworkRepositoryImpl @Inject constructor(
                 val started: Long = System.nanoTime()
                 val page: PageResult? = withTimeoutOrNull(PROVIDER_FETCH_TIMEOUT_MS.milliseconds)
                 {
-                    source.provider.fetchPage(cursor,size,source.department)
+                    source.provider.fetchPage(cursor, size, source.department)
                 }
                 val ms: Long = (System.nanoTime() - started) / 1_000_000
-                if (page == null)
-                {
+                if (page == null) {
                     Log.d("REPO", "${source.key} timed out after ${ms}ms")
                     failures.add("${source.key}: timed out")
                     continue
                 }
-                Log.d("REPO", "${source.key} took ${ms}ms, ${page.items.size} items, next=${page.next}")
+                Log.d(
+                    "REPO",
+                    "${source.key} took ${ms}ms, ${page.items.size} items, next=${page.next}"
+                )
                 if (page.status == PageStatus.FAILED) {
                     val reason: String = page.failureReason ?: "failed"
                     Log.d("REPO", "${source.key} failed: $reason")

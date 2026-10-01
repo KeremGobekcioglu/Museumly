@@ -60,8 +60,7 @@ class ScrollViewModel @Inject constructor(
     private val positionStore: FeedPositionSource,
     private val prefetcher: ArtworkPrefetcher,
     private val networkMonitor: NetworkMonitor
-) : ViewModel()
-{
+) : ViewModel() {
 
     private companion object {
         const val MIN_RETRY_VISIBLE_MS: Long = 600
@@ -75,24 +74,20 @@ class ScrollViewModel @Inject constructor(
     @OptIn(ExperimentalCoroutinesApi::class)
     private val feed: Flow<Pair<Section, List<Artwork>>> = section
         .filterNotNull()
-        .flatMapLatest {
-        current: Section ->
-            repository.artworks(current).map {
-                list: List<Artwork> ->
-                Pair(current,list)
+        .flatMapLatest { current: Section ->
+            repository.artworks(current).map { list: List<Artwork> ->
+                Pair(current, list)
             }
-    }
+        }
     val uiState: StateFlow<ScrollUiState> = combine(
         feed,
         initialPage,
         tail,
         networkMonitor.isOnline
-    ){
-        feedValue: Pair<Section, List<Artwork>>, page: Pair<Section, Int>?, tailState: TailState, online: Boolean ->
+    ) { feedValue: Pair<Section, List<Artwork>>, page: Pair<Section, Int>?, tailState: TailState, online: Boolean ->
         val feedSection: Section = feedValue.first
-        var matchedPage: Int?= null
-        if(page != null && page.first == feedSection)
-        {
+        var matchedPage: Int? = null
+        if (page != null && page.first == feedSection) {
             matchedPage = page.second
         }
         ScrollUiState(
@@ -113,8 +108,7 @@ class ScrollViewModel @Inject constructor(
             val restoredSection = positionStore.getLastSection()
             // Defensive: nothing should set section before this. The section pill
             // only appears once section is set, so the user can't tap first.
-            if(section.value == null)
-            {
+            if (section.value == null) {
                 section.value = restoredSection
                 enter(restoredSection)
             }
@@ -123,58 +117,57 @@ class ScrollViewModel @Inject constructor(
             // auto retry
             networkMonitor.isOnline
                 .drop(1)
-                .collect {
-                    online: Boolean ->
-                        if(online && tail.value is TailState.Failed)
-                        {
-                            Log.d("VM", "back online, retrying")
-                            loadMore()
-                        }
+                .collect { online: Boolean ->
+                    if (online && tail.value is TailState.Failed) {
+                        Log.d("VM", "back online, retrying")
+                        loadMore()
+                    }
                 }
         }
     }
 
     private var enterJob: Job? = null
 
-    private fun enter(target: Section)
-    {
+    private fun enter(target: Section) {
         enterJob?.cancel()
         enterJob = viewModelScope.launch {
+            // Count first: the saved frontier can outlive Room's rows
+            // (a schema bump wipes Room but keeps DataStore).
+            // Ask the database directly. A Flow's first emission can't tell
+            // "empty because loading" from "empty because empty" — a count query can.
+            val existing: Int = repository.count(target)
+            val stored: Int = positionStore.getFrontier(target)
+            var start: Int = stored - 2
+            if (start > existing - 1) {
+                start = existing - 1        // never past the last artwork
+            }
+            if (start < 0) {
+                start = 0                   // also covers existing == 0
+            }
+            initialPage.value = Pair(target, start)
 
-                val stored: Int = positionStore.getFrontier(target)
-                var start: Int = stored - 2
-                if (start < 0) {
-                    start = 0
-                }
-                initialPage.value = Pair(target,start)
+            // Start the landing page's image now, before the pager is even
+            // composed. By the time AsyncImage asks for it, it's in the memory
+            // cache, so the page draws with its image instead of empty.
+            val landing: Artwork? = repository.artworks(target).first().getOrNull(start)
+            if (landing != null) {
+                prefetch(listOf(landing.imageUrl))
+            }
 
-                // Start the landing page's image now, before the pager is even
-                // composed. By the time AsyncImage asks for it, it's in the memory
-                // cache, so the page draws with its image instead of empty.
-                val landing: Artwork? = repository.artworks(target).first().getOrNull(start)
-                if (landing != null) {
-                    prefetch(listOf(landing.imageUrl))
-                }
-
-                // Ask the database directly. A Flow's first emission can't tell
-                // "empty because loading" from "empty because empty" — a count query can.
-                val existing: Int = repository.count(target)
-                if (existing == 0) {
-                    loadMore()
-                } else {
-                    // Cache already has data and nothing is pending. Without this,
-                    // tail stays stuck at its Loading default and the tail
-                    // placeholder page would spin forever with no fetch in flight.
-                    tail.value = TailState.Idle
-                }
+            if (existing == 0) {
+                loadMore()
+            } else {
+                // Cache already has data and nothing is pending. Without this,
+                // tail stays stuck at its Loading default and the tail
+                // placeholder page would spin forever with no fetch in flight.
+                tail.value = TailState.Idle
+            }
 
         }
     }
 
-    fun selectSection(target: Section)
-    {
-        if(target == section.value)
-        {
+    fun selectSection(target: Section) {
+        if (target == section.value) {
             return
         }
 
@@ -187,8 +180,8 @@ class ScrollViewModel @Inject constructor(
             positionStore.setLastSection(target)
         }
     }
-    fun loadMore()
-    {
+
+    fun loadMore() {
         Log.d("VM", "loadMore called, active=${loadJob?.isActive}")
         if (loadJob?.isActive == true) {
             Log.d("VM", "skipped, already loading")
@@ -209,26 +202,22 @@ class ScrollViewModel @Inject constructor(
             val previous: TailState = tail.value
             val isRetry: Boolean = previous is TailState.Failed
 
-            if(previous is TailState.Failed)
-            {
+            if (previous is TailState.Failed) {
                 tail.value = previous.copy(retrying = true)
-            }
-            else
-            {
+            } else {
                 tail.value = TailState.Loading
             }
             val next: TailState
-            if(isRetry)
-            {
+            if (isRetry) {
                 /**
                  * result will come after at lest MIN_RETRY_VISIBLE_MS SECONDS
                  * IF RETRY İS CALLED. at least.
                  */
                 next = coroutineScope {
-                    val minimumTimeShouldSpentBeforeVisible : Job =
+                    val minimumTimeShouldSpentBeforeVisible: Job =
                         launch { delay(MIN_RETRY_VISIBLE_MS.milliseconds) }
 
-                    val result : TailState = runLoad(target)
+                    val result: TailState = runLoad(target)
                     /**
                      * minimum.join() suspends until the timer finishes.
                      * If it already finished, this returns immediately.
@@ -236,17 +225,14 @@ class ScrollViewModel @Inject constructor(
                     minimumTimeShouldSpentBeforeVisible.join()
                     result
                 }
-            }
-            else
-            {
+            } else {
                 next = runLoad(target)
             }
             tail.value = next
         }
     }
 
-    private suspend fun runLoad(target: Section) : TailState
-    {
+    private suspend fun runLoad(target: Section): TailState {
         return try {
             when (val outcome = repository.loadMore(target)) {
                 LoadOutcome.Loaded -> TailState.Idle
@@ -259,6 +245,7 @@ class ScrollViewModel @Inject constructor(
             TailState.Failed(e.message ?: "Couldn't load more artworks")
         }
     }
+
     fun onPageChanged(page: Int) {
         val shown = uiState.value.section ?: return
         viewModelScope.launch {
@@ -269,17 +256,15 @@ class ScrollViewModel @Inject constructor(
         // Offset 0 keeps the current page in the list. The prefetcher cancels
         // anything not in the latest list, and enter() may have just started
         // this page's image — dropping it would throw that head start away.
-        val urls = (0..2).mapNotNull {
-            offset ->
-                artworks.getOrNull(page + offset)?.imageUrl
+        val urls = (0..2).mapNotNull { offset ->
+            artworks.getOrNull(page + offset)?.imageUrl
         }
         prefetch(urls)
         // <= (not <) so landing directly on the tail placeholder page — e.g. a
         // fast fling that skips past the "within 5 of the end" pages — still
         // triggers a load instead of leaving tail stuck at Idle with nothing
         // ever fetching.
-        if(artworks.size - page <= 5)
-        {
+        if (artworks.size - page <= 5) {
             loadMore()
         }
     }
