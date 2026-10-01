@@ -126,7 +126,7 @@ fun ArtworkReelsScreen(
             visible = state.section != null,
             enter = fadeIn(tween(300)),
             exit = fadeOut(),
-            modifier = Modifier.align(Alignment.TopCenter)
+            modifier = Modifier.align(Alignment.TopStart)
         ) {
             state.section?.let { section ->
                 SectionPicker(
@@ -165,8 +165,8 @@ private fun SectionPicker(
         contentColor = Color.White,
         modifier = modifier
             .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top))
-            .padding(top = 12.dp)
-            .widthIn(max = 220.dp)
+            .padding(start = 16.dp, top = 12.dp)
+            .widthIn(max = 200.dp)
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,

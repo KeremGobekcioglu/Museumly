@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -145,7 +146,9 @@ internal fun ArtworkPageWithRespectToAspectRatio(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
+                    .safeDrawingPadding()
                     .padding(16.dp)
+                    .widthIn(max = maxWidth * 0.4f)
             )
             AsyncImage(
                 model = artwork.imageUrl,
