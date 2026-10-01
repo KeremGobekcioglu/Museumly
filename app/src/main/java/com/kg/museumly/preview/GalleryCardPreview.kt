@@ -46,8 +46,10 @@ private fun GalleryNoticeErrorPreview() {
 @Composable
 private fun GalleryNoticeTailPreview() {
     GalleryNotice(
-        title = "End of the gallery",
-        body = "You've seen everything here.",
+        title = "You've walked the whole gallery",
+        body = "That's every work we have in Islamic. " +
+            "Thank you for taking the time to look. " +
+            "Another gallery is waiting in the menu above.",
     )
 }
 

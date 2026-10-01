@@ -341,8 +341,10 @@ private fun ReelsPager(
                         )
 
                         TailState.Exhausted -> GalleryNotice(
-                            title = "End of the gallery",
-                            body = "You've seen everything here.",
+                            title = "You've walked the whole gallery",
+                            body = "That's every work we have in ${state.section?.label ?: "this gallery"}. " +
+                                "Thank you for taking the time to look. " +
+                                "Another gallery is waiting in the menu above.",
                         )
                     }
                 }

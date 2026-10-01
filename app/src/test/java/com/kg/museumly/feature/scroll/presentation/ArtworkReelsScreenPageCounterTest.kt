@@ -48,7 +48,7 @@ class ArtworkReelsScreenPageCounterTest {
             )
         }
 
-        composeRule.onNodeWithText("End of the gallery").assertIsDisplayed()
+        composeRule.onNodeWithText("You've walked the whole gallery").assertIsDisplayed()
         composeRule.onNodeWithText("${artworks.size} / ${artworks.size}").assertDoesNotExist()
     }
 
