@@ -58,6 +58,7 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import com.kg.museumly.BuildConfig
 import com.kg.museumly.feature.scroll.presentation.components.ArtworkPageWithRespectToAspectRatio
+import com.kg.museumly.feature.scroll.presentation.components.ArtworkPageWithRestrainedBox
 import com.kg.museumly.feature.scroll.presentation.components.GalleryLoading
 import com.kg.museumly.feature.scroll.presentation.components.GalleryNotice
 import com.kg.museumly.model.Section
@@ -319,7 +320,7 @@ private fun ReelsPager(
                 if (page < state.artworks.size) {
                     val artwork = state.artworks.getOrNull(page)
                     if (artwork != null) {
-                        ArtworkPageWithRespectToAspectRatio(
+                        ArtworkPageWithRestrainedBox(
                             artwork = artwork,
                             onDetailPage = onDetailPage
                         )

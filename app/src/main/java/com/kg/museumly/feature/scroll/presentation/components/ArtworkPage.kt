@@ -93,10 +93,14 @@ internal fun ArtworkPageWithRestrainedBox(
                 }
             },
             modifier = Modifier
-                .fillMaxWidth(0.6f)      // <-- force it smaller than the screen
-                .fillMaxHeight(0.4f)
-                .border(2.dp, Color.Red) // <-- shows you exactly where the box is
-                .background(Color(0xFF222222)), // <-- shows empty space vs image
+                .fillMaxWidth()      // <-- force it smaller than the screen
+                .fillMaxHeight(0.7f)
+                //.border(2.dp, Color.Red) // <-- shows you exactly where the box is
+                //.background(Color(0xFF222222)) // <-- shows empty space vs image
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                ) { onDetailPage(artwork.id) },
             contentScale = ContentScale.Fit
         )
 
