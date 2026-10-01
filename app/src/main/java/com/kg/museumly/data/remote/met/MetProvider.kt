@@ -24,6 +24,9 @@ import kotlin.coroutines.cancellation.CancellationException
 import kotlin.math.min
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.TimeMark
+import kotlin.time.TimeSource
 
 /**
  * right now we can only get paintings if it is our query.
@@ -37,6 +40,9 @@ class MetProvider @Inject constructor(
         val RETRY_DELAY: Duration = 500.milliseconds
         const val ID_PAGE_LIMIT = 500      // v1.1 max per request
         const val SEARCH_CEILING = 10_000  // v1.1: offset + limit may not exceed this
+
+        // How long to stop calling the Met after it answers 403/429.
+        val BLOCK_COOLDOWN: Duration = 30.seconds
     }
 
     override val id = "met"
@@ -45,6 +51,15 @@ class MetProvider @Inject constructor(
      * Different departments so a map is needed with a int key and list value.
      */
     private val cachedIds: MutableMap<Int, MutableList<Int>> = HashMap()
+
+    /**
+     * Set when the Met answers 403/429 (its bot protection / rate limit).
+     * Until it passes, fetchPage fails at once without touching the network,
+     * for every department — the block is on the app, not on one department.
+     * Written from parallel fetchArtwork calls, hence @Volatile.
+     */
+    @Volatile
+    private var blockedUntil: TimeMark? = null
 
     /**
      * Different departments, so a map of totals. Int key -> department id,
@@ -60,6 +75,16 @@ class MetProvider @Inject constructor(
         return minOf(total, SEARCH_CEILING)
     }
 
+    private fun markBlocked()
+    {
+        blockedUntil = TimeSource.Monotonic.markNow() + BLOCK_COOLDOWN
+    }
+
+    private fun isBlocked() : Boolean
+    {
+        val until = blockedUntil ?: return false
+        return !until.hasPassedNow()
+    }
     /**
      * met api returns object ids for search. it returns objectIds for departments.
      * This function does if a department is asked before, return its existing id list.
@@ -119,6 +144,10 @@ class MetProvider @Inject constructor(
         }
         catch (e: HttpException)
         {
+            if(e.code() == 403 || e.code() == 429)
+            {
+                markBlocked()
+            }
             when {
                 e.code() == 404 -> ApiResult.Rejected("404 for object $objectId")
                 e.code() in 500..599 || e.code() == 429 || e.code() == 403 -> ApiResult.Failed(e)
@@ -188,6 +217,10 @@ class MetProvider @Inject constructor(
             catch (e: CancellationException) {
                 throw e
             } catch (e: HttpException) {
+                if(e.code() == 403 || e.code() == 429)
+                {
+                    markBlocked()
+                }
                 if (e.code() in 500..599 || e.code() == 429 || e.code() == 403) ApiResult.Failed(e)
                 else ApiResult.Rejected("HTTP ${e.code()} loading Met ID list")
             } catch (e: IOException) {
@@ -202,7 +235,8 @@ class MetProvider @Inject constructor(
     /** Your old retry-once rule, moved from the loadIds() call site to here. */
     private suspend fun ensureIdsWithRetry(upTo: Int, departmentId: Int): ApiResult<Unit> {
         val first = ensureIds(upTo, departmentId)
-        if (first is ApiResult.Failed && first.worthRetrying()) {
+        // A 429 has just started the cooldown; retrying now would ignore it.
+        if (first is ApiResult.Failed && first.worthRetrying() && !isBlocked()) {
             Log.d("METPROVIDER", "retrying id page after transient failure: ${first.cause.message}")
             delay(RETRY_DELAY)
             return ensureIds(upTo, departmentId)
@@ -216,6 +250,10 @@ class MetProvider @Inject constructor(
         department: String
     ): PageResult {
         Log.d("METPROVIDER", "fetchPage department=$department cursor=$cursor")
+        if (isBlocked()) {
+            Log.d("METPROVIDER", "cooling down, skipping department=$department")
+            return PageResult(emptyList(), emptyList(), cursor, PageStatus.FAILED, "Met is rate-limiting, cooling down")
+        }
         // ← new: the "6" the repository handed back becomes 6 again
         val departmentId: Int = department.toIntOrNull()
             ?: return PageResult(emptyList(), emptyList(), cursor,
@@ -238,6 +276,15 @@ class MetProvider @Inject constructor(
         // pointing at the failing record so the next page retries it.
         while (items.size < size)
         {
+            // A batch just got 403/429 but the streak is under the threshold:
+            // stop now rather than sending another batch into the block.
+            // Rewind the open streak (each of its failures did i++) so those
+            // IDs are retried next page instead of skipped forever.
+            if (isBlocked()) {
+                i -= consecutiveFailures
+                failureReason = "Met is rate-limiting, cooling down"
+                break
+            }
             // The cursor walked past the IDs we have so far. Usually
             // i == ids.size (the cache ran out), but it can also be further
             // ahead: the cursor lives in Room and survives process death,

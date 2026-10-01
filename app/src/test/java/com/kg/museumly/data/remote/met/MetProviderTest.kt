@@ -403,6 +403,45 @@ class MetProviderTest {
     }
 
     @Test
+    fun `a 403 below the streak threshold stops the page and rewinds to the first blocked id`() = runTest {
+        // Recorded on MockWebServer's thread, asserted afterwards — see the
+        // multi-page test above for why.
+        val requestedObjects: MutableList<Int> = java.util.Collections.synchronizedList(mutableListOf())
+        server.dispatcher = object : Dispatcher() {
+            override fun dispatch(request: RecordedRequest): MockResponse {
+                val path = request.path ?: ""
+                if (path.startsWith("/v1.1/search")) {
+                    return MockResponse().setBody(searchResponse((1101..1108).toList()))
+                }
+                val objectId = request.objectId()
+                requestedObjects.add(objectId)
+                return when (objectId) {
+                    // First batch: ok, ok, 403, 403. The streak is 2, under the
+                    // threshold, so only the block check can stop the walk here.
+                    1103, 1104 -> MockResponse().setResponseCode(403)
+                    else -> MockResponse().setBody(objectResponse(objectId))
+                }
+            }
+        }
+
+        val page: PageResult = provider.fetchPage(cursor = null, size = 20, department = "11")
+
+        assertEquals(PageStatus.OK, page.status)
+        assertEquals(listOf("met:1101", "met:1102"), page.items.map { it.id })
+        // Cursor on 1103 (index 2), so the blocked ids are retried, not skipped.
+        assertEquals("2", page.next)
+        // No second batch went out into the block.
+        assertEquals(listOf(1101, 1102, 1103, 1104), requestedObjects.sorted())
+
+        // While cooling down, the next page fails without touching the network.
+        val requestsBefore: Int = server.requestCount
+        val cooling: PageResult = provider.fetchPage(cursor = page.next, size = 20, department = "11")
+        assertEquals(PageStatus.FAILED, cooling.status)
+        assertEquals("2", cooling.next)
+        assertEquals(requestsBefore, server.requestCount)
+    }
+
+    @Test
     fun `every section maps to numeric Met department ids`() {
         // fetchPage parses the department back with toIntOrNull; a
         // non-numeric entry here would fail that department on every page.

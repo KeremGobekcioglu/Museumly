@@ -264,7 +264,11 @@ class ScrollViewModel @Inject constructor(
         // fast fling that skips past the "within 5 of the end" pages — still
         // triggers a load instead of leaving tail stuck at Idle with nothing
         // ever fetching.
-        if (artworks.size - page <= 5) {
+
+        // A failed tail is retried by its Retry button or by reconnecting, not by
+        // swiping. Swipe-retries fire about once a second and keep hitting a server
+        // that may be rate-limiting us.
+        if (artworks.size - page <= 5 && tail.value !is TailState.Failed) {
             loadMore()
         }
     }
