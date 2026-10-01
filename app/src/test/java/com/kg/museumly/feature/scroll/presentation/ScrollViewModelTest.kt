@@ -245,7 +245,7 @@ class ScrollViewModelTest {
 
     @Test
     fun `initialPage is only exposed alongside the section it was computed for`() = runTest {
-        repository.countValue = 5
+        repository.countValue = 20
         coEvery { positionStore.getFrontier(Section.EUROPEAN) } returns 12
         coEvery { positionStore.getFrontier(Section.ASIA) } returns 0
 
@@ -261,6 +261,18 @@ class ScrollViewModelTest {
         // Never European's 10 on Asia's list.
         assertEquals(Section.ASIA, viewModel.uiState.value.section)
         assertEquals(0, viewModel.uiState.value.initialPage)
+    }
+
+    @Test
+    fun `initialPage is clamped to the last artwork when the frontier is past the list`() = runTest {
+        repository.countValue = 5
+        coEvery { positionStore.getFrontier(Section.EUROPEAN) } returns 12
+
+        val viewModel = buildViewModel()
+        collect(viewModel)
+        advanceUntilIdle()
+
+        assertEquals(4, viewModel.uiState.value.initialPage)
     }
 
     @Test
