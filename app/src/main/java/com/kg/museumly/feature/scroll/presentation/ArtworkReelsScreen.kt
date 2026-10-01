@@ -14,11 +14,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
-import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -49,11 +47,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import com.kg.museumly.BuildConfig
@@ -176,8 +172,8 @@ private fun SectionPicker(
             Text(
                 text = selected.label,
                 style = MaterialTheme.typography.labelLarge,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+                // Wraps instead of truncating: a cut-off section name reads
+                // as a bug.
                 modifier = Modifier.weight(1f, fill = false)
             )
             Icon(
@@ -352,24 +348,39 @@ private fun ReelsPager(
 
 
             if (pagerState.currentPage < state.artworks.size) {
-                PageCounter(pagerState = pagerState, total = state.artworks.size)
+                PageCounter(
+                    pagerState = pagerState,
+                    total = state.artworks.size,
+                    isComplete = state.tail == TailState.Exhausted,
+                    modifier = Modifier.align(Alignment.TopEnd),
+                )
             }
         }
     }
 }
 
+/**
+ * The pill's partner on the right of the top bar: same height, same
+ * surface. Until the section is exhausted the loaded count isn't the
+ * section's size — it grows with every batch — so the total stays ∞ until
+ * it's real. Tabular figures keep it from shifting sideways at 9 → 10.
+ */
 @Composable
-private fun PageCounter(pagerState: PagerState, total: Int, modifier: Modifier = Modifier) {
-    Box(modifier = modifier.fillMaxWidth().safeDrawingPadding().padding(top = 60.dp)) {
-        Text(
-            text = "${pagerState.currentPage + 1} / $total",
-            color = Color.White,
-            style = MaterialTheme.typography.labelLarge,
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .background(Color.Black.copy(alpha = 0.35f))
-                .padding(horizontal = 12.dp, vertical = 4.dp)
-                .alpha(0.9f),
-        )
-    }
+private fun PageCounter(
+    pagerState: PagerState,
+    total: Int,
+    isComplete: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val totalLabel: String = if (isComplete) total.toString() else "∞"
+    Text(
+        text = "${pagerState.currentPage + 1} / $totalLabel",
+        color = Color.White,
+        style = MaterialTheme.typography.labelLarge.copy(fontFeatureSettings = "tnum"),
+        modifier = modifier
+            .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top))
+            .padding(end = 16.dp, top = 12.dp)
+            .background(Color.Black.copy(alpha = 0.45f), CircleShape)
+            .padding(horizontal = 14.dp, vertical = 8.dp),
+    )
 }

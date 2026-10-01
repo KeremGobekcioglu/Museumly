@@ -2,21 +2,27 @@ package com.kg.museumly.feature.scroll.presentation.components
 
 import android.content.ContentValues.TAG
 import android.util.Log
-import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.windowInsetsTopHeight
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -26,12 +32,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import coil3.compose.AsyncImagePainter
 import com.kg.museumly.model.Artwork
@@ -74,54 +80,67 @@ internal fun ArtworkPageWithoutAspectRatio(
         ArtworkCaption(artwork = artwork, modifier = Modifier.align(Alignment.BottomStart))
     }
 }
+/**
+ * Height of the row the section pill and page counter sit in, below the
+ * status bar. Pages reserve it so a tall work can never slide under them.
+ */
+internal val ReelsTopBarHeight = 60.dp
+
+/**
+ * Three stacked regions — top bar, artwork, caption — instead of layers.
+ * The artwork box takes whatever the other two leave, so a tall work or a
+ * two-line title can't overlap the text, and the box is the same on every
+ * page apart from that.
+ */
 @Composable
 internal fun ArtworkPageWithRestrainedBox(
     artwork: Artwork,
     modifier: Modifier = Modifier,
     onDetailPage: (String) -> Unit,
 )  {
-    Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        var loadFailed by remember(artwork.id) { mutableStateOf(false) }
+    Column(modifier = modifier.fillMaxSize()) {
+        Spacer(modifier = Modifier.windowInsetsTopHeight(WindowInsets.safeDrawing))
+        Spacer(modifier = Modifier.height(ReelsTopBarHeight))
 
-        AsyncImage(
-            model = artwork.imageUrl,
-            contentDescription = artwork.title,
-            onState = { state ->
-                if (state is AsyncImagePainter.State.Error) {
-                    Log.e(TAG, "Failed to load ${artwork.id}: ${artwork.imageUrl}", state.result.throwable)
-                    loadFailed = true
-                }
-            },
+        Box(
             modifier = Modifier
-                .fillMaxWidth()      // <-- force it smaller than the screen
-                .fillMaxHeight(0.7f)
-                //.border(2.dp, Color.Red) // <-- shows you exactly where the box is
-                //.background(Color(0xFF222222)) // <-- shows empty space vs image
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                ) { onDetailPage(artwork.id) },
-            contentScale = ContentScale.Fit
-        )
+                .weight(1f)
+                .fillMaxWidth()
+                // Wall on both sides, so a wide work reads as hung, not as a
+                // full-bleed photo.
+                .padding(horizontal = 20.dp, vertical = 16.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            var loadFailed by remember(artwork.id) { mutableStateOf(false) }
 
-        Text(
-            text = sourceLabel(artwork),
-            color = Color.White,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.align(Alignment.TopEnd).padding(16.dp)
-        )
-
-        if (loadFailed) {
-            Text(
-                text = "Couldn't load this image",
-                color = Color.Red,
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.align(Alignment.Center),
+            AsyncImage(
+                model = artwork.imageUrl,
+                contentDescription = artwork.title,
+                onState = { state ->
+                    if (state is AsyncImagePainter.State.Error) {
+                        Log.e(TAG, "Failed to load ${artwork.id}: ${artwork.imageUrl}", state.result.throwable)
+                        loadFailed = true
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                    ) { onDetailPage(artwork.id) },
+                contentScale = ContentScale.Fit
             )
+
+            if (loadFailed) {
+                Text(
+                    text = "Couldn't load this image",
+                    color = Color.Red,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
         }
 
-        ArtworkCaption(artwork = artwork, modifier = Modifier.align(Alignment.BottomStart))
+        ArtworkCaption(artwork = artwork)
     }
 }
 
@@ -187,18 +206,20 @@ internal fun ArtworkPageWithRespectToAspectRatio(
     }
 }
 
+/**
+ * Sits on the wall below the work, not over it, so it needs no scrim.
+ * Read top to bottom like a museum label: title, maker, then the
+ * collection credit as the quietest line.
+ */
 @Composable
 private fun ArtworkCaption(artwork: Artwork, modifier: Modifier = Modifier) {
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f)),
-                ),
+            .windowInsetsPadding(
+                WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom)
             )
-            .safeDrawingPadding()
-            .padding(horizontal = 20.dp, vertical = 24.dp),
+            .padding(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 40.dp),
     ) {
         Text(
             text = artwork.title,
@@ -218,7 +239,31 @@ private fun ArtworkCaption(artwork: Artwork, modifier: Modifier = Modifier) {
                 overflow = TextOverflow.Ellipsis,
             )
         }
+        Text(
+            text = museumName(artwork.providerId).uppercase(),
+            color = Color.White.copy(alpha = 0.5f),
+            style = MaterialTheme.typography.labelSmall,
+            letterSpacing = 1.5.sp,
+            modifier = Modifier.padding(top = 8.dp),
+        )
+        // No maxLines on the credit: a cut-off museum or department name
+        // reads as a bug. A long one wraps, and the artwork box gives up the
+        // height.
+        artwork.department?.let { department ->
+            Text(
+                text = department.uppercase(),
+                color = Color.White.copy(alpha = 0.5f),
+                style = MaterialTheme.typography.labelSmall,
+                letterSpacing = 1.5.sp,
+            )
+        }
     }
+}
+
+private fun museumName(providerId: String): String = when (providerId) {
+    "met" -> "The Met"
+    "cleveland" -> "Cleveland Museum of Art"
+    else -> providerId
 }
 
 /**
