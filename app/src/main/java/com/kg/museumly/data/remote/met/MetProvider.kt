@@ -42,7 +42,9 @@ class MetProvider @Inject constructor(
         const val SEARCH_CEILING = 10_000  // v1.1: offset + limit may not exceed this
 
         // How long to stop calling the Met after it answers 403/429.
-        val BLOCK_COOLDOWN: Duration = 30.seconds
+        // Blocks left alone cleared in ~30–35s in testing; 60s covers them
+        // so the first call after the cooldown doesn't start a new block.
+        val BLOCK_COOLDOWN: Duration = 60.seconds
     }
 
     override val id = "met"
