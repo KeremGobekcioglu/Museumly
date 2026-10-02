@@ -6,7 +6,9 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -36,6 +38,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -134,6 +137,9 @@ fun ArtworkReelsScreen(
     }
 }
 
+/** Outline of the section pill and the page counter, a matching pair. */
+private val TopBarChipOutline: Color = Color.White.copy(alpha = 0.3f)
+
 private val Section.label: String
     get() = when (this) {
         Section.EGYPT_NEAR_EAST -> "Egypt & Near East"
@@ -157,7 +163,10 @@ private fun SectionPicker(
     Surface(
         onClick = { sheetOpen = true },
         shape = CircleShape,
-        color = Color.Black.copy(alpha = 0.45f),
+        // Sits on the wall, not over an image, so it needs no fill. Same
+        // hairline as the page counter.
+        color = Color.Transparent,
+        border = BorderStroke(1.dp, TopBarChipOutline),
         contentColor = Color.White,
         modifier = modifier
             .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top))
@@ -230,9 +239,9 @@ private fun SectionPicker(
  * contentKey = mode() means only a change of screen animates, and the
  * screen fading out keeps the state it last had instead of the newest one.
  *
- * Waiting (initialPage == null, mid section switch) stays a plain black
- * screen. Showing GalleryLoading there would flash the gallery wall on
- * every cached switch.
+ * Waiting (initialPage == null, mid section switch) is an empty,
+ * transparent box, so the wall shows through. Showing GalleryLoading there
+ * would flash the loading screen on every cached switch.
  */
 @Composable
 private fun ReelsContent(
@@ -307,7 +316,7 @@ private fun ReelsPager(
             onPageChanged(pagerState.currentPage)
         }
 
-        Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+        Box(modifier = Modifier.fillMaxSize()) {
             VerticalPager(
                 state = pagerState,
                 modifier = Modifier.fillMaxSize(),
@@ -360,7 +369,7 @@ private fun ReelsPager(
 
 /**
  * The pill's partner on the right of the top bar: same height, same
- * surface. Until the section is exhausted the loaded count isn't the
+ * hairline outline. Until the section is exhausted the loaded count isn't the
  * section's size — it grows with every batch — so the total stays ∞ until
  * it's real. Tabular figures keep it from shifting sideways at 9 → 10.
  */
@@ -379,7 +388,11 @@ private fun PageCounter(
         modifier = modifier
             .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top))
             .padding(end = 16.dp, top = 12.dp)
-            .background(Color.Black.copy(alpha = 0.45f), CircleShape)
+            // The pill is a clickable Surface, so Material pads it to a 48dp
+            // touch target and centres it. The same here keeps the two chips
+            // on one line.
+            .minimumInteractiveComponentSize()
+            .border(1.dp, TopBarChipOutline, CircleShape)
             .padding(horizontal = 14.dp, vertical = 8.dp),
     )
 }

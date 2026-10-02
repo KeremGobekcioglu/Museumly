@@ -65,15 +65,15 @@ private fun pagerState(page: Int, tail: TailState = TailState.Idle) = ScrollUiSt
 
 // --- Pager: one per orientation ---
 
-@Preview(name = "Pager · Wide", showBackground = true)
+@Preview(name = "Pager · Wide", showBackground = true, device = "spec:width=411dp,height=891dp")
 @Composable
 private fun ReelsWidePreview() = ReelsPreview(pagerState(page = 0))
 
-@Preview(name = "Pager · Tall", showBackground = true)
+@Preview(name = "Pager · Tall", showBackground = true, device = "spec:width=411dp,height=891dp")
 @Composable
 private fun ReelsTallPreview() = ReelsPreview(pagerState(page = 1))
 
-@Preview(name = "Pager · Portrait", showBackground = true)
+@Preview(name = "Pager · Portrait", showBackground = true, device = "spec:width=411dp,height=891dp")
 @Composable
 private fun ReelsPortraitPreview() = ReelsPreview(pagerState(page = 2))
 
