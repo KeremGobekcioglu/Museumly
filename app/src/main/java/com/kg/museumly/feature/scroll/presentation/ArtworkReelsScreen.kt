@@ -53,7 +53,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import com.kg.museumly.BuildConfig
-import com.kg.museumly.feature.scroll.presentation.components.ArtworkPageWithRespectToAspectRatio
 import com.kg.museumly.feature.scroll.presentation.components.ArtworkPageWithRestrainedBox
 import com.kg.museumly.feature.scroll.presentation.components.GalleryLoading
 import com.kg.museumly.feature.scroll.presentation.components.GalleryNotice

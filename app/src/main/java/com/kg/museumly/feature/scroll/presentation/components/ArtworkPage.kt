@@ -41,45 +41,6 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import coil3.compose.AsyncImagePainter
 import com.kg.museumly.model.Artwork
-
-@Composable
-internal fun ArtworkPageWithoutAspectRatio(
-    artwork: Artwork,
-    modifier: Modifier = Modifier,
-    onDetailPage: (String) -> Unit,
-)  {
-    Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        var loadFailed by remember(artwork.id) { mutableStateOf(false) }
-        AsyncImage(
-            model = artwork.imageUrl,
-            contentDescription = artwork.title,
-            onState = { state ->
-                if (state is AsyncImagePainter.State.Error) {
-                    Log.e(TAG, "Failed to load ${artwork.id}: ${artwork.imageUrl}", state.result.throwable)
-                    loadFailed = true
-                }
-            },
-            modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Fit
-        )
-        Text(
-            text = sourceLabel(artwork),
-            color = Color.White,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.align(Alignment.TopEnd).padding(16.dp)
-        )
-        if (loadFailed) {
-            Text(
-                text = "Couldn't load this image",
-                color = Color.Red,
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.align(Alignment.Center),
-            )
-        }
-        ArtworkCaption(artwork = artwork, modifier = Modifier.align(Alignment.BottomStart))
-    }
-}
 /**
  * Height of the row the section pill and page counter sit in, below the
  * status bar. Pages reserve it so a tall work can never slide under them.
@@ -144,68 +105,6 @@ internal fun ArtworkPageWithRestrainedBox(
     }
 }
 
-
-@Composable
-internal fun ArtworkPageWithRespectToAspectRatio(
-    artwork: Artwork,
-    modifier: Modifier = Modifier,
-    onDetailPage: (String) -> Unit,
-) {
-    Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-            val containerRatio = maxWidth / maxHeight
-            val aspectRatio = artwork.aspectRatio ?: containerRatio
-            val (imageWidth, imageHeight) = if (aspectRatio > containerRatio) {
-                maxWidth to maxWidth / aspectRatio
-            } else {
-                maxHeight * aspectRatio to maxHeight
-            }
-
-            var loadFailed by remember(artwork.id) { mutableStateOf(false) }
-            Text(
-                text = sourceLabel(artwork),
-                color = Color.White,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .safeDrawingPadding()
-                    .padding(16.dp)
-                    .widthIn(max = maxWidth * 0.4f)
-            )
-            AsyncImage(
-                model = artwork.imageUrl,
-                contentDescription = artwork.title,
-                onState = { state ->
-                    if (state is AsyncImagePainter.State.Error) {
-                        Log.e(TAG, "Failed to load ${artwork.id}: ${artwork.imageUrl}", state.result.throwable)
-                        loadFailed = true
-                    }
-                },
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .width(imageWidth)
-                    .height(imageHeight)
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                    ) { onDetailPage(artwork.id) }
-            )
-
-            if (loadFailed) {
-                Text(
-                    text = "Couldn't load this image",
-                    color = Color.Red,
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.align(Alignment.Center),
-                )
-            }
-        }
-
-        ArtworkCaption(artwork = artwork, modifier = Modifier.align(Alignment.BottomStart))
-    }
-}
-
 /**
  * Sits on the wall below the work, not over it, so it needs no scrim.
  * Read top to bottom like a museum label: title, maker, then the
@@ -264,17 +163,6 @@ private fun museumName(providerId: String): String = when (providerId) {
     "met" -> "The Met"
     "cleveland" -> "Cleveland Museum of Art"
     else -> providerId
-}
-
-/**
- * "cleveland: Indian and Southeast Asian Art", "met: Asian Art".
- * department is the museum's own field on the record, so for the Met it's the
- * display name, not the numeric id in the cursor key. Just the provider when
- * the record has no department.
- */
-private fun sourceLabel(artwork: Artwork): String {
-    val department: String = artwork.department ?: return artwork.providerId
-    return "${artwork.providerId}: $department"
 }
 
 private fun captionLine(artist: String?, year: String?): String? {
