@@ -59,6 +59,7 @@ import com.kg.museumly.BuildConfig
 import com.kg.museumly.feature.scroll.presentation.components.ArtworkPageWithRestrainedBox
 import com.kg.museumly.feature.scroll.presentation.components.GalleryLoading
 import com.kg.museumly.feature.scroll.presentation.components.GalleryNotice
+import com.kg.museumly.feature.scroll.presentation.components.ReelsGutter
 import com.kg.museumly.model.Section
 
 private const val TAG = "MuseumlyImages"
@@ -170,7 +171,7 @@ private fun SectionPicker(
         contentColor = Color.White,
         modifier = modifier
             .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top))
-            .padding(start = 16.dp, top = 12.dp)
+            .padding(start = ReelsGutter, top = 12.dp)
             .widthIn(max = 200.dp)
     ) {
         Row(
@@ -387,7 +388,7 @@ private fun PageCounter(
         style = MaterialTheme.typography.labelLarge.copy(fontFeatureSettings = "tnum"),
         modifier = modifier
             .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top))
-            .padding(end = 16.dp, top = 12.dp)
+            .padding(end = ReelsGutter, top = 12.dp)
             // The pill is a clickable Surface, so Material pads it to a 48dp
             // touch target and centres it. The same here keeps the two chips
             // on one line.

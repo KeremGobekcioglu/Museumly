@@ -52,6 +52,13 @@ import com.kg.museumly.model.Artwork
 internal val ReelsTopBarHeight = 60.dp
 
 /**
+ * The page's one side margin for text and chips: the section pill, the page
+ * counter and the caption all line up on it. The artwork doesn't use it, so
+ * a wide work stays full-bleed.
+ */
+internal val ReelsGutter = 16.dp
+
+/**
  * Libre Caslon Text, bundled (OFL, licence in assets/licenses). Bundled
  * rather than downloadable so the title never renders in a fallback font
  * and then reflows, works offline, and doesn't need Play Services.
@@ -146,7 +153,7 @@ private fun ArtworkCaption(artwork: Artwork, modifier: Modifier = Modifier) {
             .windowInsetsPadding(
                 WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom)
             )
-            .padding(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 40.dp),
+            .padding(start = ReelsGutter, end = ReelsGutter, top = 8.dp, bottom = 40.dp),
     ) {
         Text(
             text = artwork.title,
