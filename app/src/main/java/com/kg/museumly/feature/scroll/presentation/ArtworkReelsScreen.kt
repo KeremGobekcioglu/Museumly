@@ -6,7 +6,9 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,11 +16,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
-import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -38,6 +38,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -49,17 +50,16 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import com.kg.museumly.BuildConfig
-import com.kg.museumly.feature.scroll.presentation.components.ArtworkPageWithRespectToAspectRatio
+import com.kg.museumly.feature.scroll.presentation.components.ArtworkPageWithRestrainedBox
 import com.kg.museumly.feature.scroll.presentation.components.GalleryLoading
 import com.kg.museumly.feature.scroll.presentation.components.GalleryNotice
+import com.kg.museumly.feature.scroll.presentation.components.ReelsGutter
 import com.kg.museumly.model.Section
 
 private const val TAG = "MuseumlyImages"
@@ -126,7 +126,7 @@ fun ArtworkReelsScreen(
             visible = state.section != null,
             enter = fadeIn(tween(300)),
             exit = fadeOut(),
-            modifier = Modifier.align(Alignment.TopCenter)
+            modifier = Modifier.align(Alignment.TopStart)
         ) {
             state.section?.let { section ->
                 SectionPicker(
@@ -137,6 +137,9 @@ fun ArtworkReelsScreen(
         }
     }
 }
+
+/** Outline of the section pill and the page counter, a matching pair. */
+private val TopBarChipOutline: Color = Color.White.copy(alpha = 0.3f)
 
 private val Section.label: String
     get() = when (this) {
@@ -161,12 +164,15 @@ private fun SectionPicker(
     Surface(
         onClick = { sheetOpen = true },
         shape = CircleShape,
-        color = Color.Black.copy(alpha = 0.45f),
+        // Sits on the wall, not over an image, so it needs no fill. Same
+        // hairline as the page counter.
+        color = Color.Transparent,
+        border = BorderStroke(1.dp, TopBarChipOutline),
         contentColor = Color.White,
         modifier = modifier
             .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top))
-            .padding(top = 12.dp)
-            .widthIn(max = 220.dp)
+            .padding(start = ReelsGutter, top = 12.dp)
+            .widthIn(max = 200.dp)
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -175,8 +181,8 @@ private fun SectionPicker(
             Text(
                 text = selected.label,
                 style = MaterialTheme.typography.labelLarge,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+                // Wraps instead of truncating: a cut-off section name reads
+                // as a bug.
                 modifier = Modifier.weight(1f, fill = false)
             )
             Icon(
@@ -234,9 +240,9 @@ private fun SectionPicker(
  * contentKey = mode() means only a change of screen animates, and the
  * screen fading out keeps the state it last had instead of the newest one.
  *
- * Waiting (initialPage == null, mid section switch) stays a plain black
- * screen. Showing GalleryLoading there would flash the gallery wall on
- * every cached switch.
+ * Waiting (initialPage == null, mid section switch) is an empty,
+ * transparent box, so the wall shows through. Showing GalleryLoading there
+ * would flash the loading screen on every cached switch.
  */
 @Composable
 private fun ReelsContent(
@@ -311,7 +317,7 @@ private fun ReelsPager(
             onPageChanged(pagerState.currentPage)
         }
 
-        Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+        Box(modifier = Modifier.fillMaxSize()) {
             VerticalPager(
                 state = pagerState,
                 modifier = Modifier.fillMaxSize(),
@@ -319,7 +325,7 @@ private fun ReelsPager(
                 if (page < state.artworks.size) {
                     val artwork = state.artworks.getOrNull(page)
                     if (artwork != null) {
-                        ArtworkPageWithRespectToAspectRatio(
+                        ArtworkPageWithRestrainedBox(
                             artwork = artwork,
                             onDetailPage = onDetailPage
                         )
@@ -340,8 +346,10 @@ private fun ReelsPager(
                         )
 
                         TailState.Exhausted -> GalleryNotice(
-                            title = "End of the gallery",
-                            body = "You've seen everything here.",
+                            title = "You've walked the whole gallery",
+                            body = "That's every work we have in ${state.section?.label ?: "this gallery"}. " +
+                                "Thank you for taking the time to look. " +
+                                "Another gallery is waiting in the menu above.",
                         )
                     }
                 }
@@ -349,24 +357,43 @@ private fun ReelsPager(
 
 
             if (pagerState.currentPage < state.artworks.size) {
-                PageCounter(pagerState = pagerState, total = state.artworks.size)
+                PageCounter(
+                    pagerState = pagerState,
+                    total = state.artworks.size,
+                    isComplete = state.tail == TailState.Exhausted,
+                    modifier = Modifier.align(Alignment.TopEnd),
+                )
             }
         }
     }
 }
 
+/**
+ * The pill's partner on the right of the top bar: same height, same
+ * hairline outline. Until the section is exhausted the loaded count isn't the
+ * section's size — it grows with every batch — so the total stays ∞ until
+ * it's real. Tabular figures keep it from shifting sideways at 9 → 10.
+ */
 @Composable
-private fun PageCounter(pagerState: PagerState, total: Int, modifier: Modifier = Modifier) {
-    Box(modifier = modifier.fillMaxWidth().safeDrawingPadding().padding(top = 60.dp)) {
-        Text(
-            text = "${pagerState.currentPage + 1} / $total",
-            color = Color.White,
-            style = MaterialTheme.typography.labelLarge,
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .background(Color.Black.copy(alpha = 0.35f))
-                .padding(horizontal = 12.dp, vertical = 4.dp)
-                .alpha(0.9f),
-        )
-    }
+private fun PageCounter(
+    pagerState: PagerState,
+    total: Int,
+    isComplete: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val totalLabel: String = if (isComplete) total.toString() else "∞"
+    Text(
+        text = "${pagerState.currentPage + 1} / $totalLabel",
+        color = Color.White,
+        style = MaterialTheme.typography.labelLarge.copy(fontFeatureSettings = "tnum"),
+        modifier = modifier
+            .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top))
+            .padding(end = ReelsGutter, top = 12.dp)
+            // The pill is a clickable Surface, so Material pads it to a 48dp
+            // touch target and centres it. The same here keeps the two chips
+            // on one line.
+            .minimumInteractiveComponentSize()
+            .border(1.dp, TopBarChipOutline, CircleShape)
+            .padding(horizontal = 14.dp, vertical = 8.dp),
+    )
 }
