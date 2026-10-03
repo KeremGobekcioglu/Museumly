@@ -41,6 +41,18 @@ private val previewArtworks = listOf(
         aspectRatio = 0.88f,
         department = "European Painting and Sculpture",
     ),
+    // Worst case for the caption. The title is a real Cleveland work (it was
+    // cut off on device); the artist and department are long on purpose, so
+    // every caption line is stressed at once.
+    Artwork(
+        id = "cleveland:long",
+        title = "Red-Figure Lekythos (Oil Vessel): Athena Slaying Giant (body); Satyr between Maenads (shoulder)",
+        artist = "Attributed to the Berlin Painter, workshop of the Kleophrades Painter",
+        year = "c. 490 BCE",
+        imageUrl = TALL_URL,
+        aspectRatio = 0.48f,
+        department = "Arts of Africa, Oceania, and the Americas",
+    ),
 )
 
 private const val PREVIEW_ERROR = "UnknownHostException: collectionapi.metmuseum.org"
@@ -76,6 +88,15 @@ private fun ReelsTallPreview() = ReelsPreview(pagerState(page = 1))
 @Preview(name = "Pager · Portrait", showBackground = true, device = "spec:width=411dp,height=891dp")
 @Composable
 private fun ReelsPortraitPreview() = ReelsPreview(pagerState(page = 2))
+
+@Preview(name = "Pager · Long caption", showBackground = true, device = "spec:width=411dp,height=891dp")
+@Composable
+private fun ReelsLongCaptionPreview() = ReelsPreview(pagerState(page = 3))
+
+// The same page on a small phone, where every line wraps sooner.
+@Preview(name = "Pager · Long caption, small phone", showBackground = true, device = "spec:width=360dp,height=740dp")
+@Composable
+private fun ReelsLongCaptionSmallPreview() = ReelsPreview(pagerState(page = 3))
 
 // --- Tail page: the slot after the last artwork ---
 

@@ -38,7 +38,6 @@ import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
@@ -159,8 +158,6 @@ private fun ArtworkCaption(artwork: Artwork, modifier: Modifier = Modifier) {
             text = artwork.title,
             color = Color.White,
             style = CaptionTitleStyle,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
         )
         val line: String? = captionLine(artwork.artist, artwork.year)
         if (line != null) {
@@ -168,8 +165,6 @@ private fun ArtworkCaption(artwork: Artwork, modifier: Modifier = Modifier) {
                 text = line,
                 color = CaptionSecondaryColor,
                 style = MaterialTheme.typography.bodyMedium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
             )
         }
         Text(
@@ -179,9 +174,9 @@ private fun ArtworkCaption(artwork: Artwork, modifier: Modifier = Modifier) {
             letterSpacing = 1.5.sp,
             modifier = Modifier.padding(top = 8.dp),
         )
-        // No maxLines on the credit: a cut-off museum or department name
-        // reads as a bug. A long one wraps, and the artwork box gives up the
-        // height.
+        // No maxLines anywhere in the caption: a cut-off title, artist,
+        // museum or department reads as a bug. A long one wraps, and the
+        // artwork box gives up the height.
         artwork.department?.let { department ->
             Text(
                 text = department.uppercase(),
