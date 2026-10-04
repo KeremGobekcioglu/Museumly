@@ -1,7 +1,7 @@
 package com.kg.museumly.testutil
 
-import com.kg.museumly.domain.domain.ArtworkRepository
-import com.kg.museumly.domain.domain.LoadOutcome
+import com.kg.museumly.domain.ArtworkRepository
+import com.kg.museumly.domain.LoadOutcome
 import com.kg.museumly.domain.model.Artwork
 import com.kg.museumly.domain.model.ArtworkWithDetail
 import com.kg.museumly.domain.model.Section

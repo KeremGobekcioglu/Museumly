@@ -2,7 +2,7 @@ package com.kg.museumly.di
 
 import com.kg.museumly.data.remote.cleveland.ClevelandProvider
 import com.kg.museumly.data.remote.met.MetProvider
-import com.kg.museumly.domain.domain.ArtworkProvider
+import com.kg.museumly.domain.ArtworkProvider
 import dagger.Binds
 import dagger.Module
 import dagger.multibindings.IntoSet

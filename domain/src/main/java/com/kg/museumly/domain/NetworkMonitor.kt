@@ -1,4 +1,4 @@
-package com.kg.museumly.domain.domain
+package com.kg.museumly.domain
 
 import kotlinx.coroutines.flow.StateFlow
 

@@ -1,7 +1,7 @@
 package com.kg.museumly.di
 
 import com.kg.museumly.data.local.FeedPositionSource
-import com.kg.museumly.domain.domain.FeedPositionSourceInterface
+import com.kg.museumly.domain.FeedPositionSourceInterface
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn

@@ -2,7 +2,7 @@ package com.kg.museumly.feature.detail
 
 import androidx.lifecycle.SavedStateHandle
 import androidx.navigation.testing.invoke
-import com.kg.museumly.domain.domain.FeedPositionSourceInterface
+import com.kg.museumly.domain.FeedPositionSourceInterface
 import com.kg.museumly.navigation.DetailPage
 import com.kg.museumly.testutil.FakeArtworkRepository
 import com.kg.museumly.testutil.MainDispatcherRule

@@ -1,8 +1,8 @@
 package com.kg.museumly.feature.scroll.presentation
 
 import app.cash.turbine.test
-import com.kg.museumly.domain.domain.FeedPositionSourceInterface
-import com.kg.museumly.domain.domain.LoadOutcome
+import com.kg.museumly.domain.FeedPositionSourceInterface
+import com.kg.museumly.domain.LoadOutcome
 import com.kg.museumly.testutil.FakeArtworkPrefetcher
 import com.kg.museumly.testutil.FakeArtworkRepository
 import com.kg.museumly.testutil.FakeNetworkMonitor

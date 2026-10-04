@@ -1,7 +1,7 @@
 package com.kg.museumly.testutil
 
-import com.kg.museumly.domain.domain.ArtworkProvider
-import com.kg.museumly.domain.domain.PageResult
+import com.kg.museumly.domain.ArtworkProvider
+import com.kg.museumly.domain.PageResult
 import com.kg.museumly.domain.model.Section
 
 /**

@@ -2,10 +2,10 @@ package com.kg.museumly.data.remote.cleveland
 
 import android.util.Log
 import com.kg.museumly.data.remote.worthRetrying
-import com.kg.museumly.domain.domain.ApiResult
-import com.kg.museumly.domain.domain.ArtworkProvider
-import com.kg.museumly.domain.domain.PageResult
-import com.kg.museumly.domain.domain.PageStatus
+import com.kg.museumly.domain.ApiResult
+import com.kg.museumly.domain.ArtworkProvider
+import com.kg.museumly.domain.PageResult
+import com.kg.museumly.domain.PageStatus
 import com.kg.museumly.domain.model.Artwork
 import com.kg.museumly.domain.model.ArtworkDetail
 import com.kg.museumly.domain.model.Section

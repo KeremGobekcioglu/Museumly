@@ -8,10 +8,10 @@ import com.kg.museumly.data.local.MuseumDatabase
 import com.kg.museumly.data.local.ProviderCursor
 import com.kg.museumly.data.local.ProviderCursorDao
 import com.kg.museumly.data.local.ProviderTurnSource
-import com.kg.museumly.domain.domain.ArtworkProvider
-import com.kg.museumly.domain.domain.LoadOutcome
-import com.kg.museumly.domain.domain.PageResult
-import com.kg.museumly.domain.domain.PageStatus
+import com.kg.museumly.domain.ArtworkProvider
+import com.kg.museumly.domain.LoadOutcome
+import com.kg.museumly.domain.PageResult
+import com.kg.museumly.domain.PageStatus
 import com.kg.museumly.domain.model.Section
 import com.kg.museumly.testutil.FakeArtworkProvider
 import com.kg.museumly.testutil.sampleArtwork

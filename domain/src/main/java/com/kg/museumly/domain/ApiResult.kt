@@ -1,4 +1,4 @@
-package com.kg.museumly.domain.domain
+package com.kg.museumly.domain
 
 sealed class ApiResult <out T> {
     data class Success<T>(val value: T) : ApiResult<T>()

@@ -1,7 +1,7 @@
 package com.kg.museumly.di
 
 import com.kg.museumly.data.ArtworkRepositoryImpl
-import com.kg.museumly.domain.domain.ArtworkRepository
+import com.kg.museumly.domain.ArtworkRepository
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn

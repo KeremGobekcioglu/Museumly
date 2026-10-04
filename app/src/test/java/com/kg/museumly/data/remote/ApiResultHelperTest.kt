@@ -1,6 +1,6 @@
 package com.kg.museumly.data.remote
 
-import com.kg.museumly.domain.domain.ApiResult
+import com.kg.museumly.domain.ApiResult
 import java.io.IOException
 import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Assert.assertFalse

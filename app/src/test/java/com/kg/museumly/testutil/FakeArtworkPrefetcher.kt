@@ -1,6 +1,6 @@
 package com.kg.museumly.testutil
 
-import com.kg.museumly.domain.domain.ArtworkPrefetcher
+import com.kg.museumly.domain.ArtworkPrefetcher
 
 class FakeArtworkPrefetcher : ArtworkPrefetcher {
 

@@ -5,7 +5,7 @@ import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.util.Log
-import com.kg.museumly.domain.domain.NetworkMonitor
+import com.kg.museumly.domain.NetworkMonitor
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
