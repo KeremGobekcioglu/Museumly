@@ -1,6 +1,6 @@
 
 plugins {
-    alias(libs.plugins.android.application)
+    id("museumly.android.application")
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt.android)
@@ -8,11 +8,9 @@ plugins {
 
 android {
     namespace = "com.kg.museumly"
-    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.kg.museumly"
-        minSdk = 29
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
@@ -25,11 +23,6 @@ android {
                 enable = false
             }
         }
-    }
-
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
     }
 
     buildFeatures {
