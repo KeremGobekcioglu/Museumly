@@ -1,0 +1,123 @@
+package com.kg.museumly.presentation.feature.scroll.presentation.components
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+
+private val PlacardSurface = Color(0xFFE8E3D9)
+private val PlacardInk = Color(0xFF1A1713)
+
+/**
+ * A museum wall label. Cream card, dark ink, left-aligned, deliberately small —
+ * on a dark wall this reads as a placard and nothing else does.
+ *
+ * Used for every non-loading state the feed can be in: cold failure, cold empty,
+ * tail failure, exhausted. The action is optional because only the cold states
+ * offer Retry — on the tail the user can swipe off and back, which re-fires the
+ * LaunchedEffect and reloads without a button.
+ */
+@Composable
+fun GalleryPlacard(
+    title: String,
+    body: String?,
+    actionLabel: String? = null,
+    modifier: Modifier = Modifier,
+    onAction: (() -> Unit)? = null,
+    isBusy: Boolean = false,
+    // Debug-build-only technical detail (raw exception/HTTP reason). Callers
+    // gate this to BuildConfig.DEBUG — a real user must never see it, so
+    // this component doesn't second-guess that and just renders whatever
+    // it's handed.
+    debugDetail: String? = null,
+)
+{
+    Column(
+        modifier = modifier
+            // widthIn(280.dp) set a MINIMUM, which is why the card stretched.
+            .widthIn(max = 280.dp)
+            .background(color = PlacardSurface, shape = RoundedCornerShape(2.dp))
+            .border(1.dp, PlacardInk.copy(alpha = 0.12f), RoundedCornerShape(2.dp))
+            .padding(horizontal = 20.dp, vertical = 16.dp)
+    ) {
+
+        Text(
+            text = title,
+            color = PlacardInk,
+            style = MaterialTheme.typography.labelLarge,
+            letterSpacing = 0.15.sp
+        )
+
+        body?.let {
+            Text(
+                text = body,
+                color = PlacardInk.copy(0.7f),
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(top = 6.dp)
+            )
+        }
+
+        debugDetail?.let {
+            Text(
+                text = "DEBUG: $it",
+                color = PlacardInk.copy(0.4f),
+                style = MaterialTheme.typography.labelSmall,
+                modifier = Modifier.padding(top = 6.dp)
+            )
+        }
+
+        if(actionLabel != null && onAction != null)
+        {
+            val interactionSource = remember { MutableInteractionSource() }
+            Box(
+                Modifier.padding(top = 12.dp),
+                contentAlignment = Alignment.CenterStart
+            )
+            {
+                // Always laid out, so the placard keeps its size when the
+                // spinner replaces it. Invisible while busy, not removed.
+                Text(
+                    text = actionLabel,
+                    color = PlacardInk,
+                    style = MaterialTheme.typography.bodySmall,
+                    textDecoration = TextDecoration.Underline,
+                    modifier = Modifier
+                        .alpha( if(isBusy) 0f else 1f)
+                        .padding(top = 12.dp)
+                        .clickable(
+                            enabled = !isBusy,
+                            interactionSource = interactionSource,
+                            indication = null,
+                            onClick = onAction
+                        )
+                )
+                if(isBusy)
+                {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(12.dp),
+                        color = PlacardInk,
+                        strokeWidth = 1.5.dp
+                    )
+                }
+            }
+        }
+    }
+}

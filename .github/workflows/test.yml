@@ -36,8 +36,10 @@ jobs:
 
       # Upload the HTML test report. `if: always()` runs this even when the
       # step above fails, which is exactly when you need the report.
+      # The glob collects every module's report (data/, presentation/, …);
+      # quoted because a YAML value starting with * is read as an alias.
       - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: test-report
-          path: app/build/reports/tests/testDebugUnitTest/
+          path: '**/build/reports/tests/testDebugUnitTest/'

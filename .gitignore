@@ -19,11 +19,19 @@ local.properties
 /.idea/markdown.xml
 
 # Scratch notes / investigation docs
+/CLEVELAND_DESCRIPTION_FEAT.md
+/EMULATOR_TEST_RESULTS.md
+/FEED_DESIGN_EXPERIMENTS.md
 /IMAGE_DIMENSION_FINDINGS.md
 /INTERVIEW_PREP.md
+/MET_RATE_LIMIT.md
+/MODULARIZATION_FINDINGS.md
+/MODULARIZATION_PLAN.md
+/REPORT.md
 /SCROLL_SCREEN_FINDINGS.md
 /SECTION_PROBE_FINDINGS.md
 /SECTION_SELECTION_PLAN.md
+/bug.md
 /investigation_findings.txt
 /section_probe.py
 

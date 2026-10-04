@@ -6,9 +6,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.navigation.compose.rememberNavController
-import com.kg.museumly.navigation.MuseumlyNavGraph
-import com.kg.museumly.ui.theme.MuseumlyTheme
+import com.kg.museumly.presentation.navigation.MuseumlyNavGraph
+import com.kg.museumly.presentation.ui.theme.MuseumlyTheme
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
@@ -23,8 +22,7 @@ class MainActivity : ComponentActivity() {
         )
         setContent {
             MuseumlyTheme {
-                val navController = rememberNavController()
-                MuseumlyNavGraph(navController)
+                MuseumlyNavGraph()
             }
         }
     }
