@@ -1,5 +1,5 @@
 plugins {
-    alias(libs.plugins.android.library)
+    id("museumly.android.library")
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
@@ -8,36 +8,9 @@ plugins {
 
 android {
     namespace = "com.kg.museumly.presentation"
-    compileSdk = 37
-
-    defaultConfig {
-        minSdk = 29
-
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-    }
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
-    }
     buildFeatures {
         compose = true
         buildConfig = true
-    }
-
-    testOptions {
-        unitTests {
-            // Robolectric-backed tests (Room, Compose) need real resources
-            // (themes, strings) merged in, not just the stub SDK jar.
-            isIncludeAndroidResources = true
-
-            all {
-                // Conscrypt, which Robolectric installs as a security provider,
-                // lowercases os.name with the default locale. Under tr-TR
-                // "Windows" becomes "wındows" (dotless i), so the bundled
-                // native library never resolves. Pin the test JVM to en-US.
-                it.jvmArgs("-Duser.language=en", "-Duser.country=US")
-            }
-        }
     }
 }
 
