@@ -8,6 +8,7 @@ import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.Dispatcher
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
@@ -60,8 +61,12 @@ class MetProviderTest {
             ignoreUnknownKeys = true
             coerceInputValues = true
         }
+        val client = OkHttpClient.Builder()
+            .readTimeout(1, TimeUnit.SECONDS)
+            .build()
         val retrofit = Retrofit.Builder()
             .baseUrl(server.url("/"))
+            .client(client)
             .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
             .build()
         provider = MetProvider(retrofit.create(MetApi::class.java))
@@ -106,14 +111,15 @@ class MetProviderTest {
         path!!.substringAfterLast("/").toInt()
 
     @Test
-    fun `search returning null ids with zero total marks the provider exhausted, not failed`() = runTest {
-        server.enqueue(MockResponse().setBody("""{"total": 0, "objectIDs": null}"""))
+    fun `search returning null ids with zero total marks the provider exhausted, not failed`() =
+        runTest {
+            server.enqueue(MockResponse().setBody("""{"total": 0, "objectIDs": null}"""))
 
-        val page: PageResult = provider.fetchPage(cursor = null, size = 20, department = "11")
+            val page: PageResult = provider.fetchPage(cursor = null, size = 20, department = "11")
 
-        assertEquals(PageStatus.EXHAUSTED, page.status)
-        assertTrue(page.items.isEmpty())
-    }
+            assertEquals(PageStatus.EXHAUSTED, page.status)
+            assertTrue(page.items.isEmpty())
+        }
 
     @Test
     fun `ensureIds does not cache after a failed search response`() = runTest {
@@ -169,7 +175,16 @@ class MetProviderTest {
             override fun dispatch(request: RecordedRequest): MockResponse {
                 val path = request.path ?: ""
                 return when {
-                    path.startsWith("/v1.1/search") -> MockResponse().setBody(searchResponse(listOf(3001, 3002, 3003, 3004)))
+                    path.startsWith("/v1.1/search") -> MockResponse().setBody(
+                        searchResponse(
+                            listOf(
+                                3001,
+                                3002,
+                                3003,
+                                3004
+                            )
+                        )
+                    )
                     // Every object call fails — three in a row trips the outage threshold.
                     else -> MockResponse().setResponseCode(500)
                 }
@@ -196,6 +211,7 @@ class MetProviderTest {
                     // them in the opposite order to the batch's input order.
                     path.contains("objects/4001") -> MockResponse().setBody(objectResponse(4001))
                         .setBodyDelay(150, TimeUnit.MILLISECONDS)
+
                     path.contains("objects/4002") -> MockResponse().setBody(objectResponse(4002))
                     else -> MockResponse().setBody(searchResponse(listOf(4001, 4002)))
                 }
@@ -208,60 +224,81 @@ class MetProviderTest {
     }
 
     @Test
-    fun `a page needing ids past one 500-window fetches a second id page at the right offset`() = runTest {
-        // total=501 forces ensureIds to loop: the first search response can
-        // only carry ID_PAGE_LIMIT (500) ids per the real API's cap, so id
-        // 500 isn't available until a second /search call at offset=500.
-        val firstWindow = (0 until 500).toList()
-        // dispatch() runs on MockWebServer's own thread — an AssertionError
-        // thrown in there gets swallowed into a broken response instead of
-        // failing the test, so just record offsets here and assert on them
-        // afterwards, same as the requestCount checks below already do.
-        val searchOffsets = mutableListOf<Int?>()
-        server.dispatcher = object : Dispatcher() {
-            override fun dispatch(request: RecordedRequest): MockResponse {
-                val path = request.path ?: ""
-                return when {
-                    path.startsWith("/v1.1/search") -> {
-                        val offset = request.offset() ?: 0
-                        searchOffsets.add(offset)
-                        if (offset == 0) {
-                            MockResponse().setBody(searchResponse(firstWindow, total = 501))
-                        } else {
-                            MockResponse().setBody(searchResponse(listOf(500), total = 501))
+    fun `a page needing ids past one 500-window fetches a second id page at the right offset`() =
+        runTest {
+            // total=501 forces ensureIds to loop: the first search response can
+            // only carry ID_PAGE_LIMIT (500) ids per the real API's cap, so id
+            // 500 isn't available until a second /search call at offset=500.
+            val firstWindow = (0 until 500).toList()
+            // dispatch() runs on MockWebServer's own thread — an AssertionError
+            // thrown in there gets swallowed into a broken response instead of
+            // failing the test, so just record offsets here and assert on them
+            // afterwards, same as the requestCount checks below already do.
+            val searchOffsets = mutableListOf<Int?>()
+            server.dispatcher = object : Dispatcher() {
+                override fun dispatch(request: RecordedRequest): MockResponse {
+                    val path = request.path ?: ""
+                    return when {
+                        path.startsWith("/v1.1/search") -> {
+                            val offset = request.offset() ?: 0
+                            searchOffsets.add(offset)
+                            if (offset == 0) {
+                                MockResponse().setBody(searchResponse(firstWindow, total = 501))
+                            } else {
+                                MockResponse().setBody(searchResponse(listOf(500), total = 501))
+                            }
                         }
+
+                        else -> MockResponse().setBody(
+                            objectResponse(
+                                request.path!!.substringAfterLast(
+                                    "/"
+                                ).toInt()
+                            )
+                        )
                     }
-                    else -> MockResponse().setBody(objectResponse(request.path!!.substringAfterLast("/").toInt()))
                 }
             }
+
+            // Ask for one item starting right at the boundary — id 500 only
+            // exists in the second page, so this can't be served without the loop.
+            val page: PageResult = provider.fetchPage(cursor = "500", size = 1, department = "11")
+
+            assertEquals(PageStatus.EXHAUSTED, page.status)
+            assertEquals(listOf("met:500"), page.items.map { it.id })
+            assertEquals(listOf(0, 500), searchOffsets)
         }
 
-        // Ask for one item starting right at the boundary — id 500 only
-        // exists in the second page, so this can't be served without the loop.
-        val page: PageResult = provider.fetchPage(cursor = "500", size = 1, department = "11")
-
-        assertEquals(PageStatus.EXHAUSTED, page.status)
-        assertEquals(listOf("met:500"), page.items.map { it.id })
-        assertEquals(listOf(0, 500), searchOffsets)
-    }
-
     @Test
-    fun `running out of hydrated ids mid-query returns OK with a next cursor, not EXHAUSTED`() = runTest {
-        // total says 10 ids exist but this page only returns 3 — a real
-        // gap between "what we've cached" and "what the query actually has
-        // left." The old exhaustion check (cursor caught up to cachedIds.size)
-        // would wrongly call this done; reachable() must not.
-        server.enqueue(MockResponse().setBody(searchResponse(listOf(5001, 5002, 5003), total = 10)))
-        server.enqueue(MockResponse().setBody(objectResponse(5001)))
-        server.enqueue(MockResponse().setBody(objectResponse(5002)))
-        server.enqueue(MockResponse().setBody(objectResponse(5003)))
+    fun `running out of hydrated ids mid-query returns OK with a next cursor, not EXHAUSTED`() =
+        runTest {
+            // total says 10 ids exist but this page only returns 3 — a real
+            // gap between "what we've cached" and "what the query actually has
+            // left." The old exhaustion check (cursor caught up to cachedIds.size)
+            // would wrongly call this done; reachable() must not.
+            // size = 3 so the page ends exactly at the cached ids. With a larger
+            // size the provider asks for the next search page, which isn't queued,
+            // and waits out OkHttp's 10 s read timeout.
+            server.enqueue(
+                MockResponse().setBody(
+                    searchResponse(
+                        listOf(5001, 5002, 5003),
+                        total = 10
+                    )
+                )
+            )
+            server.enqueue(MockResponse().setBody(objectResponse(5001)))
+            server.enqueue(MockResponse().setBody(objectResponse(5002)))
+            server.enqueue(MockResponse().setBody(objectResponse(5003)))
 
-        val page: PageResult = provider.fetchPage(cursor = null, size = 20, department = "11")
+            val page: PageResult = provider.fetchPage(cursor = null, size = 3, department = "11")
 
-        assertEquals(PageStatus.OK, page.status)
-        assertEquals("3", page.next)
-        assertEquals(3, page.items.size)
-    }
+            assertEquals(PageStatus.OK, page.status)
+            assertEquals("3", page.next)
+            assertEquals(3, page.items.size)
+            // 1 search + 3 objects. A 5th request means it went looking for more ids.
+            assertEquals(4, server.requestCount)
+        }
 
     @Test
     fun `cachedIds stops growing at the 10k ceiling even when total claims more`() = runTest {
@@ -285,7 +322,14 @@ class MetProviderTest {
                         val ids = (offset until minOf(offset + limit, 10_000)).toList()
                         MockResponse().setBody(searchResponse(ids, total = 50_000))
                     }
-                    else -> MockResponse().setBody(objectResponse(request.path!!.substringAfterLast("/").toInt()))
+
+                    else -> MockResponse().setBody(
+                        objectResponse(
+                            request.path!!.substringAfterLast(
+                                "/"
+                            ).toInt()
+                        )
+                    )
                 }
             }
         }
@@ -303,7 +347,8 @@ class MetProviderTest {
     fun `a non-numeric department fails the page without calling the API`() = runTest {
         // The Met ignores a bad departmentId and searches the whole
         // collection, so a malformed value must never reach the network.
-        val page: PageResult = provider.fetchPage(cursor = "12", size = 20, department = "European Paintings")
+        val page: PageResult =
+            provider.fetchPage(cursor = "12", size = 20, department = "European Paintings")
 
         assertEquals(PageStatus.FAILED, page.status)
         assertEquals("12", page.next)
@@ -351,7 +396,8 @@ class MetProviderTest {
         val modern: PageResult = provider.fetchPage(cursor = null, size = 1, department = "12")
         // Department 11 again, from its own cursor — must come from its own
         // cache, not department 12's list and not a fresh search.
-        val europeanNext: PageResult = provider.fetchPage(cursor = european.next, size = 1, department = "11")
+        val europeanNext: PageResult =
+            provider.fetchPage(cursor = european.next, size = 1, department = "11")
 
         assertEquals(listOf("met:7001"), european.items.map { it.id })
         assertEquals(listOf("met:8001"), modern.items.map { it.id })
@@ -365,7 +411,17 @@ class MetProviderTest {
             override fun dispatch(request: RecordedRequest): MockResponse {
                 val path = request.path ?: ""
                 return when {
-                    path.startsWith("/v1.1/search") -> MockResponse().setBody(searchResponse(listOf(9001, 9002, 9003, 9004)))
+                    path.startsWith("/v1.1/search") -> MockResponse().setBody(
+                        searchResponse(
+                            listOf(
+                                9001,
+                                9002,
+                                9003,
+                                9004
+                            )
+                        )
+                    )
+
                     path.contains("objects/9004") -> MockResponse().setBody(objectResponse(9004))
                     // 200 with a body the converter can't decode -> SerializationException.
                     else -> MockResponse().setBody("{not json")
@@ -380,66 +436,75 @@ class MetProviderTest {
     }
 
     @Test
-    fun `an outage after some successes rewinds the cursor to the first failure of the streak`() = runTest {
-        server.dispatcher = object : Dispatcher() {
-            override fun dispatch(request: RecordedRequest): MockResponse {
-                val path = request.path ?: ""
-                return when {
-                    path.startsWith("/v1.1/search") -> MockResponse().setBody(searchResponse(listOf(6001, 6002, 6003, 6004, 6005)))
-                    path.contains("objects/6001") -> MockResponse().setBody(objectResponse(6001))
-                    // 6002, 6003, 6004 fail in a row -> outage on 6004.
-                    else -> MockResponse().setResponseCode(500)
+    fun `an outage after some successes rewinds the cursor to the first failure of the streak`() =
+        runTest {
+            server.dispatcher = object : Dispatcher() {
+                override fun dispatch(request: RecordedRequest): MockResponse {
+                    val path = request.path ?: ""
+                    return when {
+                        path.startsWith("/v1.1/search") -> MockResponse().setBody(
+                            searchResponse(
+                                listOf(6001, 6002, 6003, 6004, 6005)
+                            )
+                        )
+
+                        path.contains("objects/6001") -> MockResponse().setBody(objectResponse(6001))
+                        // 6002, 6003, 6004 fail in a row -> outage on 6004.
+                        else -> MockResponse().setResponseCode(500)
+                    }
                 }
             }
+
+            val page: PageResult = provider.fetchPage(cursor = null, size = 20, department = "11")
+
+            // 6001 was delivered, so this is a normal page — but the cursor must
+            // point at 6002 (index 1), not at 6004, or 6002 and 6003 are lost.
+            assertEquals(PageStatus.OK, page.status)
+            assertEquals(listOf("met:6001"), page.items.map { it.id })
+            assertEquals("1", page.next)
         }
-
-        val page: PageResult = provider.fetchPage(cursor = null, size = 20, department = "11")
-
-        // 6001 was delivered, so this is a normal page — but the cursor must
-        // point at 6002 (index 1), not at 6004, or 6002 and 6003 are lost.
-        assertEquals(PageStatus.OK, page.status)
-        assertEquals(listOf("met:6001"), page.items.map { it.id })
-        assertEquals("1", page.next)
-    }
 
     @Test
-    fun `a 403 below the streak threshold stops the page and rewinds to the first blocked id`() = runTest {
-        // Recorded on MockWebServer's thread, asserted afterwards — see the
-        // multi-page test above for why.
-        val requestedObjects: MutableList<Int> = java.util.Collections.synchronizedList(mutableListOf())
-        server.dispatcher = object : Dispatcher() {
-            override fun dispatch(request: RecordedRequest): MockResponse {
-                val path = request.path ?: ""
-                if (path.startsWith("/v1.1/search")) {
-                    return MockResponse().setBody(searchResponse((1101..1108).toList()))
-                }
-                val objectId = request.objectId()
-                requestedObjects.add(objectId)
-                return when (objectId) {
-                    // First batch: ok, ok, 403, 403. The streak is 2, under the
-                    // threshold, so only the block check can stop the walk here.
-                    1103, 1104 -> MockResponse().setResponseCode(403)
-                    else -> MockResponse().setBody(objectResponse(objectId))
+    fun `a 403 below the streak threshold stops the page and rewinds to the first blocked id`() =
+        runTest {
+            // Recorded on MockWebServer's thread, asserted afterwards — see the
+            // multi-page test above for why.
+            val requestedObjects: MutableList<Int> =
+                java.util.Collections.synchronizedList(mutableListOf())
+            server.dispatcher = object : Dispatcher() {
+                override fun dispatch(request: RecordedRequest): MockResponse {
+                    val path = request.path ?: ""
+                    if (path.startsWith("/v1.1/search")) {
+                        return MockResponse().setBody(searchResponse((1101..1108).toList()))
+                    }
+                    val objectId = request.objectId()
+                    requestedObjects.add(objectId)
+                    return when (objectId) {
+                        // First batch: ok, ok, 403, 403. The streak is 2, under the
+                        // threshold, so only the block check can stop the walk here.
+                        1103, 1104 -> MockResponse().setResponseCode(403)
+                        else -> MockResponse().setBody(objectResponse(objectId))
+                    }
                 }
             }
+
+            val page: PageResult = provider.fetchPage(cursor = null, size = 20, department = "11")
+
+            assertEquals(PageStatus.OK, page.status)
+            assertEquals(listOf("met:1101", "met:1102"), page.items.map { it.id })
+            // Cursor on 1103 (index 2), so the blocked ids are retried, not skipped.
+            assertEquals("2", page.next)
+            // No second batch went out into the block.
+            assertEquals(listOf(1101, 1102, 1103, 1104), requestedObjects.sorted())
+
+            // While cooling down, the next page fails without touching the network.
+            val requestsBefore: Int = server.requestCount
+            val cooling: PageResult =
+                provider.fetchPage(cursor = page.next, size = 20, department = "11")
+            assertEquals(PageStatus.FAILED, cooling.status)
+            assertEquals("2", cooling.next)
+            assertEquals(requestsBefore, server.requestCount)
         }
-
-        val page: PageResult = provider.fetchPage(cursor = null, size = 20, department = "11")
-
-        assertEquals(PageStatus.OK, page.status)
-        assertEquals(listOf("met:1101", "met:1102"), page.items.map { it.id })
-        // Cursor on 1103 (index 2), so the blocked ids are retried, not skipped.
-        assertEquals("2", page.next)
-        // No second batch went out into the block.
-        assertEquals(listOf(1101, 1102, 1103, 1104), requestedObjects.sorted())
-
-        // While cooling down, the next page fails without touching the network.
-        val requestsBefore: Int = server.requestCount
-        val cooling: PageResult = provider.fetchPage(cursor = page.next, size = 20, department = "11")
-        assertEquals(PageStatus.FAILED, cooling.status)
-        assertEquals("2", cooling.next)
-        assertEquals(requestsBefore, server.requestCount)
-    }
 
     @Test
     fun `every section maps to numeric Met department ids`() {
@@ -449,7 +514,10 @@ class MetProviderTest {
             val departments: List<String> = provider.departmentsFor(section)
             assertTrue("$section has no Met departments", departments.isNotEmpty())
             for (department in departments) {
-                assertTrue("$section maps to non-numeric '$department'", department.toIntOrNull() != null)
+                assertTrue(
+                    "$section maps to non-numeric '$department'",
+                    department.toIntOrNull() != null
+                )
             }
         }
     }
