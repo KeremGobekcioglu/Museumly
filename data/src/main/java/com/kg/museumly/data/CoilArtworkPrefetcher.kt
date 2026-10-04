@@ -9,6 +9,7 @@ import com.kg.museumly.domain.ArtworkPrefetcher
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.collections.iterator
 
 /**
  * Starts downloading the next pages' images before the user swipes to them.

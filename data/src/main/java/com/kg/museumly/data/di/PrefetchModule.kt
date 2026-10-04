@@ -1,4 +1,4 @@
-package com.kg.museumly.di
+package com.kg.museumly.data.di
 
 import com.kg.museumly.data.CoilArtworkPrefetcher
 import com.kg.museumly.domain.ArtworkPrefetcher

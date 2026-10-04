@@ -55,15 +55,10 @@ android {
     }
 }
 
-ksp {
-    arg("room.schemaLocation", "$projectDir/schemas")
-    arg("room.generateKotlin", "true")
-}
-
 dependencies {
 
     implementation(project(":domain"))
-
+    implementation(project(":data"))
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.foundation)
     implementation(libs.androidx.compose.ui)
@@ -81,25 +76,6 @@ dependencies {
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
     implementation(libs.androidx.hilt.navigation.compose)
-
-    // Networking
-    implementation(libs.retrofit.core)
-    implementation(libs.retrofit.kotlin.serialization)
-    implementation(libs.okhttp.core)
-    implementation(libs.okhttp.logging)
-    implementation(libs.kotlinx.serialization.json)
-
-    // Room
-    implementation(libs.room.runtime)
-    implementation(libs.room.ktx)
-    ksp(libs.room.compiler)
-
-    // DataStore
-    implementation(libs.androidx.datastore.preferences)
-
-    // Coil 3
-    implementation(libs.coil.compose)
-    implementation(libs.coil.network.okhttp)
 
     // Telephoto — throwaway zoom spike, see ZoomSpikeScreen
     implementation(libs.telephoto.zoomable.image.coil3)

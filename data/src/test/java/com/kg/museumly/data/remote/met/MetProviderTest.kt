@@ -1,9 +1,9 @@
 package com.kg.museumly.data.remote.met
 
+import com.kg.museumly.data.testutil.Fixtures
 import com.kg.museumly.domain.PageResult
 import com.kg.museumly.domain.PageStatus
 import com.kg.museumly.domain.model.Section
-import com.kg.museumly.testutil.Fixtures
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
@@ -23,6 +23,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
+import java.util.Collections
 
 /**
  * Protects the cursor-poisoning trap README.md calls out twice: a failed or
@@ -469,7 +470,7 @@ class MetProviderTest {
             // Recorded on MockWebServer's thread, asserted afterwards — see the
             // multi-page test above for why.
             val requestedObjects: MutableList<Int> =
-                java.util.Collections.synchronizedList(mutableListOf())
+                Collections.synchronizedList(mutableListOf())
             server.dispatcher = object : Dispatcher() {
                 override fun dispatch(request: RecordedRequest): MockResponse {
                     val path = request.path ?: ""

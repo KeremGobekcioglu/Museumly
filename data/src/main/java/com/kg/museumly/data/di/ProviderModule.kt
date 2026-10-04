@@ -1,4 +1,4 @@
-package com.kg.museumly.di
+package com.kg.museumly.data.di
 
 import com.kg.museumly.data.remote.cleveland.ClevelandProvider
 import com.kg.museumly.data.remote.met.MetProvider

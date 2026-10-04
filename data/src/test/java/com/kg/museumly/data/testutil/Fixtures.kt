@@ -1,4 +1,4 @@
-package com.kg.museumly.testutil
+package com.kg.museumly.data.testutil
 
 /**
  * Loads trimmed, real-shaped JSON payloads from src/test/resources for

@@ -1,4 +1,4 @@
-package com.kg.museumly.testutil
+package com.kg.museumly.data.testutil
 
 import com.kg.museumly.domain.ArtworkProvider
 import com.kg.museumly.domain.PageResult

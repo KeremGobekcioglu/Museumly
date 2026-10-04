@@ -25,3 +25,4 @@ dependencyResolutionManagement {
 rootProject.name = "Museumly"
 include(":app")
 include(":domain")
+include(":data")

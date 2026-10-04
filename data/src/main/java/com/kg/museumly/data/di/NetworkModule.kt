@@ -1,6 +1,6 @@
-package com.kg.museumly.di
+package com.kg.museumly.data.di
 
-import com.kg.museumly.BuildConfig
+import com.kg.museumly.data.BuildConfig
 import com.kg.museumly.data.remote.cleveland.ClevelandApi
 import com.kg.museumly.data.remote.met.MetApi
 import dagger.Module

@@ -1,11 +1,9 @@
-package com.kg.museumly.di
+package com.kg.museumly.data.di
 
 import android.content.Context
 import androidx.room.Room
-import androidx.room.RoomDatabase
 import com.kg.museumly.data.local.ArtworkDao
 import com.kg.museumly.data.local.MuseumDatabase
-import com.kg.museumly.data.local.ProviderCursor
 import com.kg.museumly.data.local.ProviderCursorDao
 import com.kg.museumly.data.local.detail.ArtworkDetailDao
 import dagger.Module
