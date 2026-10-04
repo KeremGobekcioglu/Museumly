@@ -3,9 +3,9 @@ package com.kg.museumly.feature.scroll.presentation
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.kg.museumly.data.local.FeedPositionSource
 import com.kg.museumly.domain.ArtworkPrefetcher
 import com.kg.museumly.domain.ArtworkRepository
+import com.kg.museumly.domain.FeedPositionSourceInterface
 import com.kg.museumly.domain.LoadOutcome
 import com.kg.museumly.domain.NetworkMonitor
 import com.kg.museumly.model.Artwork
@@ -57,7 +57,7 @@ import kotlin.time.Duration.Companion.milliseconds
 @HiltViewModel
 class ScrollViewModel @Inject constructor(
     private val repository: ArtworkRepository,
-    private val positionStore: FeedPositionSource,
+    private val positionStore: FeedPositionSourceInterface,
     private val prefetcher: ArtworkPrefetcher,
     private val networkMonitor: NetworkMonitor
 ) : ViewModel() {

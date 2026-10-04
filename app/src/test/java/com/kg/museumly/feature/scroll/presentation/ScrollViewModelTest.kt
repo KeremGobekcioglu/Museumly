@@ -1,7 +1,7 @@
 package com.kg.museumly.feature.scroll.presentation
 
 import app.cash.turbine.test
-import com.kg.museumly.data.local.FeedPositionSource
+import com.kg.museumly.domain.FeedPositionSourceInterface
 import com.kg.museumly.domain.LoadOutcome
 import com.kg.museumly.testutil.FakeArtworkPrefetcher
 import com.kg.museumly.testutil.FakeArtworkRepository
@@ -44,10 +44,9 @@ import org.robolectric.annotation.Config
  *
  * repository/prefetcher/networkMonitor are hand-written fakes (real
  * ArtworkRepository/ArtworkPrefetcher/NetworkMonitor interfaces, trivial to
- * hold state for). positionStore stays MockK: FeedPositionSource is a final
- * class whose constructor needs a real android.content.Context, so a fake
- * subclass would still need a real or mocked Context just to compile — a
- * mock avoids that entirely.
+ * hold state for). positionStore is a MockK mock of the
+ * FeedPositionSourceInterface interface, because the tests verify exact
+ * setFrontier/setLastSection calls with coVerify.
  *
  * Robolectric-backed (rather than isReturnDefaultValues) because
  * ScrollViewModel calls android.util.Log.d directly.
@@ -61,7 +60,7 @@ class ScrollViewModelTest {
     val mainDispatcherRule = MainDispatcherRule()
 
     private lateinit var repository: FakeArtworkRepository
-    private lateinit var positionStore: FeedPositionSource
+    private lateinit var positionStore: FeedPositionSourceInterface
     private lateinit var prefetcher: FakeArtworkPrefetcher
     private lateinit var networkMonitor: FakeNetworkMonitor
 
