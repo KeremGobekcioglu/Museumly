@@ -1,13 +1,13 @@
 package com.kg.museumly.feature.scroll.presentation
 
 import app.cash.turbine.test
-import com.kg.museumly.domain.FeedPositionSourceInterface
-import com.kg.museumly.domain.LoadOutcome
+import com.kg.museumly.domain.domain.FeedPositionSourceInterface
+import com.kg.museumly.domain.domain.LoadOutcome
 import com.kg.museumly.testutil.FakeArtworkPrefetcher
 import com.kg.museumly.testutil.FakeArtworkRepository
 import com.kg.museumly.testutil.FakeNetworkMonitor
 import com.kg.museumly.testutil.MainDispatcherRule
-import com.kg.museumly.model.Section
+import com.kg.museumly.domain.model.Section
 import com.kg.museumly.testutil.sampleArtwork
 import io.mockk.Runs
 import io.mockk.coEvery

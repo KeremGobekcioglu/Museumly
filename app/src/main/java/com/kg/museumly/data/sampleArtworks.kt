@@ -1,6 +1,6 @@
 package com.kg.museumly.data
 
-import com.kg.museumly.model.Artwork
+import com.kg.museumly.domain.model.Artwork
 
 /**
  * Phase 0 spike data: hardcoded, no network layer, no Room, no repository.

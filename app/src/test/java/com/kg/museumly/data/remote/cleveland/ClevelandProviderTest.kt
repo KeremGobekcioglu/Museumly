@@ -1,7 +1,7 @@
 package com.kg.museumly.data.remote.cleveland
 
-import com.kg.museumly.domain.PageResult
-import com.kg.museumly.domain.PageStatus
+import com.kg.museumly.domain.domain.PageResult
+import com.kg.museumly.domain.domain.PageStatus
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType

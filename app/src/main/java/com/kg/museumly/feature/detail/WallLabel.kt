@@ -21,8 +21,8 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.kg.museumly.model.Artwork
-import com.kg.museumly.model.ArtworkDetail
+import com.kg.museumly.domain.model.Artwork
+import com.kg.museumly.domain.model.ArtworkDetail
 
 private val LabelInk: Color = Color(0xFFE8E3D9)
 private const val TAG = "WallLabel"

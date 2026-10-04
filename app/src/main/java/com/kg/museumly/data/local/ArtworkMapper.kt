@@ -1,6 +1,6 @@
 package com.kg.museumly.data.local
 
-import com.kg.museumly.model.Artwork
+import com.kg.museumly.domain.model.Artwork
 
 
 object ArtworkMapper {

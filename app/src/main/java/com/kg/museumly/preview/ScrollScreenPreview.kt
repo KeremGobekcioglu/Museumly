@@ -5,8 +5,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import com.kg.museumly.feature.scroll.presentation.ArtworkReelsScreen
 import com.kg.museumly.feature.scroll.presentation.ScrollUiState
 import com.kg.museumly.feature.scroll.presentation.TailState
-import com.kg.museumly.model.Artwork
-import com.kg.museumly.model.Section
+import com.kg.museumly.domain.model.Artwork
+import com.kg.museumly.domain.model.Section
 
 /**
  * The same three orientations as the detail previews, as a feed. The

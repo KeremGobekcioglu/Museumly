@@ -7,8 +7,8 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
-import com.kg.museumly.domain.FeedPositionSourceInterface
-import com.kg.museumly.model.Section
+import com.kg.museumly.domain.domain.FeedPositionSourceInterface
+import com.kg.museumly.domain.model.Section
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.first
 import javax.inject.Inject

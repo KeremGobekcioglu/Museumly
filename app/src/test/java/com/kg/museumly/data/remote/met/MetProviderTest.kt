@@ -1,8 +1,8 @@
 package com.kg.museumly.data.remote.met
 
-import com.kg.museumly.domain.PageResult
-import com.kg.museumly.domain.PageStatus
-import com.kg.museumly.model.Section
+import com.kg.museumly.domain.domain.PageResult
+import com.kg.museumly.domain.domain.PageStatus
+import com.kg.museumly.domain.model.Section
 import com.kg.museumly.testutil.Fixtures
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.test.runTest
@@ -15,7 +15,6 @@ import okhttp3.mockwebserver.MockWebServer
 import okhttp3.mockwebserver.RecordedRequest
 import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test

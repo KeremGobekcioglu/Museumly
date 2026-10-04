@@ -1,7 +1,7 @@
 package com.kg.museumly.feature.scroll.presentation
 
-import com.kg.museumly.model.Artwork
-import com.kg.museumly.model.Section
+import com.kg.museumly.domain.model.Artwork
+import com.kg.museumly.domain.model.Section
 
 data class ScrollUiState(
     val section: Section? = null,     // ← new

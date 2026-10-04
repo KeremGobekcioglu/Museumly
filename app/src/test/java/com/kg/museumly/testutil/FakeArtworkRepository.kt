@@ -1,10 +1,10 @@
 package com.kg.museumly.testutil
 
-import com.kg.museumly.domain.ArtworkRepository
-import com.kg.museumly.domain.LoadOutcome
-import com.kg.museumly.model.Artwork
-import com.kg.museumly.model.ArtworkWithDetail
-import com.kg.museumly.model.Section
+import com.kg.museumly.domain.domain.ArtworkRepository
+import com.kg.museumly.domain.domain.LoadOutcome
+import com.kg.museumly.domain.model.Artwork
+import com.kg.museumly.domain.model.ArtworkWithDetail
+import com.kg.museumly.domain.model.Section
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow

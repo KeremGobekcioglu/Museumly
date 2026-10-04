@@ -1,7 +1,7 @@
 package com.kg.museumly.data.remote.met
 
-import com.kg.museumly.model.Artwork
-import com.kg.museumly.model.ArtworkDetail
+import com.kg.museumly.domain.model.Artwork
+import com.kg.museumly.domain.model.ArtworkDetail
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test

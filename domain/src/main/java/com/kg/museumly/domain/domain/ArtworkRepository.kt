@@ -1,8 +1,8 @@
-package com.kg.museumly.domain
+package com.kg.museumly.domain.domain
 
-import com.kg.museumly.model.Artwork
-import com.kg.museumly.model.ArtworkWithDetail
-import com.kg.museumly.model.Section
+import com.kg.museumly.domain.model.Artwork
+import com.kg.museumly.domain.model.ArtworkWithDetail
+import com.kg.museumly.domain.model.Section
 import kotlinx.coroutines.flow.Flow
 
 interface ArtworkRepository {

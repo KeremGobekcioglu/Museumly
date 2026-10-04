@@ -1,8 +1,7 @@
 package com.kg.museumly.data.remote.cleveland
 
-import com.kg.museumly.data.local.detail.ArtworkDetailEntity
-import com.kg.museumly.model.Artwork
-import com.kg.museumly.model.ArtworkDetail
+import com.kg.museumly.domain.model.Artwork
+import com.kg.museumly.domain.model.ArtworkDetail
 
 
 object ClevelandMapper {

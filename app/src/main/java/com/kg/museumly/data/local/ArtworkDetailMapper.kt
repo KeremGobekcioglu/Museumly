@@ -1,7 +1,7 @@
 package com.kg.museumly.data.local
 
 import com.kg.museumly.data.local.detail.ArtworkDetailEntity
-import com.kg.museumly.model.ArtworkDetail
+import com.kg.museumly.domain.model.ArtworkDetail
 
 object ArtworkDetailMapper {
     fun toDomain(entity: ArtworkDetailEntity): ArtworkDetail {

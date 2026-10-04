@@ -1,9 +1,8 @@
 package com.kg.museumly.data.remote.met
 
-import com.kg.museumly.data.local.detail.ArtworkDetailEntity
-import com.kg.museumly.model.Artwork
-import com.kg.museumly.model.ArtworkDetail
-import com.kg.museumly.model.MetDepartment
+import com.kg.museumly.domain.model.Artwork
+import com.kg.museumly.domain.model.ArtworkDetail
+import com.kg.museumly.domain.model.MetDepartment
 object MetMapper
 {
     fun toDomain(dto: MetObjectDto) : Artwork?

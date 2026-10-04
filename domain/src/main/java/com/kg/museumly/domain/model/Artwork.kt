@@ -1,4 +1,4 @@
-package com.kg.museumly.model
+package com.kg.museumly.domain.model
 
 /**
  * even though we do have different dtos and apis, our model will be main.

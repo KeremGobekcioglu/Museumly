@@ -1,7 +1,7 @@
-package com.kg.museumly.domain
+package com.kg.museumly.domain.domain
 
-import com.kg.museumly.model.Artwork
-import com.kg.museumly.model.ArtworkDetail
+import com.kg.museumly.domain.model.Artwork
+import com.kg.museumly.domain.model.ArtworkDetail
 
 enum class PageStatus {
     /** Records returned, more may exist. */

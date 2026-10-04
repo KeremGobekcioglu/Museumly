@@ -1,7 +1,7 @@
 package com.kg.museumly.di
 
 import com.kg.museumly.data.CoilArtworkPrefetcher
-import com.kg.museumly.domain.ArtworkPrefetcher
+import com.kg.museumly.domain.domain.ArtworkPrefetcher
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn

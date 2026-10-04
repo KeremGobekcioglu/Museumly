@@ -1,6 +1,6 @@
-package com.kg.museumly.domain
+package com.kg.museumly.domain.domain
 
-import com.kg.museumly.model.Section
+import com.kg.museumly.domain.model.Section
 
 interface ArtworkProvider {
     // providers need to have an id. so we can differentiate them.

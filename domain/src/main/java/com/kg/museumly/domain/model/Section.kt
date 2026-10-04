@@ -1,4 +1,4 @@
-package com.kg.museumly.model
+package com.kg.museumly.domain.model
 
 /**
  * This class represents departments in a museum. This is shared between different api s so

@@ -3,9 +3,9 @@ package com.kg.museumly.feature.detail
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.kg.museumly.domain.ArtworkRepository
-import com.kg.museumly.domain.FeedPositionSourceInterface
-import com.kg.museumly.model.ArtworkWithDetail
+import com.kg.museumly.domain.domain.ArtworkRepository
+import com.kg.museumly.domain.domain.FeedPositionSourceInterface
+import com.kg.museumly.domain.model.ArtworkWithDetail
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

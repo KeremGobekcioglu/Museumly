@@ -1,4 +1,4 @@
-package com.kg.museumly.domain
+package com.kg.museumly.domain.domain
 
 sealed class LoadOutcome {
     data object Loaded : LoadOutcome()

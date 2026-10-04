@@ -1,4 +1,4 @@
-package com.kg.museumly.model
+package com.kg.museumly.domain.model
 
 // domain/ArtworkDetail.kt
 data class ArtworkDetail(

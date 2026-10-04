@@ -32,7 +32,6 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.layout.windowInsetsTopHeight
 import androidx.compose.foundation.rememberScrollState
@@ -73,12 +72,11 @@ import coil3.request.crossfade
 import com.kg.museumly.feature.scroll.presentation.components.FrameLine
 import com.kg.museumly.feature.scroll.presentation.components.GalleryGeometry
 import com.kg.museumly.feature.scroll.presentation.components.GalleryNotice
-import com.kg.museumly.feature.scroll.presentation.components.GalleryPlacard
 import com.kg.museumly.feature.scroll.presentation.components.PendantLamp
 import com.kg.museumly.feature.scroll.presentation.components.WallColor
 import com.kg.museumly.feature.scroll.presentation.components.hangingGeometry
-import com.kg.museumly.model.Artwork
-import com.kg.museumly.model.ArtworkWithDetail
+import com.kg.museumly.domain.model.Artwork
+import com.kg.museumly.domain.model.ArtworkWithDetail
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import me.saket.telephoto.zoomable.ZoomableState

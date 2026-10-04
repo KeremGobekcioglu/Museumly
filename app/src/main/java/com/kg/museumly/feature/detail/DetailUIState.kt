@@ -1,6 +1,6 @@
 package com.kg.museumly.feature.detail
 
-import com.kg.museumly.model.ArtworkWithDetail
+import com.kg.museumly.domain.model.ArtworkWithDetail
 
 data class DetailUiState(
     val data: ArtworkWithDetail? = null,

@@ -4,7 +4,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import com.kg.museumly.model.Section
+import com.kg.museumly.domain.model.Section
 import com.kg.museumly.testutil.sampleArtwork
 import org.junit.Assert.assertEquals
 import org.junit.Rule

@@ -4,9 +4,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
 import com.kg.museumly.feature.detail.DetailScreen
 import com.kg.museumly.feature.detail.DetailUiState
-import com.kg.museumly.model.Artwork
-import com.kg.museumly.model.ArtworkDetail
-import com.kg.museumly.model.ArtworkWithDetail
+import com.kg.museumly.domain.model.Artwork
+import com.kg.museumly.domain.model.ArtworkDetail
+import com.kg.museumly.domain.model.ArtworkWithDetail
 
 /**
  * The three orientations the fixed frame has to survive: wide, tall (a

@@ -5,7 +5,7 @@ import android.net.ConnectivityManager
 import coil3.ImageLoader
 import coil3.request.Disposable
 import coil3.request.ImageRequest
-import com.kg.museumly.domain.ArtworkPrefetcher
+import com.kg.museumly.domain.domain.ArtworkPrefetcher
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton

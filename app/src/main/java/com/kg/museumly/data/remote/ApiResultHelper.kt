@@ -1,6 +1,6 @@
 package com.kg.museumly.data.remote
 
-import com.kg.museumly.domain.ApiResult
+import com.kg.museumly.domain.domain.ApiResult
 import retrofit2.HttpException
 
 // A second attempt only makes sense when the failure was the server's,

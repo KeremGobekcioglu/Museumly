@@ -1,6 +1,6 @@
 package com.kg.museumly.testutil
 
-import com.kg.museumly.domain.NetworkMonitor
+import com.kg.museumly.domain.domain.NetworkMonitor
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
