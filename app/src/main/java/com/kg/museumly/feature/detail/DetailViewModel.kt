@@ -3,11 +3,9 @@ package com.kg.museumly.feature.detail
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.navigation.toRoute
-import com.kg.museumly.data.local.FeedPositionSource
 import com.kg.museumly.domain.ArtworkRepository
+import com.kg.museumly.domain.FeedPositionSourceInterface
 import com.kg.museumly.model.ArtworkWithDetail
-import com.kg.museumly.navigation.DetailPage
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -19,10 +17,12 @@ import javax.inject.Inject
 class DetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val repository: ArtworkRepository,
-    private val positionStore: FeedPositionSource,
+    private val positionStore: FeedPositionSourceInterface,
 ) : ViewModel()
 {
-    private val route: DetailPage = savedStateHandle.toRoute()
+    // key = DetailPage.artworkId, filled in by Navigation. Read by name so
+    // this ViewModel doesn't depend on the route class.
+    private val artworkId: String = checkNotNull(savedStateHandle["artworkId"])
 
     private val _uiState = MutableStateFlow(DetailUiState())
     val state: StateFlow<DetailUiState> = _uiState.asStateFlow()
@@ -34,7 +34,7 @@ class DetailViewModel @Inject constructor(
     private fun load()
     {
         viewModelScope.launch {
-            val result: ArtworkWithDetail? = repository.artworkWithDetail(route.artworkId)
+            val result: ArtworkWithDetail? = repository.artworkWithDetail(artworkId)
             val hasInspected: Boolean = positionStore.hasInspected()
             if (result == null) {
                 _uiState.value = DetailUiState(

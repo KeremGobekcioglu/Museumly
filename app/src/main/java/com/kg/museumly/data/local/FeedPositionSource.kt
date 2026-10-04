@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.kg.museumly.domain.FeedPositionSourceInterface
 import com.kg.museumly.model.Section
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.first
@@ -18,7 +19,7 @@ private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(na
 @Singleton
 class FeedPositionSource @Inject constructor(
     @ApplicationContext private val context: Context
-)
+) : FeedPositionSourceInterface
 {
     private val lastSectionKey = stringPreferencesKey("last_section")
     private fun frontierKey(section: Section): Preferences.Key<Int>
@@ -31,8 +32,7 @@ class FeedPositionSource @Inject constructor(
     // once per app launch is enough to not be annoying within a session.
     private var hasInspectedThisSession: Boolean = false
 
-    // always returns a valid section.
-    suspend fun getLastSection() : Section
+    override suspend fun getLastSection() : Section
     {
         // open datastore
         val prefs = context.dataStore.data.first()
@@ -44,7 +44,7 @@ class FeedPositionSource @Inject constructor(
         return match ?: Section.EUROPEAN
     }
 
-    suspend fun setLastSection(section: Section)
+    override suspend fun setLastSection(section: Section)
     {
         context.dataStore.edit {
             prefs ->
@@ -52,19 +52,14 @@ class FeedPositionSource @Inject constructor(
         }
     }
 
-    suspend fun getFrontier(section: Section): Int
+    override suspend fun getFrontier(section: Section): Int
     {
         val prefs: Preferences = context.dataStore.data.first()
         val stored: Int = prefs[frontierKey(section)] ?: return 0
         return stored
     }
-    /**
-     * Highest page index the user has ever reached. Not "where they left
-     * off" — if they swiped to 30 then browsed back to 5 and closed, we
-     * want 30. Going backwards is free; going forwards is the thing worth
-     * remembering.
-     */
-    suspend fun setFrontier(section: Section, position: Int)
+
+    override suspend fun setFrontier(section: Section, position: Int)
     {
         context.dataStore.edit { prefs ->
             val key: Preferences.Key<Int> = frontierKey(section)
@@ -75,14 +70,9 @@ class FeedPositionSource @Inject constructor(
         }
     }
 
-    /**
-     * Whether the user has completed a tap/pinch into inspect mode this
-     * session. One-way within the session: once true, InspectHint stops
-     * showing until the app is relaunched.
-     */
-    fun hasInspected(): Boolean = hasInspectedThisSession
+    override fun hasInspected(): Boolean = hasInspectedThisSession
 
-    fun setInspected()
+    override fun setInspected()
     {
         hasInspectedThisSession = true
     }

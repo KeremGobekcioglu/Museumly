@@ -45,7 +45,10 @@ class FakeArtworkRepository : ArtworkRepository {
         return flowFor(section)
     }
 
+    val artworkWithDetailIds: MutableList<String> = ArrayList()
+
     override suspend fun artworkWithDetail(id: String): ArtworkWithDetail? {
+        artworkWithDetailIds.add(id)
         return null
     }
 
