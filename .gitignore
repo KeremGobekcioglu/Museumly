@@ -39,3 +39,4 @@ local.properties
 /girl.jpg
 /harvesters.jpg
 .idea/deploymentTargetSelector.xml
+/.idea/kotlinc.xml
