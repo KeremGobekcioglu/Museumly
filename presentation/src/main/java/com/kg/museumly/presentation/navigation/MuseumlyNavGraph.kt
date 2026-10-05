@@ -54,7 +54,8 @@ fun MuseumlyNavGraph()
                 refresh = viewModel::loadMore,
                 onPageChanged = viewModel::onPageChanged,
                 onDetailPage = { id -> navController.navigate(DetailPage(id)) },
-                onSectionSelected = viewModel::selectSection
+                onSectionSelected = viewModel::selectSection,
+                setFavorite = viewModel::setFavorite
             )
         }
 
@@ -75,6 +76,7 @@ fun MuseumlyNavGraph()
                 state = state,
                 onBack = { navController.popBackStack() },
                 onInspected = viewmodel::onInspected,
+                setFavorite = viewmodel::setFavorite,
             )
         }
     }

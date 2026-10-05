@@ -107,7 +107,8 @@ fun ArtworkReelsScreen(
     refresh: () -> Unit,
     onPageChanged: (Int) -> Unit,
     onDetailPage: (String) -> Unit,
-    onSectionSelected: (Section) -> Unit
+    onSectionSelected: (Section) -> Unit,
+    setFavorite: (String, Boolean) -> Unit
 
 ) {
     Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
@@ -115,7 +116,8 @@ fun ArtworkReelsScreen(
             state = state,
             refresh = refresh,
             onPageChanged = onPageChanged,
-            onDetailPage = onDetailPage
+            onDetailPage = onDetailPage,
+            setFavorite = setFavorite
         )
         // Same 300 ms as the gallery crossfade, so the pill and the
         // artwork appear together instead of the pill popping in on its own.
@@ -246,7 +248,8 @@ private fun ReelsContent(
     state: ScrollUiState,
     refresh: () -> Unit,
     onPageChanged: (Int) -> Unit,
-    onDetailPage: (String) -> Unit
+    onDetailPage: (String) -> Unit,
+    setFavorite: (String, Boolean) -> Unit
 ) {
     AnimatedContent(
         targetState = state,
@@ -262,7 +265,8 @@ private fun ReelsContent(
                 state = slotState,
                 refresh = refresh,
                 onPageChanged = onPageChanged,
-                onDetailPage = onDetailPage
+                onDetailPage = onDetailPage,
+                setFavorite = setFavorite
             )
         }
     }
@@ -299,7 +303,8 @@ private fun ReelsPager(
     state: ScrollUiState,
     refresh: () -> Unit,
     onPageChanged: (Int) -> Unit,
-    onDetailPage: (String) -> Unit
+    onDetailPage: (String) -> Unit,
+    setFavorite: (String, Boolean) -> Unit
 ) {
     key(state.section) {
         val pagerState = rememberPagerState(
@@ -324,7 +329,9 @@ private fun ReelsPager(
                     if (artwork != null) {
                         ArtworkPageWithRestrainedBox(
                             artwork = artwork,
-                            onDetailPage = onDetailPage
+                            onDetailPage = onDetailPage,
+                            isFavorite = state.favoriteIds.contains(artwork.id),
+                            setFavorite = setFavorite
                         )
                     }
                 } else {

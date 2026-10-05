@@ -77,6 +77,7 @@ import com.kg.museumly.presentation.feature.scroll.presentation.components.WallC
 import com.kg.museumly.presentation.feature.scroll.presentation.components.hangingGeometry
 import com.kg.museumly.domain.model.Artwork
 import com.kg.museumly.domain.model.ArtworkWithDetail
+import com.kg.museumly.presentation.feature.scroll.presentation.components.ArtworkActions
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import me.saket.telephoto.zoomable.ZoomableState
@@ -90,6 +91,7 @@ fun DetailScreen(
     state: DetailUiState,
     onBack: () -> Unit,
     onInspected: () -> Unit,
+    setFavorite: (String, Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     // rememberSaveable so a rotation mid-inspection doesn't dump the user
@@ -117,6 +119,10 @@ fun DetailScreen(
                 data = state.data,
                 inspecting = inspecting,
                 showInspectHint = state.showInspectHint,
+                isFavorite = state.isFavorite,
+                onFavoriteClick = {
+                    setFavorite(state.data.artwork.id, !state.isFavorite)
+                },
                 onInspect = {
                     inspecting = true
                     onInspected()
@@ -168,6 +174,8 @@ private fun DetailContent(
     data: ArtworkWithDetail,
     inspecting: Boolean,
     showInspectHint: Boolean,
+    isFavorite: Boolean,
+    onFavoriteClick: () -> Unit,
     onInspect: () -> Unit,
     onExit: () -> Unit,
     modifier: Modifier = Modifier,
@@ -268,6 +276,26 @@ private fun DetailContent(
                     .height(roomHeight)
             ) {
                 PendantLamp(geometry = geometry, modifier = Modifier.fillMaxSize())
+
+                // In the room rather than over the screen, so it scrolls away
+                // with the work while the back button stays. The column's alpha
+                // already fades it out while inspecting; the guard stops a tap
+                // reaching it while it's invisible. The top inset is the spacer
+                // above, and 12dp (not 16) because these buttons are 48dp, not
+                // 40, so the heart sits on the back arrow's line.
+                ArtworkActions(
+                    isFavorite = isFavorite,
+                    onFavoriteClick = {
+                        if (!inspecting) {
+                            onFavoriteClick()
+                        }
+                    },
+                    onShareClick = null,
+                    verticalState = false,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(12.dp),
+                )
 
                 ArtworkFrame(
                     imageUrl = artwork.imageUrl,

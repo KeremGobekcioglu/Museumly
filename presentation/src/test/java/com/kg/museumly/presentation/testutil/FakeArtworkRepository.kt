@@ -8,6 +8,7 @@ import com.kg.museumly.domain.model.Section
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
@@ -23,6 +24,7 @@ import kotlin.time.Duration.Companion.milliseconds
 class FakeArtworkRepository : ArtworkRepository {
 
     private val artworksFlows: MutableMap<Section, MutableStateFlow<List<Artwork>>> = HashMap()
+    private val favoriteIds: MutableStateFlow<Set<String>> = MutableStateFlow(emptySet())
 
     var countValue: Int = 0
     var loadMoreOutcome: LoadOutcome = LoadOutcome.Loaded
@@ -71,5 +73,32 @@ class FakeArtworkRepository : ArtworkRepository {
 
     override suspend fun count(section: Section): Int {
         return countValue
+    }
+
+    override fun getFavorites(section: Section?): Flow<List<Artwork>> {
+        return flowOf(emptyList())
+    }
+
+    override fun getFavoritesIds(): Flow<Set<String>> {
+        return favoriteIds
+    }
+
+    var setFavoriteDelayMs: Long = 0
+
+    override suspend fun setFavorite(id: String, isFavorite: Boolean) {
+        delay(setFavoriteDelayMs.milliseconds)
+        if (isFavorite) {
+            favoriteIds.value = favoriteIds.value + id
+        } else {
+            favoriteIds.value = favoriteIds.value - id
+        }
+    }
+
+    override suspend fun getFavoriteById(id: String): Artwork? {
+        return null
+    }
+
+    override suspend fun favoritesCount(): Int {
+        return 0
     }
 }

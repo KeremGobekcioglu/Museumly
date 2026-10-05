@@ -7,4 +7,5 @@ data class DetailUiState(
     val isLoading: Boolean = true,
     val notFound: Boolean = false,
     val showInspectHint: Boolean = false,
+    val isFavorite: Boolean = false
 )

@@ -6,6 +6,7 @@ import com.kg.museumly.data.local.ArtworkDao
 import com.kg.museumly.data.local.MuseumDatabase
 import com.kg.museumly.data.local.ProviderCursorDao
 import com.kg.museumly.data.local.detail.ArtworkDetailDao
+import com.kg.museumly.data.local.favorites.FavoritesDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -51,5 +52,11 @@ object DatabaseModule {
     fun provideArtworkDetailDao(db: MuseumDatabase) : ArtworkDetailDao
     {
         return db.artworkDetailDao()
+    }
+
+    @Provides
+    fun provideFavoritesDao(db: MuseumDatabase) : FavoritesDao
+    {
+        return db.favoritesDao()
     }
 }

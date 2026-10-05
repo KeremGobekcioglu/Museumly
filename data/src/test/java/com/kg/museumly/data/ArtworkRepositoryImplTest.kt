@@ -8,6 +8,7 @@ import com.kg.museumly.data.local.MuseumDatabase
 import com.kg.museumly.data.local.ProviderCursor
 import com.kg.museumly.data.local.ProviderCursorDao
 import com.kg.museumly.data.local.ProviderTurnSource
+import com.kg.museumly.data.local.favorites.FavoritesDao
 import com.kg.museumly.data.testutil.FakeArtworkProvider
 import com.kg.museumly.data.testutil.sampleArtwork
 import com.kg.museumly.data.testutil.sampleDetail
@@ -21,11 +22,18 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.just
 import io.mockk.mockk
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
@@ -35,6 +43,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Protects the repository's round-robin and the cursor-poisoning trap
@@ -61,6 +70,7 @@ class ArtworkRepositoryImplTest {
     private lateinit var cursorDao: ProviderCursorDao
     private lateinit var turnSource: ProviderTurnSource
 
+    private lateinit var favoritesDao: FavoritesDao
     private fun provider(id: String, page: PageResult): FakeArtworkProvider {
         val fake = FakeArtworkProvider(id)
         fake.enqueue(page)
@@ -75,7 +85,7 @@ class ArtworkRepositoryImplTest {
         ).allowMainThreadQueries().build()
         artworkDao = database.artworkDao()
         cursorDao = database.cursorDao()
-
+        favoritesDao = database.favoritesDao()
         turnSource = mockk()
         coEvery { turnSource.getTurn(any()) } returns 0
         coEvery { turnSource.setTurn(any(), any()) } just Runs
@@ -98,6 +108,7 @@ class ArtworkRepositoryImplTest {
             // (seedIfEmpty is commented out), so there's nothing to fake.
             seedSource = SeedSource(),
             turnSource = turnSource,
+            favoritesDao = favoritesDao
         )
     }
 
@@ -399,6 +410,57 @@ class ArtworkRepositoryImplTest {
         // singleton, so this fails.
         assertNotEquals(LoadOutcome.Loaded, outcome)
     }
+
+    @Test
+    fun testThatFavoriteArtworkSurvivesLoadMOREDeliveringItself() = runTest {
+        val met: FakeArtworkProvider = FakeArtworkProvider("met") { listOf("11") }
+        met.enqueue(PageResult(listOf(sampleArtwork("met:1"), sampleArtwork("met:2")), listOf(sampleDetail(), sampleDetail()), next = "2", status = PageStatus.OK))
+        // The museum's list shifted: met:1 comes back on the next page.
+        met.enqueue(PageResult(listOf(sampleArtwork("met:1")), listOf(sampleDetail()), next = "3", status = PageStatus.OK))
+        val repository = repository(setOf(met))
+        repository.loadMore(Section.EUROPEAN,20)
+        repository.setFavorite("met:1", true)
+        repository.loadMore(Section.EUROPEAN,20)
+
+        assertEquals(2 , artworkDao.byId("met:1")?.position)
+        assertTrue(repository.getFavoritesIds().first().contains("met:1"))
+    }
+
+    @Test
+    fun `setFavorite true adds the id and false removes only that id`() = runTest {
+        val repository: ArtworkRepositoryImpl = repository(emptySet())
+
+        repository.setFavorite("met:1", true)
+        repository.setFavorite("met:2", true)
+        assertEquals(setOf("met:1", "met:2"), repository.getFavoritesIds().first())
+
+        repository.setFavorite("met:1", false)
+        assertEquals(setOf("met:2"), repository.getFavoritesIds().first())
+    }
+
+    @Test
+    fun setFavoriteHASnothingToDoWithRemoteFetching() = runBlocking {
+        val slow = GatedArtworkProvider("met")
+        val repository: ArtworkRepositoryImpl = repository(setOf(slow))
+
+        // A real thread, so loadMore really runs next to the test.
+        val load: Job = launch(Dispatchers.Default) {
+            repository.loadMore(Section.EUROPEAN, size = 20)
+        }
+        // loadMore now holds the mutex and is stuck inside fetchPage.
+        slow.entered.await()
+
+        // If setFavorite took the mutex it would hang here; this turns the hang into null.
+        val finished: Unit? = withTimeoutOrNull(2_000.milliseconds) {
+            repository.setFavorite("met:1", true)
+        }
+        assertNotNull("setFavorite waited for the load to finish", finished)
+        assertTrue(load.isActive)
+        assertTrue(repository.getFavoritesIds().first().contains("met:1"))
+
+        slow.gate.complete(Unit)
+        load.join()
+    }
 }
 
 /**
@@ -409,5 +471,24 @@ class ArtworkRepositoryImplTest {
 private class ThrowingInsertArtworkDao(private val delegate: ArtworkDao) : ArtworkDao by delegate {
     override suspend fun insertAll(items: List<ArtworkEntity>) {
         throw IllegalStateException("insert failed on purpose")
+    }
+}
+
+/**
+ * A provider whose fetchPage waits until the test opens the gate.
+ * Lets a test hold loadMore in the middle of its network call.
+ */
+private class GatedArtworkProvider(override val id: String) : ArtworkProvider {
+    val entered: CompletableDeferred<Unit> = CompletableDeferred()
+    val gate: CompletableDeferred<Unit> = CompletableDeferred()
+
+    override fun departmentsFor(section: Section): List<String> {
+        return listOf("all")
+    }
+
+    override suspend fun fetchPage(cursor: String?, size: Int, department: String): PageResult {
+        entered.complete(Unit)
+        gate.await()
+        return PageResult(emptyList(), emptyList(), cursor, PageStatus.FAILED, "gate opened")
     }
 }

@@ -65,6 +65,7 @@ private fun ReelsPreview(state: ScrollUiState) = WithPreviewImages {
         onPageChanged = {},
         onDetailPage = {},
         onSectionSelected = {},
+        setFavorite = {_,_ -> }
     )
 }
 
