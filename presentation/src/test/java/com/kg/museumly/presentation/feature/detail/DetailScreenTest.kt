@@ -31,6 +31,7 @@ class DetailScreenTest {
                 state = DetailUiState(data = null, isLoading = false, notFound = true),
                 onBack = {},
                 onInspected = {},
+                setFavorite = { _, _ -> },
             )
         }
 

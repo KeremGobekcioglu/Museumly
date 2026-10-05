@@ -179,7 +179,7 @@ private fun ArtworkCaption(
                 isFavorite = isFavorite,
                 onFavoriteClick = onFavoriteClick,
                 onShareClick = null,
-                verticalState = false,
+                verticalState = true,
             )
         }
         Text(

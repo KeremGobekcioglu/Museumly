@@ -76,6 +76,7 @@ fun MuseumlyNavGraph()
                 state = state,
                 onBack = { navController.popBackStack() },
                 onInspected = viewmodel::onInspected,
+                setFavorite = viewmodel::setFavorite,
             )
         }
     }

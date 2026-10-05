@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kg.museumly.domain.ArtworkRepository
 import com.kg.museumly.domain.FeedPositionSourceInterface
+import com.kg.museumly.domain.model.Artwork
 import com.kg.museumly.domain.model.ArtworkWithDetail
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -27,8 +28,19 @@ class DetailViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(DetailUiState())
     val state: StateFlow<DetailUiState> = _uiState.asStateFlow()
 
+    /**
+     * load loads for one time it is okay but
+     * when user sets favorite, ui wont be updated
+     * without favorites flow collector.
+     */
     init {
         load()
+        viewModelScope.launch {
+            repository.getFavoritesIds().collect { ids: Set<String> ->
+                val favorite: Boolean = ids.contains(artworkId)
+                _uiState.value = _uiState.value.copy(isFavorite = favorite)
+            }
+        }
     }
 
     private fun load()
@@ -36,6 +48,7 @@ class DetailViewModel @Inject constructor(
         viewModelScope.launch {
             val result: ArtworkWithDetail? = repository.artworkWithDetail(artworkId)
             val hasInspected: Boolean = positionStore.hasInspected()
+            val favoriteArtwork: Artwork? = repository.getFavoriteById(artworkId)
             if (result == null) {
                 _uiState.value = DetailUiState(
                     data = null,
@@ -48,11 +61,17 @@ class DetailViewModel @Inject constructor(
                     isLoading = false,
                     notFound = false,
                     showInspectHint = !hasInspected,
+                    isFavorite = favoriteArtwork != null
                 )
             }
         }
     }
-
+    fun setFavorite(artworkId: String, isFavorite: Boolean)
+    {
+        viewModelScope.launch {
+            repository.setFavorite(artworkId,isFavorite)
+        }
+    }
     /**
      * Called wherever the screen enters inspect mode. Idempotent: once the
      * hint is off, repeat calls (a pinch fires this every frame of the
