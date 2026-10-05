@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
@@ -87,6 +88,8 @@ internal fun ArtworkPageWithRestrainedBox(
     artwork: Artwork,
     modifier: Modifier = Modifier,
     onDetailPage: (String) -> Unit,
+    setFavorite: (String, Boolean) -> Unit,
+    isFavorite: Boolean
 )  {
     Column(modifier = modifier.fillMaxSize()) {
         Spacer(modifier = Modifier.windowInsetsTopHeight(WindowInsets.safeDrawing))
@@ -130,7 +133,11 @@ internal fun ArtworkPageWithRestrainedBox(
             }
         }
 
-        ArtworkCaption(artwork = artwork)
+        ArtworkCaption(
+            artwork = artwork,
+            isFavorite = isFavorite,
+            onFavoriteClick = { setFavorite(artwork.id, !isFavorite) },
+        )
     }
 }
 
@@ -140,7 +147,12 @@ internal fun ArtworkPageWithRestrainedBox(
  * collection credit as the quietest line.
  */
 @Composable
-private fun ArtworkCaption(artwork: Artwork, modifier: Modifier = Modifier) {
+private fun ArtworkCaption(
+    artwork: Artwork,
+    isFavorite: Boolean,
+    onFavoriteClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -154,12 +166,20 @@ private fun ArtworkCaption(artwork: Artwork, modifier: Modifier = Modifier) {
             color = Color.White,
             style = CaptionTitleStyle,
         )
-        val line: String? = captionLine(artwork.artist, artwork.year)
-        if (line != null) {
+        // The actions share the maker line's row, so they stay even when
+        // there's no artist or year to show.
+        Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                text = line,
+                text = captionLine(artwork.artist, artwork.year).orEmpty(),
                 color = CaptionSecondaryColor,
                 style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.weight(1f),
+            )
+            ArtworkActions(
+                isFavorite = isFavorite,
+                onFavoriteClick = onFavoriteClick,
+                onShareClick = null,
+                verticalState = false,
             )
         }
         Text(

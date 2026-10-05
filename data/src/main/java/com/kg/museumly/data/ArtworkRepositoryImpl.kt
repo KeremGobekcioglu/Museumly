@@ -12,6 +12,8 @@ import com.kg.museumly.data.local.ProviderCursorDao
 import com.kg.museumly.data.local.ProviderTurnSource
 import com.kg.museumly.data.local.detail.ArtworkDetailDao
 import com.kg.museumly.data.local.detail.ArtworkDetailEntity
+import com.kg.museumly.data.local.favorites.FavoriteEntity
+import com.kg.museumly.data.local.favorites.FavoritesDao
 import com.kg.museumly.domain.ArtworkProvider
 import com.kg.museumly.domain.ArtworkRepository
 import com.kg.museumly.domain.LoadOutcome
@@ -47,7 +49,8 @@ class ArtworkRepositoryImpl @Inject constructor(
     private val cursorDao: ProviderCursorDao,
     private val providers: Set<@JvmSuppressWildcards ArtworkProvider>,
     private val seedSource: SeedSource,
-    private val turnSource: ProviderTurnSource
+    private val turnSource: ProviderTurnSource,
+    private val favoritesDao: FavoritesDao
 ) : ArtworkRepository {
     private companion object {
         // callTimeout (NetworkModule) bounds a single HTTP call. fetchPage
@@ -309,6 +312,47 @@ class ArtworkRepositoryImpl @Inject constructor(
 
     override suspend fun count(section: Section): Int {
         return artworkDao.count(section.id)
+    }
+
+    override fun getFavorites(section: Section?): Flow<List<Artwork>> {
+        return favoritesDao.getFavorites(section?.id).map { rows: List<ArtworkEntity> ->
+            val result : MutableList<Artwork> = ArrayList()
+            for(row in rows)
+            {
+                result.add(ArtworkMapper.toDomain(row))
+            }
+            result
+        }
+    }
+
+    override fun getFavoritesIds(): Flow<Set<String>> {
+        return favoritesDao.observeFavoriteIds().map { it.toSet() }
+    }
+
+    override suspend fun setFavorite(id: String, isFavorite: Boolean) {
+        /**
+         * if isFavorite true, insert. else, remove.
+         */
+        if(isFavorite)
+        {
+            val favoriteArtwork = FavoriteEntity(id, System.currentTimeMillis())
+            favoritesDao.insert(favoriteArtwork)
+        }
+        else
+        {
+            favoritesDao.remove(id)
+        }
+    }
+
+    override suspend fun favoritesCount(): Int {
+        return favoritesDao.count()
+    }
+
+
+    override suspend fun getFavoriteById(id: String): Artwork? {
+        val favorite = favoritesDao.byId(id) ?: return null
+        val entity = artworkDao.byId(id) ?: return null
+        return ArtworkMapper.toDomain(entity)
     }
 
 }

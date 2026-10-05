@@ -45,6 +45,7 @@ class ArtworkReelsScreenPageCounterTest {
                 onPageChanged = {},
                 onDetailPage = {},
                 onSectionSelected = {},
+                setFavorite = {_,_ -> }
             )
         }
 
@@ -70,6 +71,7 @@ class ArtworkReelsScreenPageCounterTest {
                 onPageChanged = {},
                 onDetailPage = {},
                 onSectionSelected = { selected = it },
+                setFavorite = {_,_ -> }
             )
         }
 

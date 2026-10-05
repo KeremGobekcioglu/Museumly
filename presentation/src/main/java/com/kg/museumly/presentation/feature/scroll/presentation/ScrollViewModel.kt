@@ -83,8 +83,9 @@ class ScrollViewModel @Inject constructor(
         feed,
         initialPage,
         tail,
-        networkMonitor.isOnline
-    ) { feedValue: Pair<Section, List<Artwork>>, page: Pair<Section, Int>?, tailState: TailState, online: Boolean ->
+        networkMonitor.isOnline,
+        repository.getFavoritesIds()
+    ) { feedValue: Pair<Section, List<Artwork>>, page: Pair<Section, Int>?, tailState: TailState, online: Boolean, favorites: Set<String> ->
         val feedSection: Section = feedValue.first
         var matchedPage: Int? = null
         if (page != null && page.first == feedSection) {
@@ -95,7 +96,8 @@ class ScrollViewModel @Inject constructor(
             artworks = feedValue.second,
             initialPage = matchedPage,
             tail = tailState,
-            isOnline = online
+            isOnline = online,
+            favoriteIds = favorites
         )
     }.stateIn(
         scope = viewModelScope,
@@ -165,7 +167,12 @@ class ScrollViewModel @Inject constructor(
 
         }
     }
-
+    fun setFavorite(artworkId: String, isFavorite: Boolean)
+    {
+        viewModelScope.launch {
+            repository.setFavorite(artworkId,isFavorite)
+        }
+    }
     fun selectSection(target: Section) {
         if (target == section.value) {
             return

@@ -8,7 +8,8 @@ data class ScrollUiState(
     val artworks: List<Artwork> = emptyList(),
     val initialPage: Int? = null,
     val tail: TailState = TailState.Loading,
-    val isOnline: Boolean = true
+    val isOnline: Boolean = true,
+    val favoriteIds: Set<String> = emptySet()
 )
 
 sealed interface TailState {

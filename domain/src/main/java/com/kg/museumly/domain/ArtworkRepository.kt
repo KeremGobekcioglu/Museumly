@@ -24,4 +24,17 @@ interface ArtworkRepository {
      * now count tracks section by section.
      */
     suspend fun count(section: Section): Int
+
+    /**
+     * name implies.
+     */
+    fun getFavorites(section: Section?) : Flow<List<Artwork>>
+
+    fun getFavoritesIds() : Flow<Set<String>>
+
+    suspend fun setFavorite(id: String, isFavorite: Boolean)
+
+    suspend fun getFavoriteById(id: String) : Artwork?
+
+    suspend fun favoritesCount() : Int
 }

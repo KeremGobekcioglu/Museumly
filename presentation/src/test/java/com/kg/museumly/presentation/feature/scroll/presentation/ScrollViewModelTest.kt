@@ -360,4 +360,36 @@ class ScrollViewModelTest {
 
         assertEquals(listOf(artworks[1].imageUrl), prefetcher.prefetchedBatches.first())
     }
+
+    @Test
+    fun tapFavoritesQuicklyForTwoDifferentArtwork() = runTest {
+        repository.countValue = 5
+        repository.setFavoriteDelayMs = 100
+        val viewModel = buildViewModel()
+        collect(viewModel)
+        advanceUntilIdle()
+        // Back to back: the first write is still in its delay when the second tap arrives.
+        // The second tap must not cancel it.
+        viewModel.setFavorite("met:1", true)
+        viewModel.setFavorite("met:2", true)
+        advanceUntilIdle()
+        assertEquals(setOf("met:1", "met:2"), viewModel.uiState.value.favoriteIds)
+    }
+
+    @Test
+    fun `setFavorite true puts the id in uiState and false removes it`() = runTest {
+        repository.countValue = 5
+
+        val viewModel = buildViewModel()
+        collect(viewModel)
+        advanceUntilIdle()
+
+        viewModel.setFavorite("met:1", true)
+        advanceUntilIdle()
+        assertEquals(setOf("met:1"), viewModel.uiState.value.favoriteIds)
+
+        viewModel.setFavorite("met:1", false)
+        advanceUntilIdle()
+        assertEquals(emptySet<String>(), viewModel.uiState.value.favoriteIds)
+    }
 }
