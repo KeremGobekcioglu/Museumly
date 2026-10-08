@@ -27,6 +27,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -34,6 +35,7 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.minimumInteractiveComponentSize
@@ -108,8 +110,8 @@ fun ArtworkReelsScreen(
     onPageChanged: (Int) -> Unit,
     onDetailPage: (String) -> Unit,
     onSectionSelected: (Section) -> Unit,
-    setFavorite: (String, Boolean) -> Unit
-
+    setFavorite: (String, Boolean) -> Unit,
+    onDebugFavorites: () -> Unit = {},
 ) {
     Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
         ReelsContent(
@@ -132,6 +134,20 @@ fun ArtworkReelsScreen(
                     selected = section,
                     onSectionSelected = onSectionSelected
                 )
+            }
+        }
+
+        // Temporary entry point until the bottom bar exists.
+        if (BuildConfig.DEBUG) {
+            SmallFloatingActionButton(
+                onClick = onDebugFavorites,
+                containerColor = Color.White.copy(alpha = 0.15f),
+                contentColor = Color.White,
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .padding(end = ReelsGutter)
+            ) {
+                Icon(Icons.Default.Favorite, contentDescription = "Debug: open favorites")
             }
         }
     }

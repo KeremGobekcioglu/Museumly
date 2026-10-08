@@ -60,7 +60,10 @@ fun MuseumlyNavGraph()
                 onPageChanged = viewModel::onPageChanged,
                 onDetailPage = { id -> navController.navigate(DetailPage(id)) },
                 onSectionSelected = viewModel::selectSection,
-                setFavorite = viewModel::setFavorite
+                setFavorite = viewModel::setFavorite,
+                onDebugFavorites = {
+                    navController.navigate(FavoritesPage) { launchSingleTop = true }
+                },
             )
         }
 
@@ -106,7 +109,11 @@ fun MuseumlyNavGraph()
                     }
                 }
             }
-            FavoritesScreen(state = state, onIntent = viewmodel::onIntent)
+            FavoritesScreen(
+                state = state,
+                onIntent = viewmodel::onIntent,
+                onBack = { navController.popBackStack() },
+            )
         }
     }
 }
