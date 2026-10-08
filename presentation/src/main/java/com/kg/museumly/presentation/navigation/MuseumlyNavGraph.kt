@@ -10,6 +10,7 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -21,6 +22,10 @@ import androidx.navigation.compose.rememberNavController
 import com.kg.museumly.presentation.feature.detail.DetailScreen
 import com.kg.museumly.presentation.feature.detail.DetailUiState
 import com.kg.museumly.presentation.feature.detail.DetailViewModel
+import com.kg.museumly.presentation.feature.favorites.FavoritesEffect
+import com.kg.museumly.presentation.feature.favorites.FavoritesScreen
+import com.kg.museumly.presentation.feature.favorites.FavoritesUIState
+import com.kg.museumly.presentation.feature.favorites.FavoritesViewModel
 import com.kg.museumly.presentation.feature.scroll.presentation.ArtworkReelsScreen
 import com.kg.museumly.presentation.feature.scroll.presentation.ScrollUiState
 import com.kg.museumly.presentation.feature.scroll.presentation.ScrollViewModel
@@ -78,6 +83,30 @@ fun MuseumlyNavGraph()
                 onInspected = viewmodel::onInspected,
                 setFavorite = viewmodel::setFavorite,
             )
+        }
+
+        composable<FavoritesPage>(
+            enterTransition = {
+                fadeIn(tween(450)) + scaleIn(initialScale = 0.94f, animationSpec = tween(450))
+            },
+            popExitTransition = {
+                fadeOut(tween(350)) + scaleOut(targetScale = 0.94f, animationSpec = tween(350))
+            },
+        )
+        {
+            val viewmodel : FavoritesViewModel = hiltViewModel()
+            val state : FavoritesUIState by viewmodel.uiState.collectAsStateWithLifecycle()
+            LaunchedEffect(Unit) {
+                viewmodel.effects.collect { effect: FavoritesEffect ->
+                    when(effect)
+                    {
+                        is FavoritesEffect.OpenDetail -> {
+                                navController.navigate(DetailPage(effect.artworkId))
+                        }
+                    }
+                }
+            }
+            FavoritesScreen(state = state, onIntent = viewmodel::onIntent)
         }
     }
 }
