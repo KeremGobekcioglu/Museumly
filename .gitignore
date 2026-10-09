@@ -42,3 +42,4 @@ local.properties
 /.idea/kotlinc.xml
 google-services.json
 app/google-services.json
+debug.keystore

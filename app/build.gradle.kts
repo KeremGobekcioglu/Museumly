@@ -19,7 +19,13 @@ android {
         versionName = "1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
-
+    signingConfigs {
+        getByName("debug")
+        {
+            val sharedKeystore = rootProject.file("debug.keystore")
+            if (sharedKeystore.exists()) storeFile = sharedKeystore
+        }
+    }
     buildTypes {
         release {
             optimization {
