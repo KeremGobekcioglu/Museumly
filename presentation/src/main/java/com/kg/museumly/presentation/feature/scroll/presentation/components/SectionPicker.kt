@@ -3,14 +3,9 @@ package com.kg.museumly.presentation.feature.scroll.presentation.components
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.WindowInsetsSides
-import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
@@ -54,11 +49,45 @@ val Section.label: String
         Section.AFRICA_OCEANIA_AMERICAS -> "Africa, Oceania & Americas"
     }
 
-@OptIn(ExperimentalMaterial3Api::class)
+
+/** Scroll feed: a section is always selected. */
 @Composable
 fun SectionPicker(
     selected: Section,
     onSectionSelected: (Section) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    SectionPickerCore(
+        selected = selected,
+        allLabel = null,
+        // Core only emits null when an "All" row exists, so this is safe.
+        onSelected = { it?.let(onSectionSelected) },
+        modifier = modifier
+    )
+}
+
+/** Favorites: null means "show everything". */
+@Composable
+fun SectionPicker(
+    selected: Section?,
+    allLabel: String,
+    onSectionSelected: (Section?) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    SectionPickerCore(
+        selected = selected,
+        allLabel = allLabel,
+        onSelected = onSectionSelected,
+        modifier = modifier
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SectionPickerCore(
+    selected: Section?,
+    allLabel: String?,
+    onSelected: (Section?) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var sheetOpen by rememberSaveable { mutableStateOf(false) }
@@ -72,8 +101,6 @@ fun SectionPicker(
         border = BorderStroke(1.dp, TopBarChipOutline),
         contentColor = Color.White,
         modifier = modifier
-            .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top))
-            .padding(start = ReelsGutter, top = 12.dp)
             .widthIn(max = 200.dp)
     ) {
         Row(
@@ -81,7 +108,7 @@ fun SectionPicker(
             modifier = Modifier.padding(start = 16.dp, end = 10.dp, top = 8.dp, bottom = 8.dp)
         ) {
             Text(
-                text = selected.label,
+                text = selected?.label ?: allLabel.orEmpty(),
                 style = MaterialTheme.typography.labelLarge,
                 // Wraps instead of truncating: a cut-off section name reads
                 // as a bug.
@@ -98,6 +125,10 @@ fun SectionPicker(
     if (sheetOpen) {
         val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
         val scope = rememberCoroutineScope()
+        // null entry = the "All" row, only present when allLabel is given.
+        val options: List<Section?> =
+            if (allLabel != null) listOf(null) + Section.entries else Section.entries
+
         ModalBottomSheet(
             onDismissRequest = { sheetOpen = false },
             sheetState = sheetState,
@@ -109,12 +140,12 @@ fun SectionPicker(
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
             )
-            for (section in Section.entries) {
-                val isSelected = section == selected
+            for (option in options) {
+                val isSelected = option == selected
                 ListItem(
                     headlineContent = {
                         Text(
-                            text = section.label,
+                            text = option?.label ?: allLabel.orEmpty(),
                             fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
                         )
                     },
@@ -127,7 +158,7 @@ fun SectionPicker(
                         trailingIconColor = Color.White
                     ),
                     modifier = Modifier.clickable {
-                        onSectionSelected(section)
+                        onSelected(option)
                         scope.launch { sheetState.hide() }.invokeOnCompletion { sheetOpen = false }
                     }
                 )

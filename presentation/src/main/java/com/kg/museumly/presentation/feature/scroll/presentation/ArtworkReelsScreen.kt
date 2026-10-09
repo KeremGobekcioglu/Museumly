@@ -115,7 +115,10 @@ fun ArtworkReelsScreen(
             state.section?.let { section ->
                 SectionPicker(
                     selected = section,
-                    onSectionSelected = onSectionSelected
+                    onSectionSelected = onSectionSelected,
+                    modifier = Modifier
+                        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top))
+                        .padding(start = ReelsGutter, top = 12.dp)
                 )
             }
         }
