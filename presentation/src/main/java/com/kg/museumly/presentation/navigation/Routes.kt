@@ -9,3 +9,6 @@ object ScrollPage
 // in sync. DetailViewModelTest fails if they drift.
 @Serializable
 data class DetailPage(val artworkId: String)
+
+@Serializable
+object FavoritesPage

@@ -4,12 +4,18 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 
 val WallColor = Color(0xFF0D0C0B)
 
@@ -22,6 +28,7 @@ fun GalleryNotice(
     onAction: (() -> Unit)? = null,
     isBusy: Boolean = false,
     debugDetail: String? = null,
+    onBack: (() -> Unit)? = null
 ) {
     BoxWithConstraints(
         modifier = modifier
@@ -53,5 +60,23 @@ fun GalleryNotice(
                 .align(Alignment.TopCenter)
                 .offset(y = geometry.placardTop),
         )
+
+        // Same placement as DetailScreen's back button; the lamp hangs from
+        // TopCenter, so the corner is free.
+        if (onBack != null) {
+            IconButton(
+                onClick = onBack,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(16.dp)
+                    .size(40.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Back",
+                    tint = Color.White,
+                )
+            }
+        }
     }
 }
