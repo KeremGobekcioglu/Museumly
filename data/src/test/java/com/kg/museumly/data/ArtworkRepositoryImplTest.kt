@@ -8,6 +8,7 @@ import com.kg.museumly.data.local.MuseumDatabase
 import com.kg.museumly.data.local.ProviderCursor
 import com.kg.museumly.data.local.ProviderCursorDao
 import com.kg.museumly.data.local.ProviderTurnSource
+import com.kg.museumly.data.local.favorites.FavoriteEntity
 import com.kg.museumly.data.local.favorites.FavoritesDao
 import com.kg.museumly.data.testutil.FakeArtworkProvider
 import com.kg.museumly.data.testutil.sampleArtwork
@@ -460,6 +461,40 @@ class ArtworkRepositoryImplTest {
 
         slow.gate.complete(Unit)
         load.join()
+    }
+
+    @Test
+    fun `getFavorites returns only favorited works, newest favorite first`() = runTest {
+        val met: FakeArtworkProvider = FakeArtworkProvider("met") { listOf("11") }
+        met.enqueue(PageResult(listOf(sampleArtwork("met:1"), sampleArtwork("met:2"), sampleArtwork("met:3")), listOf(sampleDetail(), sampleDetail(), sampleDetail()), next = "3", status = PageStatus.OK))
+        val repository: ArtworkRepositoryImpl = repository(setOf(met))
+        repository.loadMore(Section.EUROPEAN, size = 20)
+
+        // Fixed timestamps instead of setFavorite: it reads the system clock,
+        // and two calls in the same millisecond have no defined order.
+        favoritesDao.insert(FavoriteEntity("met:1", favoritedAt = 100))
+        favoritesDao.insert(FavoriteEntity("met:3", favoritedAt = 200))
+
+        val favorites: List<String> = repository.getFavorites(null).first().map { it.id }
+        assertEquals(listOf("met:3", "met:1"), favorites)
+    }
+
+    @Test
+    fun `getFavorites with a section returns only that section, null returns every section`() = runTest {
+        val met: FakeArtworkProvider = FakeArtworkProvider("met") { section -> listOf(section.id) }
+        met.enqueue(PageResult(listOf(sampleArtwork("met:eu")), listOf(sampleDetail()), next = "1", status = PageStatus.OK))
+        met.enqueue(PageResult(listOf(sampleArtwork("met:asia")), listOf(sampleDetail()), next = "1", status = PageStatus.OK))
+        val repository: ArtworkRepositoryImpl = repository(setOf(met))
+        repository.loadMore(Section.EUROPEAN, size = 20)
+        repository.loadMore(Section.ASIA, size = 20)
+
+        repository.setFavorite("met:eu", true)
+        repository.setFavorite("met:asia", true)
+
+        val european: List<String> = repository.getFavorites(Section.EUROPEAN).first().map { it.id }
+        val all: Set<String> = repository.getFavorites(null).first().map { it.id }.toSet()
+        assertEquals(listOf("met:eu"), european)
+        assertEquals(setOf("met:eu", "met:asia"), all)
     }
 }
 
