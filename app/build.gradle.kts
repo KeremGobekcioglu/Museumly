@@ -1,9 +1,12 @@
+import com.google.firebase.appdistribution.gradle.firebaseAppDistribution
 
 plugins {
     id("museumly.android.application")
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt.android)
+    alias(libs.plugins.google.services)
+    alias(libs.plugins.firebase.appdistribution)
 }
 
 android {
@@ -23,6 +26,13 @@ android {
                 enable = false
             }
         }
+
+        debug {
+            firebaseAppDistribution {
+                appId = "1:1057344497240:android:95aaa1b8f31ebaaba44c2d"
+                groups = "first" // it may be First.
+            }
+        }
     }
 
     buildFeatures {
@@ -39,6 +49,9 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.coil)
+
+    // Firebase
+    implementation(platform(libs.firebase.bom))
 
     // Hilt
     implementation(libs.hilt.android)

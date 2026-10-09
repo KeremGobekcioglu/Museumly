@@ -40,3 +40,5 @@ local.properties
 /harvesters.jpg
 .idea/deploymentTargetSelector.xml
 /.idea/kotlinc.xml
+google-services.json
+app/google-services.json
