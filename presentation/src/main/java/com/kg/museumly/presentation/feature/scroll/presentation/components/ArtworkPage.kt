@@ -159,7 +159,7 @@ private fun ArtworkCaption(
             .windowInsetsPadding(
                 WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom)
             )
-            .padding(start = ReelsGutter, end = ReelsGutter, top = 8.dp, bottom = 40.dp),
+            .padding(start = ReelsGutter, end = ReelsGutter, top = 8.dp, bottom = 24.dp),
     ) {
         Text(
             text = artwork.title,
