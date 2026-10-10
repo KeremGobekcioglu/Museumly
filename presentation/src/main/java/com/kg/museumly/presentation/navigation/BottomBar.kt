@@ -8,13 +8,14 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.width
@@ -120,7 +121,7 @@ internal fun MainBottomBar(
             .fillMaxWidth()
             .background(Color.Black)
             .windowInsetsPadding(WindowInsets.navigationBars)
-            .height(56.dp),
+            .heightIn(min = 56.dp),
     ) {
         val slotWidth: Dp = maxWidth / MainTabs.size
         val targetX: Dp = slotWidth * selectedIndex + (slotWidth - 24.dp) / 2
@@ -142,7 +143,12 @@ internal fun MainBottomBar(
                 .height(1.dp)
                 .background(Color.White),
         )
-        Row(modifier = Modifier.fillMaxSize()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 56.dp)
+                .height(IntrinsicSize.Min),
+        ) {
             for (tab in MainTabs) {
                 val selected = isSelected(tab)
                 MainBarItem(
