@@ -83,6 +83,9 @@ fun MainShell(
                 enterTransition = {
                     fadeIn(tween(450)) + scaleIn(initialScale = 0.94f, animationSpec = tween(450))
                 },
+                exitTransition = {
+                    fadeOut(tween(350)) + scaleOut(targetScale = 0.94f, animationSpec = tween(350))
+                },
                 popExitTransition = {
                     fadeOut(tween(350)) + scaleOut(targetScale = 0.94f, animationSpec = tween(350))
                 },
