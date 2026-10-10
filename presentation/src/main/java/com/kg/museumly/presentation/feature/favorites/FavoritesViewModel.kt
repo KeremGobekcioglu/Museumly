@@ -63,6 +63,11 @@ class FavoritesViewModel @Inject constructor(
                     newestFirst = !it.newestFirst
                 ) }
             }
+            is FavoritesIntent.RatioLearned -> {
+                viewModelScope.launch {
+                    repo.rememberAspectRatio(intent.artworkId, intent.ratio)
+                }
+            }
         }
     }
 }

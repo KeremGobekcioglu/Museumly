@@ -32,6 +32,9 @@ interface ArtworkDao
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(items: List<ArtworkEntity>)
 
+    @Query("UPDATE artworks SET aspectRatio = :ratio WHERE id = :id AND aspectRatio IS NULL")
+    suspend fun setAspectRatio(id: String, ratio: Float)
+
     @Query("DELETE FROM artworks")
     suspend fun clear()
 }

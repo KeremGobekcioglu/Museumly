@@ -37,4 +37,6 @@ interface ArtworkRepository {
     suspend fun getFavoriteById(id: String) : Artwork?
 
     suspend fun favoritesCount() : Int
+
+    suspend fun rememberAspectRatio(id: String, ratio: Float)
 }

@@ -496,6 +496,23 @@ class ArtworkRepositoryImplTest {
         assertEquals(listOf("met:eu"), european)
         assertEquals(setOf("met:eu", "met:asia"), all)
     }
+
+    @Test
+    fun `rememberAspectRatio fills an empty ratio and never overwrites an existing one`() = runTest {
+        val met: FakeArtworkProvider = FakeArtworkProvider("met") { listOf("11") }
+        // met:empty is what MetMapper produces; met:known stands in for a
+        // provider that supplied real dimensions.
+        met.enqueue(PageResult(listOf(sampleArtwork("met:empty").copy(aspectRatio = null), sampleArtwork("met:known").copy(aspectRatio = 0.5f)), listOf(sampleDetail(), sampleDetail()), next = "2", status = PageStatus.OK))
+        val repository: ArtworkRepositoryImpl = repository(setOf(met))
+        repository.loadMore(Section.EUROPEAN, size = 20)
+
+        repository.rememberAspectRatio("met:empty", 1.5f)
+        repository.rememberAspectRatio("met:empty", 2f)
+        repository.rememberAspectRatio("met:known", 2f)
+
+        assertEquals(1.5f, artworkDao.byId("met:empty")?.aspectRatio)
+        assertEquals(0.5f, artworkDao.byId("met:known")?.aspectRatio)
+    }
 }
 
 /**

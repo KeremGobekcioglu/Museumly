@@ -99,7 +99,8 @@ private fun FavoritesGrid(
 {
     LazyVerticalStaggeredGrid(
         columns = StaggeredGridCells.Fixed(columnCount(artworks.size)),
-        horizontalArrangement = Arrangement.spacedBy(2.dp)
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalItemSpacing = 4.dp
     ) {
         itemsIndexed(
             items = artworks,
@@ -108,8 +109,12 @@ private fun FavoritesGrid(
             },
         ){ index, artwork ->
             FavoritesTile(
-                artwork,
-                onClick = { onIntent(FavoritesIntent.ArtworkClicked(artwork.id))}
+                artwork = artwork,
+                onClick = { onIntent(FavoritesIntent.ArtworkClicked(artwork.id)) },
+                onRatioLearned = { ratio: Float ->
+                    onIntent(FavoritesIntent.RatioLearned(artwork.id, ratio))
+                },
+                modifier = Modifier.animateItem()
             )
         }
     }
