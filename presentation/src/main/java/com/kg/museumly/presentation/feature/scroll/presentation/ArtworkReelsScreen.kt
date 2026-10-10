@@ -20,11 +20,7 @@ import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
@@ -34,18 +30,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import com.kg.museumly.domain.model.Section
 import com.kg.museumly.presentation.BuildConfig
 import com.kg.museumly.presentation.feature.scroll.presentation.components.ArtworkPageWithRestrainedBox
 import com.kg.museumly.presentation.feature.scroll.presentation.components.GalleryLoading
 import com.kg.museumly.presentation.feature.scroll.presentation.components.GalleryNotice
 import com.kg.museumly.presentation.feature.scroll.presentation.components.ReelsGutter
 import com.kg.museumly.presentation.feature.scroll.presentation.components.SectionPicker
-import com.kg.museumly.domain.model.Section
 import com.kg.museumly.presentation.feature.scroll.presentation.components.TopBarChipOutline
 import com.kg.museumly.presentation.feature.scroll.presentation.components.label
-
-private const val TAG = "MuseumlyImages"
-
 private fun failedTitle(isOnline: Boolean, isTail: Boolean): String {
     if (!isOnline) {
         return if (isTail) "Lost the connection" else "No connection"
@@ -94,7 +87,6 @@ fun ArtworkReelsScreen(
     onDetailPage: (String) -> Unit,
     onSectionSelected: (Section) -> Unit,
     setFavorite: (String, Boolean) -> Unit,
-    onDebugFavorites: () -> Unit = {},
 ) {
     Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
         ReelsContent(
@@ -120,20 +112,6 @@ fun ArtworkReelsScreen(
                         .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top))
                         .padding(start = ReelsGutter, top = 12.dp)
                 )
-            }
-        }
-
-        // Temporary entry point until the bottom bar exists.
-        if (BuildConfig.DEBUG) {
-            SmallFloatingActionButton(
-                onClick = onDebugFavorites,
-                containerColor = Color.White.copy(alpha = 0.15f),
-                contentColor = Color.White,
-                modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    .padding(end = ReelsGutter)
-            ) {
-                Icon(Icons.Default.Favorite, contentDescription = "Debug: open favorites")
             }
         }
     }
