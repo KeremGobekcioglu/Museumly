@@ -348,6 +348,10 @@ class ArtworkRepositoryImpl @Inject constructor(
         return favoritesDao.count()
     }
 
+    override suspend fun rememberAspectRatio(id: String, ratio: Float) {
+        artworkDao.setAspectRatio(id, ratio)
+    }
+
 
     override suspend fun getFavoriteById(id: String): Artwork? {
         val favorite = favoritesDao.byId(id) ?: return null

@@ -21,11 +21,13 @@ import com.kg.museumly.domain.model.Artwork
 @Composable
 internal fun FavoritesTile(
     artwork: Artwork,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onRatioLearned: (Float) -> Unit,
+    modifier: Modifier = Modifier
 )
 {
     var loadedRatio: Float? by remember(artwork.id) { mutableStateOf(null) }
-    val ratio = loadedRatio ?: artwork.aspectRatio ?: 1f
+    val ratio: Float = artwork.aspectRatio ?: loadedRatio ?: 1f
 
     AsyncImage(
         model = artwork.imageUrl,
@@ -35,10 +37,15 @@ internal fun FavoritesTile(
             val size : Size = success.painter.intrinsicSize
             if(size.width > 0f && size.height > 0f)
             {
-                loadedRatio = size.width / size.height
+                val learned: Float = size.width / size.height
+                loadedRatio = learned
+                if (artwork.aspectRatio == null)
+                {
+                    onRatioLearned(learned)
+                }
             }
         },
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .aspectRatio(ratio)
             .background(Color(0xFF1A1A1A))

@@ -16,6 +16,7 @@ sealed interface FavoritesIntent
     data object SortToggled: FavoritesIntent
     data class ArtworkClicked(val artworkId: String) : FavoritesIntent
     data class SectionPicked(val section: Section? = null) : FavoritesIntent
+    data class RatioLearned(val artworkId: String, val ratio: Float) : FavoritesIntent
 }
 
 sealed interface FavoritesEffect

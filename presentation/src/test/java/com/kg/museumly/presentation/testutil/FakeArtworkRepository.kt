@@ -103,6 +103,9 @@ class FakeArtworkRepository : ArtworkRepository {
         }
     }
 
+    override suspend fun rememberAspectRatio(id: String, ratio: Float) {
+    }
+
     override suspend fun getFavoriteById(id: String): Artwork? {
         return null
     }
