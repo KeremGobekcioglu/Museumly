@@ -109,6 +109,13 @@ fun MainShell(
                     onBack = { tabNavController.popBackStack() },
                 )
             }
+
+            composable<ErasPage>(
+
+            )
+            {
+
+            }
         }
     }
 }

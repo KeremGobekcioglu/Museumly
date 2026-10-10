@@ -15,3 +15,6 @@ object FavoritesPage
 
 @Serializable
 object MainPage
+
+@Serializable
+object ErasPage
