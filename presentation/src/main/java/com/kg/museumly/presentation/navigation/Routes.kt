@@ -12,3 +12,6 @@ data class DetailPage(val artworkId: String)
 
 @Serializable
 object FavoritesPage
+
+@Serializable
+object MainPage

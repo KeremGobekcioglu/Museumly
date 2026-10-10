@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -100,8 +101,9 @@ private fun FavoritesGrid(
     LazyVerticalStaggeredGrid(
         columns = StaggeredGridCells.Fixed(columnCount(artworks.size)),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
-        verticalItemSpacing = 4.dp
-    ) {
+        verticalItemSpacing = 4.dp,
+        contentPadding = PaddingValues(bottom = 16.dp),
+        ) {
         itemsIndexed(
             items = artworks,
             key = { index: Int, artwork: Artwork ->
