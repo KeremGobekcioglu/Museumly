@@ -9,8 +9,8 @@ import com.kg.museumly.data.local.ArtworkEntity
  * One artwork's spot in one list. The same artwork can sit in "asia" and
  * "asia@1600s" at once, each with its own position.
  *
- * listKey — section.id for a feed ("asia"), "<section or all>@<era id>"
- * for an era list ("asia@1600s", "all@1600s").
+ * listKey — section.id for a feed ("asia"), "<section>@<era id>"
+ * for an era list ("asia@1600s"). ListScope builds both.
  *
  * position — SQLite has no inherent row order. Without this, SELECT returns
  * rows in whatever order the engine feels like, and that order can change

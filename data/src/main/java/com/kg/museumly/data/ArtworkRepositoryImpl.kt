@@ -43,9 +43,37 @@ import kotlin.time.Duration.Companion.milliseconds
 private class Source(val provider: ArtworkProvider, val department: String) {
     val key = provider.id + ":" + department
 }
-object ListKey {
-    fun feed(section: Section): String = section.id
-    fun era(section: Section?, era: Era): String = "${section?.id ?: "all"}@${era.id}"
+/**
+ * One list of artworks, and the names its bookkeeping is stored under.
+ *
+ * era == null is the feed. Its keys are exactly what they were before eras
+ * existed ("european", "met:11"), so saved cursors and positions stay valid.
+ *
+ * With an era, every key gets "@<era id>": "european@1600s", "met:11@1600s".
+ * The cursor key has no section in it, because a department belongs to
+ * exactly one section.
+ *
+ * Every list, cursor and turn key is built here and nowhere else. A key
+ * built by hand somewhere is how the feed and an era end up sharing a cursor.
+ */
+private class ListScope(val section: Section, val era: Era?) {
+
+    val listKey: String
+
+    init {
+        if (era == null) {
+            listKey = section.id
+        } else {
+            listKey = section.id + "@" + era.id
+        }
+    }
+
+    fun cursorKey(source: Source): String {
+        if (era == null) {
+            return source.key
+        }
+        return source.key + "@" + era.id
+    }
 }
 @Singleton
 class ArtworkRepositoryImpl @Inject constructor(
@@ -84,18 +112,21 @@ class ArtworkRepositoryImpl @Inject constructor(
      *
      * Asia: Chinese, met:6, Japanese, met:6, Korean, met:6, Indian, met:6
      *
-     * A department can appear more than once; loadMore tries each key once per call.
-     * Must be called under the mutex — it reads cursor rows loadMore may write.
+     * A department can appear more than once; load tries each key once per call.
+     * Must be called under the mutex — it reads cursor rows load may write.
+     *
+     * Exhaustion is per scope: a department finished in one era still has a
+     * slot in the feed and in every other era, because each reads its own cursor.
      */
-    private suspend fun sourcesFor(section: Section): List<Source> {
+    private suspend fun sourcesFor(scope: ListScope): List<Source> {
         val ordered: List<ArtworkProvider> = providers.sortedBy { it.id }
 
         val perProvider: MutableList<List<String>> = ArrayList()
         var longest = 0
         for (provider in ordered) {
             val live: MutableList<String> = ArrayList()
-            for (department in provider.departmentsFor(section)) {
-                val saved = cursorDao.get(Source(provider, department).key)
+            for (department in provider.departmentsFor(scope.section)) {
+                val saved = cursorDao.get(scope.cursorKey(Source(provider, department)))
                 // we need to check exhaustion for providers
                 if (saved != null && saved.next == null) // try next provider, this is finished.
                     continue // exhausted: no slot
@@ -138,8 +169,9 @@ class ArtworkRepositoryImpl @Inject constructor(
     /**
      * Returns Flow, so the screen subscribes once and gets every future version automatically.
      */
-    override fun artworks(section: Section): Flow<List<Artwork>> {
-        return artworkDao.observeByList(ListKey.feed(section)).map { rows: List<ArtworkEntity> ->
+    override fun artworks(section: Section, era: Era?): Flow<List<Artwork>> {
+        val scope = ListScope(section, era)
+        return artworkDao.observeByList(scope.listKey).map { rows: List<ArtworkEntity> ->
             val result: MutableList<Artwork> = ArrayList()
             for (row in rows) {
                 result.add(ArtworkMapper.toDomain(row))
@@ -183,10 +215,9 @@ class ArtworkRepositoryImpl @Inject constructor(
     private suspend fun insert(
         items: List<Artwork>,
         details: List<ArtworkDetail>,
-        section: Section,
-        listKey: String = ListKey.feed(section)
+        scope: ListScope
     ) {
-        var position: Int = placementDao.maxPosition(listKey)
+        var position: Int = placementDao.maxPosition(scope.listKey)
         val entities: MutableList<ArtworkEntity> = ArrayList()
         val detailEntities: MutableList<ArtworkDetailEntity> = ArrayList()
         val placements: MutableList<PlacementEntity> = ArrayList()
@@ -194,7 +225,7 @@ class ArtworkRepositoryImpl @Inject constructor(
             position += 1
             val artwork: Artwork = items[i]
             val detail: ArtworkDetail = details[i]
-            entities.add(ArtworkMapper.toEntity(artwork, section.id))
+            entities.add(ArtworkMapper.toEntity(artwork, scope.section.id))
             detailEntities.add(
                 ArtworkDetailEntity(
                     id = artwork.id,
@@ -213,7 +244,7 @@ class ArtworkRepositoryImpl @Inject constructor(
                 PlacementEntity(
                     artworkId = artwork.id,
                     position = position,
-                    listKey = listKey
+                    listKey = scope.listKey
                 )
             )
         }
@@ -247,9 +278,22 @@ class ArtworkRepositoryImpl @Inject constructor(
     // before each source, stop if passed, else fetch with
     // withTimeoutOrNull(min(PROVIDER_FETCH_TIMEOUT_MS, time left)).
     // Only fetchPage is ever timed. Tests swap timeSource for testTimeSource.
-    override suspend fun loadMore(section: Section, size: Int): LoadOutcome {
+    override suspend fun loadMore(section: Section, size: Int, era: Era?): LoadOutcome {
+        val scope = ListScope(section, era)
+        return load(scope, size)
+    }
+
+    /**
+     * Loads one page into the scope's list. The cursor, the turn and the
+     * positions all come from the scope, so an era load never moves the
+     * feed's bookkeeping, and the feed never moves an era's.
+     *
+     * The tried set keeps source.key: it only stops one call from fetching
+     * the same department twice, and within one call every key has the same era.
+     */
+    private suspend fun load(scope: ListScope, size: Int): LoadOutcome {
         mutex.withLock {
-            val sources = sourcesFor(section)
+            val sources = sourcesFor(scope)
             if (sources.isEmpty()) {
                 // every department in this section is exhausted
                 return LoadOutcome.Exhausted
@@ -258,14 +302,15 @@ class ArtworkRepositoryImpl @Inject constructor(
             // the same department can sit in the list several times;
             // try each one at most once per call
             val tried: MutableSet<String> = HashSet()
-            val turn: Int = turnSource.getTurn(section = section)
+            val turn: Int = turnSource.getTurn(scope.listKey)
             for (attempt in sources.indices) {
                 val index: Int = (turn + attempt) % sources.size
                 val source: Source = sources[index]
                 if (!tried.add(source.key)) {
                     continue
                 }
-                val saved: ProviderCursor? = cursorDao.get(source.key)
+                val cursorKey: String = scope.cursorKey(source)
+                val saved: ProviderCursor? = cursorDao.get(cursorKey)
                 // Safety net: sourcesFor already drops exhausted departments.
                 if (saved != null && saved.next == null) {
                     Log.d("REPO", "exhausted, skipping")
@@ -315,14 +360,14 @@ class ArtworkRepositoryImpl @Inject constructor(
                 // rejected again next time.
                 database.withTransaction {
                     if (page.items.isNotEmpty()) {
-                        insert(page.items, page.details, section)
+                        insert(page.items, page.details, scope)
                     }
-                    cursorDao.put(ProviderCursor(source.key, page.next))
+                    cursorDao.put(ProviderCursor(cursorKey, page.next))
                 }
                 // DataStore, not Room, so it can't join the transaction. Only advance
                 // the turn when the source actually delivered something.
                 if (page.items.isNotEmpty()) {
-                    turnSource.setTurn((index + 1) % sources.size, section)
+                    turnSource.setTurn((index + 1) % sources.size, scope.listKey)
                     return LoadOutcome.Loaded
                 }
             }
@@ -333,8 +378,9 @@ class ArtworkRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun count(section: Section): Int {
-        return placementDao.count(ListKey.feed(section))
+    override suspend fun count(section: Section, era: Era?): Int {
+        val scope = ListScope(section, era)
+        return placementDao.count(scope.listKey)
     }
 
     override fun getFavorites(section: Section?): Flow<List<Artwork>> {

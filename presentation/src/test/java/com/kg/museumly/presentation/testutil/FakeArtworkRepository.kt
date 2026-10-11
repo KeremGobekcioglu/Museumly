@@ -4,6 +4,7 @@ import com.kg.museumly.domain.ArtworkRepository
 import com.kg.museumly.domain.LoadOutcome
 import com.kg.museumly.domain.model.Artwork
 import com.kg.museumly.domain.model.ArtworkWithDetail
+import com.kg.museumly.domain.model.Era
 import com.kg.museumly.domain.model.Section
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -53,7 +54,7 @@ class FakeArtworkRepository : ArtworkRepository {
         favoritesFlowFor(section).value = items
     }
 
-    override fun artworks(section: Section): Flow<List<Artwork>> {
+    override fun artworks(section: Section, era: Era?): Flow<List<Artwork>> {
         return flowFor(section)
     }
 
@@ -68,7 +69,7 @@ class FakeArtworkRepository : ArtworkRepository {
         return null
     }
 
-    override suspend fun loadMore(section: Section, size: Int): LoadOutcome {
+    override suspend fun loadMore(section: Section, size: Int, era: Era?): LoadOutcome {
         loadMoreSections.add(section)
         if (loadMoreDelayMs > 0) {
             delay(loadMoreDelayMs.milliseconds)
@@ -80,7 +81,7 @@ class FakeArtworkRepository : ArtworkRepository {
         return loadMoreOutcome
     }
 
-    override suspend fun count(section: Section): Int {
+    override suspend fun count(section: Section, era: Era?): Int {
         return countValue
     }
 

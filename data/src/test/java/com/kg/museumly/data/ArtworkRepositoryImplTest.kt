@@ -18,6 +18,7 @@ import com.kg.museumly.domain.ArtworkProvider
 import com.kg.museumly.domain.LoadOutcome
 import com.kg.museumly.domain.PageResult
 import com.kg.museumly.domain.PageStatus
+import com.kg.museumly.domain.model.Era
 import com.kg.museumly.domain.model.Section
 import io.mockk.Runs
 import io.mockk.coEvery
@@ -148,7 +149,7 @@ class ArtworkRepositoryImplTest {
         assertEquals(LoadOutcome.Loaded, outcome)
         // met is index 1 in the sorted [cleveland, met] list, so the next
         // turn should be (1 + 1) % 2 = 0, not 2 or unchanged.
-        coVerify(exactly = 1) { turnSource.setTurn(0 , Section.EUROPEAN) }
+        coVerify(exactly = 1) { turnSource.setTurn(0, Section.EUROPEAN.id) }
     }
 
     @Test
@@ -227,14 +228,14 @@ class ArtworkRepositoryImplTest {
         // cursor write (which runs after insert in source order) could
         // still have landed even though the insert above threw.
         assertNull(cursorDao.get("met:all"))
-        assertEquals(0, placementDao.count(ListKey.feed(Section.EUROPEAN)))
+        assertEquals(0, placementDao.count(Section.EUROPEAN.id))
         assertNull(artworkDao.byId("met:1"))
     }
 
     @Test
     fun `sources alternate providers, each walking its own departments in order`() = runTest {
         // sources interleave per round: [cleveland:a, met:11, cleveland:b, met:11]; turn = 2 lands on cleveland:b.
-        coEvery { turnSource.getTurn(Section.EUROPEAN) } returns 2
+        coEvery { turnSource.getTurn(Section.EUROPEAN.id) } returns 2
         val page = PageResult(listOf(sampleArtwork("cleveland:1")), listOf(sampleDetail()), next = "1", status = PageStatus.OK)
         val cleveland = FakeArtworkProvider("cleveland") { listOf("a", "b") }
         cleveland.enqueue(page)
@@ -247,7 +248,7 @@ class ArtworkRepositoryImplTest {
         assertEquals(listOf("b"), cleveland.requestedDepartments)
         assertEquals(0, met.callCount)
         // cleveland:b is index 2 of 4, so the next turn is 3 (met:11).
-        coVerify(exactly = 1) { turnSource.setTurn(3, Section.EUROPEAN) }
+        coVerify(exactly = 1) { turnSource.setTurn(3, Section.EUROPEAN.id) }
     }
 
     @Test
@@ -274,7 +275,7 @@ class ArtworkRepositoryImplTest {
         // slot, the list would be [cleveland:a, met:11, cleveland:b, met:11]
         // and met:11 at index 1 would hand the turn to 2 instead of 0.
         cursorDao.put(ProviderCursor(providerId = "cleveland:a", next = null))
-        coEvery { turnSource.getTurn(Section.EUROPEAN) } returns 1
+        coEvery { turnSource.getTurn(Section.EUROPEAN.id) } returns 1
         val cleveland = FakeArtworkProvider("cleveland") { listOf("a", "b") }
         val met = FakeArtworkProvider("met") { listOf("11") }
         met.enqueue(PageResult(listOf(sampleArtwork("met:1")), listOf(sampleDetail()), next = "1", status = PageStatus.OK))
@@ -284,7 +285,7 @@ class ArtworkRepositoryImplTest {
 
         assertEquals(LoadOutcome.Loaded, outcome)
         assertEquals(listOf("11"), met.requestedDepartments)
-        coVerify(exactly = 1) { turnSource.setTurn(0, Section.EUROPEAN) }
+        coVerify(exactly = 1) { turnSource.setTurn(0, Section.EUROPEAN.id) }
     }
 
     @Test
@@ -321,18 +322,89 @@ class ArtworkRepositoryImplTest {
         // European moved its turn to met; Asia still starts at its own 0 (cleveland).
         assertEquals(listOf(Section.EUROPEAN.id, Section.ASIA.id), cleveland.requestedDepartments)
         assertEquals(0, met.callCount)
-        coVerify(exactly = 1) { turnSource.setTurn(1, Section.EUROPEAN) }
-        coVerify(exactly = 1) { turnSource.setTurn(1, Section.ASIA) }
+        coVerify(exactly = 1) { turnSource.setTurn(1, Section.EUROPEAN.id) }
+        coVerify(exactly = 1) { turnSource.setTurn(1, Section.ASIA.id) }
     }
 
     /**
-     * Makes turnSource behave like the real per-section store, so a test can
+     * Makes turnSource behave like the real per-list store, so a test can
      * run several loadMore() calls and see the rotation carry over.
+     * Returns the backing map, keyed by list key, so a test can read the turns.
      */
-    private fun rememberTurns() {
-        val turns: MutableMap<Section, Int> = HashMap()
-        coEvery { turnSource.getTurn(any()) } answers { turns[firstArg<Section>()] ?: 0 }
-        coEvery { turnSource.setTurn(any(), any()) } answers { turns[secondArg<Section>()] = firstArg<Int>() }
+    private fun rememberTurns(): MutableMap<String, Int> {
+        val turns: MutableMap<String, Int> = HashMap()
+        coEvery { turnSource.getTurn(any()) } answers { turns[firstArg<String>()] ?: 0 }
+        coEvery { turnSource.setTurn(any(), any()) } answers { turns[secondArg<String>()] = firstArg<Int>() }
+        return turns
+    }
+
+    @Test
+    fun `an era load leaves the feed's count, cursor row and turn unchanged`() = runTest {
+        val turns: MutableMap<String, Int> = rememberTurns()
+        val cleveland = FakeArtworkProvider("cleveland") { listOf("a") }
+        val met = FakeArtworkProvider("met") { listOf("11") }
+        cleveland.enqueue(PageResult(listOf(sampleArtwork("cleveland:1")), listOf(sampleDetail()), next = "2", status = PageStatus.OK))
+        cleveland.enqueue(PageResult(listOf(sampleArtwork("cleveland:2")), listOf(sampleDetail()), next = "9", status = PageStatus.OK))
+
+        val repository = repository(setOf(cleveland, met))
+        repository.loadMore(Section.EUROPEAN, size = 20)
+        repository.loadMore(Section.EUROPEAN, size = 20, era = Era.Y1600)
+
+        // The feed is exactly as the first load left it.
+        assertEquals(1, repository.count(Section.EUROPEAN))
+        assertEquals("2", cursorDao.get("cleveland:a")?.next)
+        assertEquals(1, turns[Section.EUROPEAN.id])
+        coVerify(exactly = 1) { turnSource.setTurn(any(), Section.EUROPEAN.id) }
+
+        // The era started from its own turn 0 (cleveland) and kept its own books.
+        assertEquals(1, repository.count(Section.EUROPEAN, Era.Y1600))
+        assertEquals("9", cursorDao.get("cleveland:a@1600s")?.next)
+        assertEquals(1, turns["european@1600s"])
+    }
+
+    @Test
+    fun `exhausting a department in one era does not remove it from the feed's rotation`() = runTest {
+        val met = FakeArtworkProvider("met") { listOf("11") }
+        // The era runs dry on its first page.
+        met.enqueue(PageResult(listOf(sampleArtwork("met:1")), listOf(sampleDetail()), next = null, status = PageStatus.OK))
+        met.enqueue(PageResult(listOf(sampleArtwork("met:2")), listOf(sampleDetail()), next = "2", status = PageStatus.OK))
+
+        val repository = repository(setOf(met))
+        repository.loadMore(Section.EUROPEAN, size = 20, era = Era.Y1600)
+        val feedOutcome: LoadOutcome = repository.loadMore(Section.EUROPEAN, size = 20)
+        val eraOutcome: LoadOutcome = repository.loadMore(Section.EUROPEAN, size = 20, era = Era.Y1600)
+
+        assertNotNull(cursorDao.get("met:11@1600s"))
+        assertNull(cursorDao.get("met:11@1600s")?.next)
+        // The feed still fetched met:11.
+        assertEquals(LoadOutcome.Loaded, feedOutcome)
+        assertEquals(listOf("11", "11"), met.requestedDepartments)
+        assertEquals("2", cursorDao.get("met:11")?.next)
+        // The era itself is done and fetches nothing more.
+        assertEquals(LoadOutcome.Exhausted, eraOutcome)
+        assertEquals(2, met.callCount)
+    }
+
+    @Test
+    fun `two eras of one section have separate cursors and positions`() = runTest {
+        val met = FakeArtworkProvider("met") { listOf("11") }
+        met.enqueue(PageResult(listOf(sampleArtwork("met:1"), sampleArtwork("met:2")), listOf(sampleDetail(), sampleDetail()), next = "2", status = PageStatus.OK))
+        met.enqueue(PageResult(listOf(sampleArtwork("met:3")), listOf(sampleDetail()), next = "5", status = PageStatus.OK))
+
+        val repository = repository(setOf(met))
+        repository.loadMore(Section.EUROPEAN, size = 20, era = Era.Y1600)
+        repository.loadMore(Section.EUROPEAN, size = 20, era = Era.Y1700)
+
+        assertEquals("2", cursorDao.get("met:11@1600s")?.next)
+        assertEquals("5", cursorDao.get("met:11@1700s")?.next)
+        assertNull(cursorDao.get("met:11"))
+
+        // Each era is its own list, numbered from zero.
+        assertEquals(listOf("met:1", "met:2"), repository.artworks(Section.EUROPEAN, Era.Y1600).first().map { it.id })
+        assertEquals(listOf("met:3"), repository.artworks(Section.EUROPEAN, Era.Y1700).first().map { it.id })
+        assertEquals(1, placementDao.maxPosition("european@1600s"))
+        assertEquals(0, placementDao.maxPosition("european@1700s"))
+        assertEquals(0, repository.count(Section.EUROPEAN))
     }
 
     @Test
@@ -382,12 +454,12 @@ class ArtworkRepositoryImplTest {
         repository.loadMore(Section.EUROPEAN, size = 20)
         repository.loadMore(Section.ASIA, size = 20)
 
-        val european = artworkDao.observeByList(ListKey.feed(Section.EUROPEAN)).first()
-        val asia = artworkDao.observeByList(ListKey.feed(Section.ASIA)).first()
+        val european = artworkDao.observeByList(Section.EUROPEAN.id).first()
+        val asia = artworkDao.observeByList(Section.ASIA.id).first()
         assertEquals(listOf("met:1", "met:2"), european.map { it.id })
         assertEquals(listOf("met:3"), asia.map { it.id })
-        assertEquals(1, placementDao.maxPosition(ListKey.feed(Section.EUROPEAN)))
-        assertEquals(0, placementDao.maxPosition(ListKey.feed(Section.ASIA)))
+        assertEquals(1, placementDao.maxPosition(Section.EUROPEAN.id))
+        assertEquals(0, placementDao.maxPosition(Section.ASIA.id))
     }
 
     @Test
@@ -405,7 +477,7 @@ class ArtworkRepositoryImplTest {
     fun `a provider failure is not silently lost when a later provider succeeds in the same call`() = runTest {
         // sorted = [cleveland, met]; turn = 1 starts the round at met, so
         // met fails first and cleveland succeeds second, in that order.
-        coEvery { turnSource.getTurn(Section.EUROPEAN) } returns 1
+        coEvery { turnSource.getTurn(Section.EUROPEAN.id) } returns 1
         val met = provider("met", PageResult(emptyList(), emptyList(), next = null, status = PageStatus.FAILED, failureReason = "met down"))
         val cleveland = provider("cleveland", PageResult(listOf(sampleArtwork("cleveland:1")), listOf(sampleDetail()), next = "1", status = PageStatus.OK))
 
@@ -431,7 +503,7 @@ class ArtworkRepositoryImplTest {
         repository.loadMore(Section.EUROPEAN,20)
 
         // The duplicate moves to the end of the feed instead of appearing twice.
-        val feed = artworkDao.observeByList(ListKey.feed(Section.EUROPEAN)).first()
+        val feed = artworkDao.observeByList(Section.EUROPEAN.id).first()
         assertEquals(listOf("met:2", "met:1"), feed.map { it.id })
         assertTrue(repository.getFavoritesIds().first().contains("met:1"))
     }
