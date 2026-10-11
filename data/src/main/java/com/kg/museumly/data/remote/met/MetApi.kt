@@ -16,7 +16,9 @@ interface MetApi {
         //@Query("isHighlight") isHighlight: Boolean = true,
         @Query("hasImages") hasImages: Boolean = true,
         @Query("offset") offset: Int,
-        @Query("limit") limit: Int
+        @Query("limit") limit: Int,
+        @Query("dateBegin") dateBegin: Int? = null,
+        @Query("dateEnd") dateEnd: Int? = null,
         //@Query("isOnView") isOnView: Boolean = true
     ) : MetSearchDto
 

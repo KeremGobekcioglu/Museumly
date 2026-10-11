@@ -16,7 +16,9 @@ interface ClevelandApi {
         @Query("skip") skip: Int,
         @Query("limit") limit: Int,
         @Query("department") department: String?,
-        @Query("fields") fields: String?
+        @Query("fields") fields: String?,
+        @Query("created_after") createdAfter: Int? = null,
+        @Query("created_before") createdBefore: Int? = null,
     ): ClevelandSearchResponse
 
     @GET("artworks/{id}")
