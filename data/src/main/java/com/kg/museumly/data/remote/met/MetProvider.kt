@@ -8,6 +8,7 @@ import com.kg.museumly.domain.PageResult
 import com.kg.museumly.domain.PageStatus
 import com.kg.museumly.domain.model.Artwork
 import com.kg.museumly.domain.model.ArtworkDetail
+import com.kg.museumly.domain.model.Era
 import com.kg.museumly.domain.model.Section
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -27,6 +28,13 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TimeMark
 import kotlin.time.TimeSource
+
+/**
+ * One Met search: a department, with or without an era. Each one has its own
+ * ID list and total, because the date filter changes which IDs come back.
+ * era == null is the feed's query.
+ */
+private data class IdQuery(val departmentId: Int, val era: Era?)
 
 /**
  * right now we can only get paintings if it is our query.
@@ -50,9 +58,10 @@ class MetProvider @Inject constructor(
     override val id = "met"
 
     /**
-     * Different departments so a map is needed with a int key and list value.
+     * One ID list per query (department + era), so the feed's list and an
+     * era's list of the same department never mix.
      */
-    private val cachedIds: MutableMap<Int, MutableList<Int>> = HashMap()
+    private val cachedIds: MutableMap<IdQuery, MutableList<Int>> = HashMap()
 
     /**
      * Set when the Met answers 403/429 (its bot protection / rate limit).
@@ -64,16 +73,15 @@ class MetProvider @Inject constructor(
     private var blockedUntil: TimeMark? = null
 
     /**
-     * Different departments, so a map of totals. Int key -> department id,
-     * Int value -> total.
+     * One total per query (department + era). IdQuery key -> total.
      */
-    private val totals: MutableMap<Int,Int> = HashMap()        // null until the first ID page arrives
+    private val totals: MutableMap<IdQuery, Int> = HashMap()        // null until the first ID page arrives
     private val idsMutex = Mutex()
 
     /** How many IDs this query can ever give us: the real total, capped by the v1.1 ceiling. */
-    private fun reachable(departmentId: Int): Int?
+    private fun reachable(query: IdQuery): Int?
     {
-        val total: Int = totals[departmentId] ?: return null
+        val total: Int = totals[query] ?: return null
         return minOf(total, SEARCH_CEILING)
     }
 
@@ -88,17 +96,17 @@ class MetProvider @Inject constructor(
         return !until.hasPassedNow()
     }
     /**
-     * met api returns object ids for search. it returns objectIds for departments.
-     * This function does if a department is asked before, return its existing id list.
+     * met api returns object ids for search. it returns objectIds for a department and era.
+     * This function does if a query is asked before, return its existing id list.
      * ıf it is not asked before, create and put the list in the map and return it.
      * Same object every time, so ensureIds fills the list fetchPage reads.
      */
-    private fun idsFor(departmentId: Int): MutableList<Int>
+    private fun idsFor(query: IdQuery): MutableList<Int>
     {
-        var ids: MutableList<Int>? = cachedIds[departmentId]
+        var ids: MutableList<Int>? = cachedIds[query]
         if (ids == null) {
             ids = ArrayList()
-            cachedIds[departmentId] = ids
+            cachedIds[query] = ids
         }
         return ids
     }
@@ -180,17 +188,24 @@ class MetProvider @Inject constructor(
      * Grows cachedIds until it covers indices [0, upTo), one 500-ID page at a time.
      * Index into cachedIds == search offset, so the cursor stays a plain index.
      */
-    private suspend fun ensureIds(upTo: Int, departmentId: Int): ApiResult<Unit> {
+    private suspend fun ensureIds(upTo: Int, query: IdQuery): ApiResult<Unit> {
+        // Both or neither: the Met ignores a single date bound.
+        var dateBegin: Int? = null
+        var dateEnd: Int? = null
+        if (query.era != null) {
+            dateBegin = query.era.begin
+            dateEnd = query.era.end
+        }
         idsMutex.withLock {
             return try {
                 /**
-                 * idsFor checks cachedIds map, returns a list checking the department id key.
+                 * idsFor checks cachedIds map, returns a list checking the query key.
                  * we update this list s reference so we dont touch cachedIds directly.
                  */
-                val ids = idsFor(departmentId)
+                val ids = idsFor(query)
                while (ids.size < upTo)
                {
-                   val cap: Int? = reachable(departmentId)
+                   val cap: Int? = reachable(query)
                    if (cap != null && ids.size >= cap) break // query fully consumed
                    /**
                     * 500 or what we got left. lets say we have cached 9700 ids, so right side
@@ -200,8 +215,14 @@ class MetProvider @Inject constructor(
                     */
                    val limit = min(ID_PAGE_LIMIT, SEARCH_CEILING - ids.size)
                    // get 500 for first.
-                   val response = api.search(departmentId, offset = ids.size, limit = limit)
-                   totals[departmentId] = response.total
+                   val response = api.search(
+                       departmentId = query.departmentId,
+                       offset = ids.size,
+                       limit = limit,
+                       dateBegin = dateBegin,
+                       dateEnd = dateEnd
+                   )
+                   totals[query] = response.total
                    val page: List<Int>? = response.objectIDs
                    if(page == null)
                    {
@@ -235,13 +256,13 @@ class MetProvider @Inject constructor(
     }
 
     /** Your old retry-once rule, moved from the loadIds() call site to here. */
-    private suspend fun ensureIdsWithRetry(upTo: Int, departmentId: Int): ApiResult<Unit> {
-        val first = ensureIds(upTo, departmentId)
+    private suspend fun ensureIdsWithRetry(upTo: Int, query: IdQuery): ApiResult<Unit> {
+        val first = ensureIds(upTo, query)
         // A 429 has just started the cooldown; retrying now would ignore it.
         if (first is ApiResult.Failed && first.worthRetrying() && !isBlocked()) {
             Log.d("METPROVIDER", "retrying id page after transient failure: ${first.cause.message}")
             delay(RETRY_DELAY)
-            return ensureIds(upTo, departmentId)
+            return ensureIds(upTo, query)
         }
         return first
     }
@@ -249,7 +270,8 @@ class MetProvider @Inject constructor(
     override suspend fun fetchPage(
         cursor: String?,
         size: Int,
-        department: String
+        department: String,
+        era: Era?
     ): PageResult {
         Log.d("METPROVIDER", "fetchPage department=$department cursor=$cursor")
         if (isBlocked()) {
@@ -262,7 +284,8 @@ class MetProvider @Inject constructor(
                 PageStatus.FAILED,
                 "bad Met department '$department'"
             )
-        val ids = idsFor(departmentId)
+        val query = IdQuery(departmentId, era)
+        val ids = idsFor(query)
         var i = parseCursor(cursor)
         val items : MutableList<Artwork> = ArrayList()
         val details: MutableList<ArtworkDetail> = ArrayList()
@@ -295,7 +318,7 @@ class MetProvider @Inject constructor(
             // every ID page up to i, not just the next one.
             if( i >= ids.size)
             {
-                val idsOutcome = ensureIdsWithRetry( i + 1, departmentId)
+                val idsOutcome = ensureIdsWithRetry( i + 1, query)
                 if(idsOutcome is ApiResult.Rejected)
                 {
                     failureReason = idsOutcome.reason
@@ -384,7 +407,7 @@ class MetProvider @Inject constructor(
         }
         var status = PageStatus.OK
         var next: String? = null
-        val cap: Int? = reachable(departmentId)
+        val cap: Int? = reachable(query)
         if(cap != null && i >= cap)
         {
             status = PageStatus.EXHAUSTED

@@ -408,6 +408,19 @@ class ArtworkRepositoryImplTest {
     }
 
     @Test
+    fun `loadMore hands its era to the provider, and the feed hands null`() = runTest {
+        val met = FakeArtworkProvider("met") { listOf("11") }
+        met.enqueue(PageResult(listOf(sampleArtwork("met:1")), listOf(sampleDetail()), next = "1", status = PageStatus.OK))
+        met.enqueue(PageResult(listOf(sampleArtwork("met:2")), listOf(sampleDetail()), next = "1", status = PageStatus.OK))
+
+        val repository = repository(setOf(met))
+        repository.loadMore(Section.EUROPEAN, size = 20, era = Era.Y1600)
+        repository.loadMore(Section.EUROPEAN, size = 20)
+
+        assertEquals(listOf<Era?>(Era.Y1600, null), met.requestedEras)
+    }
+
+    @Test
     fun `an exhausted department skips only itself, not its provider's other departments`() = runTest {
         cursorDao.put(ProviderCursor(providerId = "met:11", next = null))
         val met = FakeArtworkProvider("met") { listOf("11", "12") }
@@ -635,7 +648,7 @@ private class GatedArtworkProvider(override val id: String) : ArtworkProvider {
         return listOf("all")
     }
 
-    override suspend fun fetchPage(cursor: String?, size: Int, department: String): PageResult {
+    override suspend fun fetchPage(cursor: String?, size: Int, department: String, era: Era?): PageResult {
         entered.complete(Unit)
         gate.await()
         return PageResult(emptyList(), emptyList(), cursor, PageStatus.FAILED, "gate opened")

@@ -326,7 +326,7 @@ class ArtworkRepositoryImpl @Inject constructor(
                 val started: Long = System.nanoTime()
                 val page: PageResult? = withTimeoutOrNull(PROVIDER_FETCH_TIMEOUT_MS.milliseconds)
                 {
-                    source.provider.fetchPage(cursor, size, source.department)
+                    source.provider.fetchPage(cursor, size, source.department, scope.era)
                 }
                 val ms: Long = (System.nanoTime() - started) / 1_000_000
                 if (page == null) {

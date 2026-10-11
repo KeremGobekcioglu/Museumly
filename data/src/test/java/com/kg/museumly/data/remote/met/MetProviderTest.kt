@@ -3,6 +3,7 @@ package com.kg.museumly.data.remote.met
 import com.kg.museumly.data.testutil.Fixtures
 import com.kg.museumly.domain.PageResult
 import com.kg.museumly.domain.PageStatus
+import com.kg.museumly.domain.model.Era
 import com.kg.museumly.domain.model.Section
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.test.runTest
@@ -115,7 +116,7 @@ class MetProviderTest {
         runTest {
             server.enqueue(MockResponse().setBody("""{"total": 0, "objectIDs": null}"""))
 
-            val page: PageResult = provider.fetchPage(cursor = null, size = 20, department = "11")
+            val page: PageResult = provider.fetchPage(cursor = null, size = 20, department = "11", era = null)
 
             assertEquals(PageStatus.EXHAUSTED, page.status)
             assertTrue(page.items.isEmpty())
@@ -128,7 +129,7 @@ class MetProviderTest {
         server.enqueue(MockResponse().setResponseCode(500))
         server.enqueue(MockResponse().setResponseCode(500))
 
-        val firstPage: PageResult = provider.fetchPage(cursor = null, size = 20, department = "11")
+        val firstPage: PageResult = provider.fetchPage(cursor = null, size = 20, department = "11", era = null)
         assertEquals(PageStatus.FAILED, firstPage.status)
 
         // A second call must hit /search again from offset=0 — if the
@@ -137,7 +138,7 @@ class MetProviderTest {
         server.enqueue(MockResponse().setBody(searchResponse(listOf(1001))))
         server.enqueue(MockResponse().setBody(objectResponse(1001)))
 
-        val secondPage: PageResult = provider.fetchPage(cursor = null, size = 20, department = "11")
+        val secondPage: PageResult = provider.fetchPage(cursor = null, size = 20, department = "11", era = null)
 
         assertEquals(PageStatus.EXHAUSTED, secondPage.status)
         assertEquals(1, secondPage.items.size)
@@ -162,7 +163,7 @@ class MetProviderTest {
             }
         }
 
-        val page: PageResult = provider.fetchPage(cursor = null, size = 20, department = "11")
+        val page: PageResult = provider.fetchPage(cursor = null, size = 20, department = "11", era = null)
 
         assertEquals(PageStatus.EXHAUSTED, page.status)
         assertEquals(listOf("met:2001", "met:2003"), page.items.map { it.id })
@@ -191,7 +192,7 @@ class MetProviderTest {
             }
         }
 
-        val page: PageResult = provider.fetchPage(cursor = null, size = 20, department = "11")
+        val page: PageResult = provider.fetchPage(cursor = null, size = 20, department = "11", era = null)
 
         assertEquals(PageStatus.FAILED, page.status)
         assertTrue(page.items.isEmpty())
@@ -218,7 +219,7 @@ class MetProviderTest {
             }
         }
 
-        val page: PageResult = provider.fetchPage(cursor = null, size = 20, department = "11")
+        val page: PageResult = provider.fetchPage(cursor = null, size = 20, department = "11", era = null)
 
         assertEquals(listOf("met:4001", "met:4002"), page.items.map { it.id })
     }
@@ -262,7 +263,7 @@ class MetProviderTest {
 
             // Ask for one item starting right at the boundary — id 500 only
             // exists in the second page, so this can't be served without the loop.
-            val page: PageResult = provider.fetchPage(cursor = "500", size = 1, department = "11")
+            val page: PageResult = provider.fetchPage(cursor = "500", size = 1, department = "11", era = null)
 
             assertEquals(PageStatus.EXHAUSTED, page.status)
             assertEquals(listOf("met:500"), page.items.map { it.id })
@@ -291,7 +292,7 @@ class MetProviderTest {
             server.enqueue(MockResponse().setBody(objectResponse(5002)))
             server.enqueue(MockResponse().setBody(objectResponse(5003)))
 
-            val page: PageResult = provider.fetchPage(cursor = null, size = 3, department = "11")
+            val page: PageResult = provider.fetchPage(cursor = null, size = 3, department = "11", era = null)
 
             assertEquals(PageStatus.OK, page.status)
             assertEquals("3", page.next)
@@ -335,7 +336,7 @@ class MetProviderTest {
         }
 
         // Cursor already at 9999 — one id left in reach (9999), then done.
-        val page: PageResult = provider.fetchPage(cursor = "9999", size = 5, department = "11")
+        val page: PageResult = provider.fetchPage(cursor = "9999", size = 5, department = "11", era = null)
 
         assertEquals(PageStatus.EXHAUSTED, page.status)
         assertEquals(listOf("met:9999"), page.items.map { it.id })
@@ -348,7 +349,7 @@ class MetProviderTest {
         // The Met ignores a bad departmentId and searches the whole
         // collection, so a malformed value must never reach the network.
         val page: PageResult =
-            provider.fetchPage(cursor = "12", size = 20, department = "European Paintings")
+            provider.fetchPage(cursor = "12", size = 20, department = "European Paintings", era = null)
 
         assertEquals(PageStatus.FAILED, page.status)
         assertEquals("12", page.next)
@@ -370,7 +371,7 @@ class MetProviderTest {
             }
         }
 
-        provider.fetchPage(cursor = null, size = 20, department = "6")
+        provider.fetchPage(cursor = null, size = 20, department = "6", era = null)
 
         assertEquals(listOf<Int?>(6), searchDepartments)
     }
@@ -392,17 +393,104 @@ class MetProviderTest {
             }
         }
 
-        val european: PageResult = provider.fetchPage(cursor = null, size = 1, department = "11")
-        val modern: PageResult = provider.fetchPage(cursor = null, size = 1, department = "12")
+        val european: PageResult = provider.fetchPage(cursor = null, size = 1, department = "11", era = null)
+        val modern: PageResult = provider.fetchPage(cursor = null, size = 1, department = "12", era = null)
         // Department 11 again, from its own cursor — must come from its own
         // cache, not department 12's list and not a fresh search.
         val europeanNext: PageResult =
-            provider.fetchPage(cursor = european.next, size = 1, department = "11")
+            provider.fetchPage(cursor = european.next, size = 1, department = "11", era = null)
 
         assertEquals(listOf("met:7001"), european.items.map { it.id })
         assertEquals(listOf("met:8001"), modern.items.map { it.id })
         assertEquals(listOf("met:7002"), europeanNext.items.map { it.id })
         assertEquals(listOf<Int?>(11, 12), searchDepartments)
+    }
+
+    @Test
+    fun `an era sends both dates to search, and the feed sends neither`() = runTest {
+        // Recorded on MockWebServer's thread, asserted afterwards.
+        val dates: MutableList<Pair<String?, String?>> = Collections.synchronizedList(mutableListOf())
+        server.dispatcher = object : Dispatcher() {
+            override fun dispatch(request: RecordedRequest): MockResponse {
+                val path = request.path ?: ""
+                if (path.startsWith("/v1.1/search")) {
+                    dates.add(
+                        Pair(
+                            request.requestUrl?.queryParameter("dateBegin"),
+                            request.requestUrl?.queryParameter("dateEnd")
+                        )
+                    )
+                    return MockResponse().setBody(searchResponse(listOf(1001)))
+                }
+                return MockResponse().setBody(objectResponse(request.objectId()))
+            }
+        }
+
+        provider.fetchPage(cursor = null, size = 20, department = "11", era = Era.Y1600)
+        provider.fetchPage(cursor = null, size = 20, department = "12", era = null)
+
+        // The Met ignores a single date, so an era must always send both.
+        assertEquals(
+            listOf(Pair<String?, String?>("1600", "1699"), Pair<String?, String?>(null, null)),
+            dates
+        )
+    }
+
+    @Test
+    fun `feed and era lists of one department do not mix`() = runTest {
+        val searches: MutableList<String> = Collections.synchronizedList(mutableListOf())
+        server.dispatcher = object : Dispatcher() {
+            override fun dispatch(request: RecordedRequest): MockResponse {
+                val path = request.path ?: ""
+                if (path.startsWith("/v1.1/search")) {
+                    val dated: Boolean = request.requestUrl?.queryParameter("dateBegin") != null
+                    if (dated) {
+                        searches.add("era")
+                        return MockResponse().setBody(searchResponse(listOf(8101, 8102)))
+                    }
+                    searches.add("feed")
+                    return MockResponse().setBody(searchResponse(listOf(7101, 7102)))
+                }
+                return MockResponse().setBody(objectResponse(request.objectId()))
+            }
+        }
+
+        val feed: PageResult = provider.fetchPage(cursor = null, size = 1, department = "11", era = null)
+        val era: PageResult = provider.fetchPage(cursor = null, size = 1, department = "11", era = Era.Y1600)
+        val feedNext: PageResult =
+            provider.fetchPage(cursor = feed.next, size = 1, department = "11", era = null)
+
+        assertEquals(listOf("met:7101"), feed.items.map { it.id })
+        assertEquals(listOf("met:8101"), era.items.map { it.id })
+        // From the feed's own cached list: not the era's, and no new search.
+        assertEquals(listOf("met:7102"), feedNext.items.map { it.id })
+        assertEquals(listOf("feed", "era"), searches)
+    }
+
+    @Test
+    fun `an era with a small total is exhausted while the same department's feed goes on`() = runTest {
+        server.dispatcher = object : Dispatcher() {
+            override fun dispatch(request: RecordedRequest): MockResponse {
+                val path = request.path ?: ""
+                if (path.startsWith("/v1.1/search")) {
+                    if (request.requestUrl?.queryParameter("dateBegin") != null) {
+                        return MockResponse().setBody(searchResponse(listOf(9101)))
+                    }
+                    return MockResponse().setBody(searchResponse(listOf(9201, 9202, 9203)))
+                }
+                return MockResponse().setBody(objectResponse(request.objectId()))
+            }
+        }
+
+        val era: PageResult = provider.fetchPage(cursor = null, size = 20, department = "11", era = Era.Y1600)
+        val feed: PageResult = provider.fetchPage(cursor = null, size = 1, department = "11", era = null)
+
+        assertEquals(PageStatus.EXHAUSTED, era.status)
+        assertEquals(null, era.next)
+        // The era's total of 1 must not cap the feed's query.
+        assertEquals(PageStatus.OK, feed.status)
+        assertEquals("1", feed.next)
+        assertEquals(listOf("met:9201"), feed.items.map { it.id })
     }
 
     @Test
@@ -429,7 +517,7 @@ class MetProviderTest {
             }
         }
 
-        val page: PageResult = provider.fetchPage(cursor = null, size = 20, department = "11")
+        val page: PageResult = provider.fetchPage(cursor = null, size = 20, department = "11", era = null)
 
         assertEquals(PageStatus.EXHAUSTED, page.status)
         assertEquals(listOf("met:9004"), page.items.map { it.id })
@@ -455,7 +543,7 @@ class MetProviderTest {
                 }
             }
 
-            val page: PageResult = provider.fetchPage(cursor = null, size = 20, department = "11")
+            val page: PageResult = provider.fetchPage(cursor = null, size = 20, department = "11", era = null)
 
             // 6001 was delivered, so this is a normal page — but the cursor must
             // point at 6002 (index 1), not at 6004, or 6002 and 6003 are lost.
@@ -488,7 +576,7 @@ class MetProviderTest {
                 }
             }
 
-            val page: PageResult = provider.fetchPage(cursor = null, size = 20, department = "11")
+            val page: PageResult = provider.fetchPage(cursor = null, size = 20, department = "11", era = null)
 
             assertEquals(PageStatus.OK, page.status)
             assertEquals(listOf("met:1101", "met:1102"), page.items.map { it.id })
@@ -500,7 +588,7 @@ class MetProviderTest {
             // While cooling down, the next page fails without touching the network.
             val requestsBefore: Int = server.requestCount
             val cooling: PageResult =
-                provider.fetchPage(cursor = page.next, size = 20, department = "11")
+                provider.fetchPage(cursor = page.next, size = 20, department = "11", era = null)
             assertEquals(PageStatus.FAILED, cooling.status)
             assertEquals("2", cooling.next)
             assertEquals(requestsBefore, server.requestCount)

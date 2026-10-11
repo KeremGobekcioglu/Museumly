@@ -2,6 +2,7 @@ package com.kg.museumly.data.testutil
 
 import com.kg.museumly.domain.ArtworkProvider
 import com.kg.museumly.domain.PageResult
+import com.kg.museumly.domain.model.Era
 import com.kg.museumly.domain.model.Section
 
 /**
@@ -27,13 +28,17 @@ class FakeArtworkProvider(
 
     val requestedDepartments: MutableList<String> = ArrayList()
 
+    /** The era of every fetchPage call, in call order. null = a feed page. */
+    val requestedEras: MutableList<Era?> = ArrayList()
+
     fun enqueue(page: PageResult) {
         queuedPages.addLast(page)
     }
 
-    override suspend fun fetchPage(cursor: String?, size: Int, department: String): PageResult {
+    override suspend fun fetchPage(cursor: String?, size: Int, department: String, era: Era?): PageResult {
         callCount += 1
         requestedDepartments.add(department)
+        requestedEras.add(era)
         val page = queuedPages.removeFirstOrNull()
         checkNotNull(page) {
             "FakeArtworkProvider(\"$id\"): fetchPage called with no queued response (call #$callCount)"
