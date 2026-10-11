@@ -10,6 +10,7 @@ import com.kg.museumly.data.local.ProviderCursorDao
 import com.kg.museumly.data.local.ProviderTurnSource
 import com.kg.museumly.data.local.favorites.FavoriteEntity
 import com.kg.museumly.data.local.favorites.FavoritesDao
+import com.kg.museumly.data.local.placement.PlacementDao
 import com.kg.museumly.data.testutil.FakeArtworkProvider
 import com.kg.museumly.data.testutil.sampleArtwork
 import com.kg.museumly.data.testutil.sampleDetail
@@ -72,6 +73,8 @@ class ArtworkRepositoryImplTest {
     private lateinit var turnSource: ProviderTurnSource
 
     private lateinit var favoritesDao: FavoritesDao
+    private lateinit var placementDao: PlacementDao
+
     private fun provider(id: String, page: PageResult): FakeArtworkProvider {
         val fake = FakeArtworkProvider(id)
         fake.enqueue(page)
@@ -87,6 +90,7 @@ class ArtworkRepositoryImplTest {
         artworkDao = database.artworkDao()
         cursorDao = database.cursorDao()
         favoritesDao = database.favoritesDao()
+        placementDao = database.placementDao()
         turnSource = mockk()
         coEvery { turnSource.getTurn(any()) } returns 0
         coEvery { turnSource.setTurn(any(), any()) } just Runs
@@ -109,7 +113,8 @@ class ArtworkRepositoryImplTest {
             // (seedIfEmpty is commented out), so there's nothing to fake.
             seedSource = SeedSource(),
             turnSource = turnSource,
-            favoritesDao = favoritesDao
+            favoritesDao = favoritesDao,
+            placementDao = placementDao
         )
     }
 
@@ -222,7 +227,8 @@ class ArtworkRepositoryImplTest {
         // cursor write (which runs after insert in source order) could
         // still have landed even though the insert above threw.
         assertNull(cursorDao.get("met:all"))
-        assertEquals(0, artworkDao.count(Section.EUROPEAN.id))
+        assertEquals(0, placementDao.count(ListKey.feed(Section.EUROPEAN)))
+        assertNull(artworkDao.byId("met:1"))
     }
 
     @Test
@@ -367,7 +373,7 @@ class ArtworkRepositoryImplTest {
     }
 
     @Test
-    fun `positions count within a section, so each section starts at zero`() = runTest {
+    fun `each section is its own list, so each starts at position zero`() = runTest {
         val met = FakeArtworkProvider("met") { section -> listOf(section.id) }
         met.enqueue(PageResult(listOf(sampleArtwork("met:1"), sampleArtwork("met:2")), listOf(sampleDetail(), sampleDetail()), next = "2", status = PageStatus.OK))
         met.enqueue(PageResult(listOf(sampleArtwork("met:3")), listOf(sampleDetail()), next = "1", status = PageStatus.OK))
@@ -376,11 +382,12 @@ class ArtworkRepositoryImplTest {
         repository.loadMore(Section.EUROPEAN, size = 20)
         repository.loadMore(Section.ASIA, size = 20)
 
-        val european = artworkDao.observeBySection(Section.EUROPEAN.id).first()
-        val asia = artworkDao.observeBySection(Section.ASIA.id).first()
-        assertEquals(listOf(0, 1), european.map { it.position })
-        assertEquals(listOf(0), asia.map { it.position })
+        val european = artworkDao.observeByList(ListKey.feed(Section.EUROPEAN)).first()
+        val asia = artworkDao.observeByList(ListKey.feed(Section.ASIA)).first()
+        assertEquals(listOf("met:1", "met:2"), european.map { it.id })
         assertEquals(listOf("met:3"), asia.map { it.id })
+        assertEquals(1, placementDao.maxPosition(ListKey.feed(Section.EUROPEAN)))
+        assertEquals(0, placementDao.maxPosition(ListKey.feed(Section.ASIA)))
     }
 
     @Test
@@ -423,7 +430,9 @@ class ArtworkRepositoryImplTest {
         repository.setFavorite("met:1", true)
         repository.loadMore(Section.EUROPEAN,20)
 
-        assertEquals(2 , artworkDao.byId("met:1")?.position)
+        // The duplicate moves to the end of the feed instead of appearing twice.
+        val feed = artworkDao.observeByList(ListKey.feed(Section.EUROPEAN)).first()
+        assertEquals(listOf("met:2", "met:1"), feed.map { it.id })
         assertTrue(repository.getFavoritesIds().first().contains("met:1"))
     }
 
@@ -512,6 +521,22 @@ class ArtworkRepositoryImplTest {
 
         assertEquals(1.5f, artworkDao.byId("met:empty")?.aspectRatio)
         assertEquals(0.5f, artworkDao.byId("met:known")?.aspectRatio)
+    }
+
+    @Test
+    fun `a measured aspect ratio survives the same artwork arriving again`() = runTest {
+        val met: FakeArtworkProvider = FakeArtworkProvider("met") { listOf("11") }
+        met.enqueue(PageResult(listOf(sampleArtwork("met:1").copy(aspectRatio = null)), listOf(sampleDetail()), next = "1", status = PageStatus.OK))
+        // The museum's list shifted: met:1 comes back, still without a ratio.
+        met.enqueue(PageResult(listOf(sampleArtwork("met:1").copy(aspectRatio = null)), listOf(sampleDetail()), next = "2", status = PageStatus.OK))
+        val repository: ArtworkRepositoryImpl = repository(setOf(met))
+        repository.loadMore(Section.EUROPEAN, size = 20)
+        repository.rememberAspectRatio("met:1", 1.5f)
+
+        repository.loadMore(Section.EUROPEAN, size = 20)
+
+        // With REPLACE the second insert rewrote the row with a null ratio.
+        assertEquals(1.5f, artworkDao.byId("met:1")?.aspectRatio)
     }
 }
 

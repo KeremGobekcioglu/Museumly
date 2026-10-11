@@ -7,6 +7,7 @@ import com.kg.museumly.data.local.MuseumDatabase
 import com.kg.museumly.data.local.ProviderCursorDao
 import com.kg.museumly.data.local.detail.ArtworkDetailDao
 import com.kg.museumly.data.local.favorites.FavoritesDao
+import com.kg.museumly.data.local.placement.PlacementDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -18,11 +19,11 @@ import javax.inject.Singleton
 @InstallIn(SingletonComponent::class)
 object DatabaseModule {
 
-    /***
-     * No fallbackToDestructiveMigration(). While the schema is churning,
-     * uninstall the app between changes
-     * — that way you notice when you've made a breaking change instead of
-     * silently wiping data later in production.
+    /**
+     * fallbackToDestructiveMigration(true): while the schema is churning,
+     * a version bump drops and recreates every table instead of needing a
+     * migration. Every table is wiped, favorites included. Replace this with
+     * real migrations before release.
      */
     @Provides
     @Singleton
@@ -58,5 +59,11 @@ object DatabaseModule {
     fun provideFavoritesDao(db: MuseumDatabase) : FavoritesDao
     {
         return db.favoritesDao()
+    }
+
+    @Provides
+    fun providePlacementDao(db: MuseumDatabase) : PlacementDao
+    {
+        return db.placementDao()
     }
 }

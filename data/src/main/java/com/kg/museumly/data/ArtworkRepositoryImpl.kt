@@ -14,6 +14,8 @@ import com.kg.museumly.data.local.detail.ArtworkDetailDao
 import com.kg.museumly.data.local.detail.ArtworkDetailEntity
 import com.kg.museumly.data.local.favorites.FavoriteEntity
 import com.kg.museumly.data.local.favorites.FavoritesDao
+import com.kg.museumly.data.local.placement.PlacementDao
+import com.kg.museumly.data.local.placement.PlacementEntity
 import com.kg.museumly.domain.ArtworkProvider
 import com.kg.museumly.domain.ArtworkRepository
 import com.kg.museumly.domain.LoadOutcome
@@ -22,6 +24,7 @@ import com.kg.museumly.domain.PageStatus
 import com.kg.museumly.domain.model.Artwork
 import com.kg.museumly.domain.model.ArtworkDetail
 import com.kg.museumly.domain.model.ArtworkWithDetail
+import com.kg.museumly.domain.model.Era
 import com.kg.museumly.domain.model.Section
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -40,7 +43,10 @@ import kotlin.time.Duration.Companion.milliseconds
 private class Source(val provider: ArtworkProvider, val department: String) {
     val key = provider.id + ":" + department
 }
-
+object ListKey {
+    fun feed(section: Section): String = section.id
+    fun era(section: Section?, era: Era): String = "${section?.id ?: "all"}@${era.id}"
+}
 @Singleton
 class ArtworkRepositoryImpl @Inject constructor(
     private val database: MuseumDatabase,
@@ -50,7 +56,8 @@ class ArtworkRepositoryImpl @Inject constructor(
     private val providers: Set<@JvmSuppressWildcards ArtworkProvider>,
     private val seedSource: SeedSource,
     private val turnSource: ProviderTurnSource,
-    private val favoritesDao: FavoritesDao
+    private val favoritesDao: FavoritesDao,
+    private val placementDao: PlacementDao
 ) : ArtworkRepository {
     private companion object {
         // callTimeout (NetworkModule) bounds a single HTTP call. fetchPage
@@ -132,7 +139,7 @@ class ArtworkRepositoryImpl @Inject constructor(
      * Returns Flow, so the screen subscribes once and gets every future version automatically.
      */
     override fun artworks(section: Section): Flow<List<Artwork>> {
-        return artworkDao.observeBySection(section.id).map { rows: List<ArtworkEntity> ->
+        return artworkDao.observeByList(ListKey.feed(section)).map { rows: List<ArtworkEntity> ->
             val result: MutableList<Artwork> = ArrayList()
             for (row in rows) {
                 result.add(ArtworkMapper.toDomain(row))
@@ -158,30 +165,36 @@ class ArtworkRepositoryImpl @Inject constructor(
             return null
         return ArtworkMapper.toDomain(entity)
     }
-
     /**
-     * Writes artworks to the database, numbering them after the last one.
+     * Writes artworks to the database and appends them to one list, numbered
+     * after that list's last placement.
      *
      * The caller must lock the mutex first. This function does not lock it.
      * Kotlin's Mutex cannot be locked twice by the same caller — it would
      * freeze forever. This is private so all callers stay in this file.
      *
-     * One insertAll for the whole list, not one per artwork, so Room
-     * notifies the screen once instead of twenty times.
+     * One transaction for all three inserts:
+     *  - placements have a foreign key on artworks, so artworks go in first,
+     *    or the insert fails with FOREIGN KEY constraint failed.
+     *  - the app can't die between the inserts and leave artworks that
+     *    belong to no list.
+     *  - Room notifies the screen once, when the transaction commits.
      */
     private suspend fun insert(
         items: List<Artwork>,
         details: List<ArtworkDetail>,
-        section: Section
+        section: Section,
+        listKey: String = ListKey.feed(section)
     ) {
-        var position: Int = artworkDao.maxPosition(section.id)
+        var position: Int = placementDao.maxPosition(listKey)
         val entities: MutableList<ArtworkEntity> = ArrayList()
         val detailEntities: MutableList<ArtworkDetailEntity> = ArrayList()
+        val placements: MutableList<PlacementEntity> = ArrayList()
         for (i in items.indices) {
             position += 1
             val artwork: Artwork = items[i]
             val detail: ArtworkDetail = details[i]
-            entities.add(ArtworkMapper.toEntity(artwork, position, section.id))
+            entities.add(ArtworkMapper.toEntity(artwork, section.id))
             detailEntities.add(
                 ArtworkDetailEntity(
                     id = artwork.id,
@@ -196,9 +209,19 @@ class ArtworkRepositoryImpl @Inject constructor(
                     didYouKnow = detail.didYouKnow,
                 )
             )
+            placements.add(
+                PlacementEntity(
+                    artworkId = artwork.id,
+                    position = position,
+                    listKey = listKey
+                )
+            )
         }
-        artworkDao.insertAll(entities)
-        artworkDetailDao.insertAll(detailEntities)
+        database.withTransaction {
+            artworkDao.insertAll(entities)
+            artworkDetailDao.insertAll(detailEntities)
+            placementDao.insertAll(placements)
+        }
     }
 
         //    override suspend fun seedIfEmpty() {
@@ -311,7 +334,7 @@ class ArtworkRepositoryImpl @Inject constructor(
     }
 
     override suspend fun count(section: Section): Int {
-        return artworkDao.count(section.id)
+        return placementDao.count(ListKey.feed(section))
     }
 
     override fun getFavorites(section: Section?): Flow<List<Artwork>> {

@@ -23,7 +23,7 @@ class FavoritesDaoTest {
     private lateinit var artworkDao: ArtworkDao
     private lateinit var favoritesDao: FavoritesDao
 
-    private fun entity(id: String, providerId: String, position: Int, sectionId: String = "european"): ArtworkEntity {
+    private fun entity(id: String, providerId: String, sectionId: String = "european"): ArtworkEntity {
         return ArtworkEntity(
             id = id,
             providerId = providerId,
@@ -34,7 +34,6 @@ class FavoritesDaoTest {
             yearStart = null,
             imageUrl = "https://example.org/$id.jpg",
             aspectRatio = null,
-            position = position,
             classification = null,
             department = null,
         )
@@ -85,9 +84,9 @@ class FavoritesDaoTest {
     fun checkThatGetFavoritesOnlyReturnFavorites() = runTest {
         artworkDao.insertAll(
             listOf(
-                entity("met:1", "met", position = 0),
-                entity("met:2", "met", position = 1),
-                entity("met:3", "met", position = 2),
+                entity("met:1", "met"),
+                entity("met:2", "met"),
+                entity("met:3", "met"),
             ),
         )
         favoritesDao.insert(FavoriteEntity("met:2", 1000L))
@@ -99,8 +98,8 @@ class FavoritesDaoTest {
     fun checkThatSectionFilterWorks() = runTest {
         artworkDao.insertAll(
             listOf(
-                entity("met:1", "met", position = 0, sectionId = "european"),
-                entity("met:2", "met", position = 0, sectionId = "asia"),
+                entity("met:1", "met", sectionId = "european"),
+                entity("met:2", "met", sectionId = "asia"),
             ),
         )
         favoritesDao.insert(FavoriteEntity("met:1", 1000L))
@@ -115,12 +114,12 @@ class FavoritesDaoTest {
     fun `getFavorites puts the most recently favorited first`() = runTest {
         artworkDao.insertAll(
             listOf(
-                entity("met:1", "met", position = 0),
-                entity("met:2", "met", position = 1),
-                entity("met:3", "met", position = 2),
+                entity("met:1", "met"),
+                entity("met:2", "met"),
+                entity("met:3", "met"),
             ),
         )
-        // Favorited in a different order than the feed positions.
+        // Favorited in a different order than they were inserted.
         favoritesDao.insert(FavoriteEntity("met:2", 1000L))
         favoritesDao.insert(FavoriteEntity("met:3", 3000L))
         favoritesDao.insert(FavoriteEntity("met:1", 2000L))
@@ -131,17 +130,16 @@ class FavoritesDaoTest {
     }
 
     @Test
-    fun `a favorite survives the artwork row being replaced`() = runTest {
-        artworkDao.insertAll(listOf(entity("met:1", "met", position = 0)))
+    fun `a favorite survives the same artwork being inserted again`() = runTest {
+        artworkDao.insertAll(listOf(entity("met:1", "met")))
         favoritesDao.insert(FavoriteEntity("met:1", 1000L))
 
-        // Same id arrives again: REPLACE deletes the row and writes it at the end.
-        artworkDao.insertAll(listOf(entity("met:1", "met", position = 5)))
+        // Same id arrives again: IGNORE keeps the existing row.
+        artworkDao.insertAll(listOf(entity("met:1", "met")))
 
         val favorites: List<ArtworkEntity> = favoritesDao.getFavorites(null).first()
 
         assertEquals(listOf("met:1"), idsOf(favorites))
-        assertEquals(5, favorites[0].position)
     }
 
     @Test
