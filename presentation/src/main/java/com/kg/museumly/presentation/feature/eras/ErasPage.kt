@@ -73,15 +73,18 @@ import com.kg.museumly.presentation.feature.scroll.presentation.components.museu
 import com.kg.museumly.presentation.ui.theme.White40
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 
 /**
  * Top to bottom: the art, the era, the caption, the pill, the scrubber.
  *
- * Everything follows the ruler's currentPage, so while the finger drags the
- * art, caption and pill change with the era, like a flipbook. Each era shows
- * its first work as it is passed.
+ * The hero follows the finger: it reads the ruler's currentPage and rolls
+ * through every era live. The art, caption and pill follow the era the
+ * playhead rests on for ShownEraDwellMillis (100 ms), so a slow drag flips
+ * through every era and a fling lands on its destination without loading
+ * the eras in between. Each era opens on its first work.
  *
  * The ruler's PagerState is saved across rotation by rememberPagerState.
  */
@@ -109,9 +112,25 @@ fun ErasScreen(
 
     val draggingGroup: EraGroup = groups[rulerState.currentPage.coerceIn(0, lastIndex)]
 
+    // The era the playhead rests on. A new page cancels the wait, so eras
+    // passed in a fast scrub never reach the art.
+    var shownPage: Int by remember { mutableIntStateOf(rulerState.currentPage) }
+    LaunchedEffect(rulerState) {
+        snapshotFlow { rulerState.currentPage }.collectLatest { page: Int ->
+            delay(ShownEraDwellMillis)
+            shownPage = page
+        }
+    }
+    val shownGroup: EraGroup = groups[shownPage.coerceIn(0, lastIndex)]
+
     // The global index (into state.stops) of the work on screen. The slot
     // inside AnimatedContent reports it; the caption and the pill read it.
     var visibleIndex: Int by remember { mutableIntStateOf(-1) }
+
+    // Reads how far the works pager is between two works. The slot on screen
+    // hands it over; the caption reads it in the draw phase, so following the
+    // finger never recomposes.
+    var worksOffset: () -> Float by remember { mutableStateOf<() -> Float>({ 0f }) }
 
     // Eras whose works pager already nudged. Written only from the slot's
     // effect, never during composition, so it needs no snapshot state.
@@ -119,9 +138,9 @@ fun ErasScreen(
 
     // Fall back to the era's first work until the slot reports one of this
     // era's own works. -1 when the era has none.
-    var moreIndex: Int = draggingGroup.firstIndex
-    val eraEnd: Int = draggingGroup.firstIndex + draggingGroup.stops.size
-    if (visibleIndex >= draggingGroup.firstIndex && visibleIndex < eraEnd) {
+    var moreIndex: Int = shownGroup.firstIndex
+    val eraEnd: Int = shownGroup.firstIndex + shownGroup.stops.size
+    if (visibleIndex >= shownGroup.firstIndex && visibleIndex < eraEnd) {
         moreIndex = visibleIndex
     }
     // The caption scales with the user's font size; the gap and the pill's
@@ -145,7 +164,7 @@ fun ErasScreen(
             .systemBarsPadding()
     ) {
         AnimatedContent(
-            targetState = draggingGroup,
+            targetState = shownGroup,
             contentKey = { group: EraGroup -> group.era },
             transitionSpec = {
                 // A flipbook: quick enough to keep up with a scrub.
@@ -162,7 +181,8 @@ fun ErasScreen(
                 hasError = state.errorMessage != null,
                 nudgedEras = nudgedEras,
                 onIntent = onIntent,
-                onVisibleIndex = { index: Int -> visibleIndex = index }
+                onVisibleIndex = { index: Int -> visibleIndex = index },
+                onWorksOffset = { reader: () -> Float -> worksOffset = reader }
             )
         }
 
@@ -198,7 +218,17 @@ fun ErasScreen(
                 // a 16dp gap.
                 if (target != null) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        EraCaption(stop = target.stop)
+                        // Fades out as the image slides away and in as the next
+                        // one slides in: invisible at the halfway point, where
+                        // the text swaps. Driven by the finger, so it can't
+                        // lead or lag.
+                        EraCaption(
+                            stop = target.stop,
+                            modifier = Modifier.graphicsLayer {
+                                val fraction: Float = abs(worksOffset())
+                                alpha = (1f - 2f * fraction).coerceIn(0f, 1f)
+                            }
+                        )
                         Spacer(modifier = Modifier.height(6.dp))
                         OutlinedPill(
                             label = "More from " + eraSpan(target.stop.era),
@@ -236,6 +266,7 @@ private fun EraSlot(
     nudgedEras: MutableSet<Era>,
     onIntent: (ErasIntent) -> Unit,
     onVisibleIndex: (Int) -> Unit,
+    onWorksOffset: (() -> Float) -> Unit,
 )
 {
     if (group.stops.isEmpty()) {
@@ -249,12 +280,26 @@ private fun EraSlot(
     val pageCount: Int by rememberUpdatedState(group.stops.size)
     val worksState: PagerState = rememberPagerState(initialPage = 0) { pageCount }
 
-    // Runs when the era settles (page 0), when its first work arrives, and
-    // whenever the works pager settles on another page. Never mid-swipe.
+    // Hands the screen a reader of this pager's offset, for the caption's fade.
+    LaunchedEffect(worksState) {
+        onWorksOffset { worksState.currentPageOffsetFraction }
+    }
+
+    // The caption follows currentPage, which flips at the swipe's halfway
+    // point, so it changes together with the image, not after the snap.
+    LaunchedEffect(worksState, group.firstIndex) {
+        snapshotFlow { worksState.currentPage }.collect { page: Int ->
+            val index: Int = group.firstIndex + page
+            onVisibleIndex(index)
+        }
+    }
+
+    // Prefetch waits for the works pager to settle: when the era is shown
+    // (page 0), when its first work arrives, and after each swipe. Never
+    // mid-swipe.
     LaunchedEffect(worksState, group.firstIndex) {
         snapshotFlow { worksState.settledPage }.collect { page: Int ->
             val index: Int = group.firstIndex + page
-            onVisibleIndex(index)
             onIntent(ErasIntent.StopChanged(index))
         }
     }

@@ -86,5 +86,8 @@ internal fun Density.captionHeight(): Dp {
  */
 internal val PillRowHeight: Dp = 48.dp
 
+/** How long the playhead must rest on an era before its art is shown. */
+internal const val ShownEraDwellMillis: Long = 100L
+
 /** How far the works pager slides to show there is a next work. */
 internal val NudgeDistance: Dp = 24.dp
