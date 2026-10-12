@@ -30,16 +30,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.Font
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import coil3.compose.AsyncImagePainter
-import com.kg.museumly.presentation.R
 import com.kg.museumly.domain.model.Artwork
+import com.kg.museumly.presentation.ui.theme.LibreCaslon
 /**
  * Height of the row the section pill and page counter sit in, below the
  * status bar. Pages reserve it so a tall work can never slide under them.
@@ -53,22 +50,9 @@ internal val ReelsTopBarHeight = 60.dp
  */
 internal val ReelsGutter = 16.dp
 
-/**
- * Libre Caslon Text, bundled (OFL, licence in assets/licenses). Bundled
- * rather than downloadable so the title never renders in a fallback font
- * and then reflows, works offline, and doesn't need Play Services.
- */
-private val CaptionSerif: FontFamily = FontFamily(
-    Font(
-        resId = R.font.libre_caslon_text,
-        weight = FontWeight.Normal,
-        variationSettings = FontVariation.Settings(FontVariation.weight(400)),
-    ),
-)
-
 /** Regular weight, a step below titleLarge: a label, not a headline. */
 private val CaptionTitleStyle: TextStyle = TextStyle(
-    fontFamily = CaptionSerif,
+    fontFamily = LibreCaslon,
     fontWeight = FontWeight.Normal,
     fontSize = 20.sp,
     lineHeight = 26.sp,
