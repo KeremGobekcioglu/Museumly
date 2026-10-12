@@ -32,6 +32,8 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -57,6 +59,7 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
@@ -68,7 +71,6 @@ import com.kg.museumly.presentation.feature.scroll.presentation.components.Reels
 import com.kg.museumly.presentation.feature.scroll.presentation.components.TopBarChipOutline
 import com.kg.museumly.presentation.feature.scroll.presentation.components.museumName
 import com.kg.museumly.presentation.ui.theme.White40
-import com.kg.museumly.presentation.ui.theme.White60
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -122,7 +124,18 @@ fun ErasScreen(
     if (visibleIndex >= draggingGroup.firstIndex && visibleIndex < eraEnd) {
         moreIndex = visibleIndex
     }
+    // The caption scales with the user's font size; the gap and the pill's
+    // touch target don't.
+    val captionBlockHeight: Dp = with(LocalDensity.current) {
+        captionHeight() + 6.dp + PillRowHeight
+    }
+
+    // Frozen per work, so a caption fading out keeps its own stop and index.
+    var captionTarget: CaptionTarget? = null
     val visibleStop: TimelineStop? = state.stops.getOrNull(moreIndex)
+    if (visibleStop != null) {
+        captionTarget = CaptionTarget(index = moreIndex, stop = visibleStop)
+    }
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -168,35 +181,30 @@ fun ErasScreen(
         ) {
             Spacer(modifier = Modifier.height(8.dp))
             AnimatedContent(
-                targetState = visibleStop,
-                contentKey = { stop: TimelineStop? -> stop?.artwork?.id },
+                targetState = captionTarget,
+                contentKey = { target: CaptionTarget? -> target?.stop?.artwork?.id },
                 transitionSpec = {
-                    fadeIn(tween(200)).togetherWith(fadeOut(tween(200)))
+                    fadeIn(tween(150)).togetherWith(fadeOut(tween(100)))
                 },
                 label = "eraCaption",
                 contentAlignment = Alignment.TopCenter,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(CaptionHeight)
+                    .height(captionBlockHeight)
                     .padding(horizontal = ReelsGutter)
-            ) { stop: TimelineStop? ->
-                if (stop != null) {
-                    EraCaption(stop = stop)
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(PillRowHeight)
-            ) {
-                if (moreIndex >= 0) {
-                    OutlinedPill(
-                        label = "More from " + eraSpan(draggingGroup.era),
-                        onClick = { onIntent(ErasIntent.MoreClicked(moreIndex)) }
-                    )
+            ) { target: CaptionTarget? ->
+                // The pill rides with the caption. Its 48dp touch target adds
+                // about 10dp above the drawn pill, so the 6dp spacer shows as
+                // a 16dp gap.
+                if (target != null) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        EraCaption(stop = target.stop)
+                        Spacer(modifier = Modifier.height(6.dp))
+                        OutlinedPill(
+                            label = "More from " + eraSpan(target.stop.era),
+                            onClick = { onIntent(ErasIntent.MoreClicked(target.index)) }
+                        )
+                    }
                 }
             }
         }
@@ -416,10 +424,15 @@ private fun EraArtwork(
     }
 }
 
+/** The work the caption shows, and its index into the stops. */
+private class CaptionTarget(val index: Int, val stop: TimelineStop)
+
 /**
  * Title in Libre Caslon, then "artist · year", then the museum in small
- * spaced caps, all centered. The title gets two lines and "artist · year"
- * one; past that they are ellipsized. The museum is never cut: it wraps.
+ * spaced caps, all centered. The title gets three lines and "artist · year"
+ * one; a long one first shrinks to fit (title down to 15sp, "artist · year"
+ * down to 11sp) and only then is ellipsized. The museum is never cut: it
+ * wraps.
  */
 @Composable
 private fun EraCaption(
@@ -431,23 +444,22 @@ private fun EraCaption(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = modifier.fillMaxWidth()
     ) {
-        Text(
+        BasicText(
             text = stop.artwork.title,
             style = CaptionTitleStyle,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis
+            maxLines = 3,
+            overflow = TextOverflow.Ellipsis,
+            autoSize = TextAutoSize.StepBased(minFontSize = 15.sp, maxFontSize = 19.sp)
         )
         val meta: String? = artistAndYear(stop.artwork)
         if (meta != null) {
             Spacer(modifier = Modifier.height(4.dp))
-            Text(
+            BasicText(
                 text = meta,
-                color = White60,
-                fontSize = 13.sp,
-                lineHeight = 18.sp,
-                textAlign = TextAlign.Center,
+                style = CaptionMetaStyle,
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                overflow = TextOverflow.Ellipsis,
+                autoSize = TextAutoSize.StepBased(minFontSize = 11.sp, maxFontSize = 13.sp)
             )
         }
         Spacer(modifier = Modifier.height(4.dp))
@@ -456,6 +468,7 @@ private fun EraCaption(
             color = White40,
             fontSize = 11.sp,
             letterSpacing = 1.5.sp,
+            lineHeight = CaptionMuseumLineHeight,
             textAlign = TextAlign.Center
         )
     }
@@ -528,6 +541,7 @@ private fun OutlinedPill(
         Text(
             text = label,
             fontSize = 12.sp,
+            lineHeight = 16.sp,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
         )
     }

@@ -5,8 +5,11 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import com.kg.museumly.presentation.ui.theme.LibreCaslon
 import com.kg.museumly.presentation.ui.theme.White60
@@ -30,12 +33,21 @@ internal val HeroCapsStyle: SpanStyle = SpanStyle(
     color = White60,
 )
 
+/** The caption's title. Its line height is in em so it scales when autoSize shrinks it. */
 internal val CaptionTitleStyle: TextStyle = TextStyle(
     fontFamily = LibreCaslon,
     fontWeight = FontWeight.Normal,
     fontSize = 19.sp,
-    lineHeight = 24.sp,
+    lineHeight = 1.26.em,
     color = Color.White,
+    textAlign = TextAlign.Center,
+)
+
+/** "artist · year" under the title. Line height in em, like the title. */
+internal val CaptionMetaStyle: TextStyle = TextStyle(
+    fontSize = 13.sp,
+    lineHeight = 1.38.em,
+    color = White60,
     textAlign = TextAlign.Center,
 )
 
@@ -48,13 +60,31 @@ internal val EmptyStyle: TextStyle = TextStyle(
     textAlign = TextAlign.Center,
 )
 
+/** The museum line's height, in sp like the text on it. */
+internal val CaptionMuseumLineHeight: TextUnit = 16.sp
+
 /**
- * The caption's fixed height: two title lines, "artist · year" and the
- * section. Fixed so a long title never pushes the art up.
+ * The caption's fixed height: three title lines, "artist · year" and the
+ * museum, with the 4dp gaps between them. Fixed so a long title never
+ * pushes the art up.
+ *
+ * Each line is converted from its own sp size: Android scales large font
+ * sizes less than small ones, so converting the sum at once would make the
+ * block too short at large font sizes.
  */
-internal val CaptionHeight: Dp = 92.dp
-/** The pill's row keeps its height in empty eras too, so the art never jumps. */
-internal val PillRowHeight: Dp = 32.dp
+internal fun Density.captionHeight(): Dp {
+    val titleLine: Dp = CaptionTitleStyle.fontSize.toDp() * CaptionTitleStyle.lineHeight.value
+    val metaLine: Dp = CaptionMetaStyle.fontSize.toDp() * CaptionMetaStyle.lineHeight.value
+    val museumLine: Dp = CaptionMuseumLineHeight.toDp()
+    return titleLine * 3 + 4.dp + metaLine + 4.dp + museumLine
+}
+
+/**
+ * The pill's share of the fixed caption block: its full 48dp touch target.
+ * In dp, since a touch target doesn't scale with font size. The block keeps
+ * it in empty eras too, so the art never jumps.
+ */
+internal val PillRowHeight: Dp = 48.dp
 
 /** How far the works pager slides to show there is a next work. */
 internal val NudgeDistance: Dp = 24.dp
