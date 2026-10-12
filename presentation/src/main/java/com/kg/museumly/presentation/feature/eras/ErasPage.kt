@@ -2,6 +2,8 @@ package com.kg.museumly.presentation.feature.eras
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.ContentTransform
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
@@ -29,6 +31,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerDefaults
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
@@ -207,6 +210,9 @@ fun ErasScreen(
                 targetState = captionTarget,
                 contentKey = { target: CaptionTarget? -> target?.stop?.artwork?.id },
                 transitionSpec = {
+                    if (initialState?.stop?.era == targetState?.stop?.era) {
+                        return@AnimatedContent EnterTransition.None togetherWith ExitTransition.None
+                    }
                     fadeIn(tween(150)).togetherWith(fadeOut(tween(100)))
                 },
                 label = "eraCaption",
@@ -225,7 +231,7 @@ fun ErasScreen(
                         stop = target.stop,
                         modifier = Modifier.graphicsLayer {
                             val fraction: Float = abs(worksOffset())
-                            alpha = (1f - 2f * fraction).coerceIn(0f, 1f)
+                            alpha = (1f - 2.5f * fraction).coerceIn(0f, 1f)
                         }
                     )
                 }
@@ -360,7 +366,11 @@ private fun EraSlot(
             key = { page: Int -> group.stops[page].artwork.id },
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(1f)
+                .weight(1f),
+            flingBehavior = PagerDefaults.flingBehavior(
+                state = worksState,
+                snapAnimationSpec = tween(durationMillis = 450, easing = FastOutSlowInEasing)
+            )
         ) { page: Int ->
             val artwork: Artwork = group.stops[page].artwork
             EraArtwork(
