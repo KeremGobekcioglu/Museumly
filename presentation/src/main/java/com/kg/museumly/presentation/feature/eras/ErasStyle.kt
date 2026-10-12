@@ -13,19 +13,19 @@ import com.kg.museumly.presentation.ui.theme.White60
 
 // The Eras screen's text styles and the sizes that keep its layout still.
 
-/** The hero's number. One number only, so 80sp fits "1400s" and "3000" with their caps. */
+/** The hero's number. It labels the work rather than leading it, so 56sp. */
 internal val HeroNumberStyle: TextStyle = TextStyle(
     fontFamily = LibreCaslon,
     fontWeight = FontWeight.Normal,
-    fontSize = 80.sp,
-    lineHeight = 84.sp,
+    fontSize = 56.sp,
+    lineHeight = 60.sp,
     color = Color.White,
     textAlign = TextAlign.Center,
 )
 
 /** "BEFORE", "BC", "AD" beside the hero's number, sitting on its baseline. */
 internal val HeroCapsStyle: SpanStyle = SpanStyle(
-    fontSize = 15.sp,
+    fontSize = 13.sp,
     letterSpacing = 2.sp,
     color = White60,
 )
@@ -54,7 +54,7 @@ internal val EmptyStyle: TextStyle = TextStyle(
  */
 internal val CaptionHeight: Dp = 92.dp
 /** The pill's row keeps its height in empty eras too, so the art never jumps. */
-internal val PillRowHeight: Dp = 40.dp
+internal val PillRowHeight: Dp = 32.dp
 
 /** How far the works pager slides to show there is a next work. */
 internal val NudgeDistance: Dp = 24.dp

@@ -9,7 +9,6 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
@@ -22,6 +21,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -38,6 +38,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
@@ -46,7 +47,6 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -63,9 +63,10 @@ import coil3.compose.AsyncImage
 import com.kg.museumly.domain.model.Artwork
 import com.kg.museumly.domain.model.Era
 import com.kg.museumly.domain.model.TimelineStop
+import com.kg.museumly.presentation.feature.detail.ArtworkFrame
 import com.kg.museumly.presentation.feature.scroll.presentation.components.ReelsGutter
 import com.kg.museumly.presentation.feature.scroll.presentation.components.TopBarChipOutline
-import com.kg.museumly.presentation.feature.scroll.presentation.components.label
+import com.kg.museumly.presentation.feature.scroll.presentation.components.museumName
 import com.kg.museumly.presentation.ui.theme.White40
 import com.kg.museumly.presentation.ui.theme.White60
 import kotlinx.coroutines.CoroutineScope
@@ -76,11 +77,9 @@ import kotlin.math.abs
 /**
  * Top to bottom: the art, the era, the caption, the pill, the scrubber.
  *
- * Two indices into the era groups, both from the ruler:
- *  - dragging is the ruler's currentPage. It follows the finger, and only
- *    the hero and the scrubber read it, so sliding stays cheap.
- *  - settled is the ruler's settledPage. The works, caption and pill read
- *    it, so the art changes only once the ruler stops.
+ * Everything follows the ruler's currentPage, so while the finger drags the
+ * art, caption and pill change with the era, like a flipbook. Each era shows
+ * its first work as it is passed.
  *
  * The ruler's PagerState is saved across rotation by rememberPagerState.
  */
@@ -93,13 +92,6 @@ fun ErasScreen(
     val groups: List<EraGroup> = remember(state.stops) { groupByEra(state.stops) }
     val lastIndex: Int = groups.size - 1
     val rulerState: PagerState = rememberPagerState(initialPage = 0) { groups.size }
-
-    var settled: Int by remember { mutableIntStateOf(rulerState.settledPage) }
-    LaunchedEffect(rulerState) {
-        snapshotFlow { rulerState.settledPage }.collect { page: Int ->
-            settled = page
-        }
-    }
 
     // One tick of haptic feedback per era passed.
     val haptic: HapticFeedback = LocalHapticFeedback.current
@@ -114,7 +106,6 @@ fun ErasScreen(
     }
 
     val draggingGroup: EraGroup = groups[rulerState.currentPage.coerceIn(0, lastIndex)]
-    val settledGroup: EraGroup = groups[settled.coerceIn(0, lastIndex)]
 
     // The global index (into state.stops) of the work on screen. The slot
     // inside AnimatedContent reports it; the caption and the pill read it.
@@ -126,19 +117,12 @@ fun ErasScreen(
 
     // Fall back to the era's first work until the slot reports one of this
     // era's own works. -1 when the era has none.
-    var moreIndex: Int = settledGroup.firstIndex
-    val eraEnd: Int = settledGroup.firstIndex + settledGroup.stops.size
-    if (visibleIndex >= settledGroup.firstIndex && visibleIndex < eraEnd) {
+    var moreIndex: Int = draggingGroup.firstIndex
+    val eraEnd: Int = draggingGroup.firstIndex + draggingGroup.stops.size
+    if (visibleIndex >= draggingGroup.firstIndex && visibleIndex < eraEnd) {
         moreIndex = visibleIndex
     }
     val visibleStop: TimelineStop? = state.stops.getOrNull(moreIndex)
-
-    // While scrubbing only the art and the era stay on screen.
-    val detailsAlpha: Float by animateFloatAsState(
-        targetValue = if (rulerState.isScrollInProgress) 0f else 1f,
-        animationSpec = tween(120),
-        label = "detailsAlpha"
-    )
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -148,15 +132,11 @@ fun ErasScreen(
             .systemBarsPadding()
     ) {
         AnimatedContent(
-            targetState = settledGroup,
+            targetState = draggingGroup,
             contentKey = { group: EraGroup -> group.era },
             transitionSpec = {
-                // The work rises from the line it stands on, just above the era.
-                (fadeIn(tween(300)) + scaleIn(
-                    animationSpec = tween(300),
-                    initialScale = 0.92f,
-                    transformOrigin = TransformOrigin(0.5f, 1f)
-                )).togetherWith(fadeOut(tween(200)))
+                // A flipbook: quick enough to keep up with a scrub.
+                fadeIn(tween(150)).togetherWith(fadeOut(tween(100)))
             },
             label = "eraWorks",
             modifier = Modifier
@@ -184,9 +164,7 @@ fun ErasScreen(
 
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier
-                .fillMaxWidth()
-                .graphicsLayer { alpha = detailsAlpha }
+            modifier = Modifier.fillMaxWidth()
         ) {
             Spacer(modifier = Modifier.height(8.dp))
             AnimatedContent(
@@ -207,6 +185,7 @@ fun ErasScreen(
                 }
             }
 
+            Spacer(modifier = Modifier.height(16.dp))
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
@@ -215,7 +194,7 @@ fun ErasScreen(
             ) {
                 if (moreIndex >= 0) {
                     OutlinedPill(
-                        label = "More from " + eraSpan(settledGroup.era) + " →",
+                        label = "More from " + eraSpan(draggingGroup.era),
                         onClick = { onIntent(ErasIntent.MoreClicked(moreIndex)) }
                     )
                 }
@@ -273,8 +252,8 @@ private fun EraSlot(
     }
 
     // Once per era: slide toward the next work and spring back, so the user
-    // sees there is more to swipe. Waits for the rise-in to finish, and skips
-    // it if the user is already swiping.
+    // sees there is more to swipe. Waits until the era is held, not just
+    // passed in a scrub, and skips it if the user is already swiping.
     val hasMore: Boolean = group.stops.size > 1
     val nudgePx: Float = with(LocalDensity.current) { NudgeDistance.toPx() }
     LaunchedEffect(group.era, hasMore) {
@@ -383,9 +362,11 @@ private fun EmptyEra(
 }
 
 /**
- * Bare image on black, no frame and no favorite button. Fitted to the
- * bottom center, so portraits, landscapes and squares all stand on the same
- * line just above the era.
+ * The work hangs at the bottom of its wall in the app's frame, like Detail,
+ * so the art, the era and the caption read as one group, like a label under
+ * its object. Until its ratio is known it shows bare and fitted; once the
+ * image reports its size, the frame replaces it and sits exactly on the
+ * image edges.
  */
 @Composable
 private fun EraArtwork(
@@ -393,21 +374,52 @@ private fun EraArtwork(
     onClick: () -> Unit,
 )
 {
-    AsyncImage(
-        model = artwork.imageUrl,
-        contentDescription = artwork.title,
-        contentScale = ContentScale.Fit,
-        alignment = Alignment.BottomCenter,
+    var ratio: Float? by remember(artwork.id) { mutableStateOf(artwork.aspectRatio) }
+
+    // The wall. The works pager's swipe area stays full width around it.
+    Box(
+        contentAlignment = Alignment.BottomCenter,
         modifier = Modifier
             .fillMaxSize()
-            .clickable(onClick = onClick)
-    )
+            .padding(start = 24.dp, end = 24.dp, top = 16.dp)
+    ) {
+        val knownRatio: Float? = ratio
+        if (knownRatio != null) {
+            ArtworkFrame(
+                imageUrl = artwork.imageUrl,
+                contentDescription = artwork.title,
+                onImageLoaded = { width, height, _ ->
+                    ratio = width.toFloat() / height.toFloat()
+                },
+                onImageFailed = { },
+                onClick = onClick,
+                modifier = Modifier.aspectRatio(knownRatio)
+            )
+        } else {
+            AsyncImage(
+                model = artwork.imageUrl,
+                contentDescription = artwork.title,
+                contentScale = ContentScale.Fit,
+                alignment = Alignment.BottomCenter,
+                onSuccess = { state ->
+                    val width: Int = state.result.image.width
+                    val height: Int = state.result.image.height
+                    if (width > 0 && height > 0) {
+                        ratio = width.toFloat() / height.toFloat()
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clickable(onClick = onClick)
+            )
+        }
+    }
 }
 
 /**
- * Title in Libre Caslon, then "artist · year", then the section in small
- * spaced caps, all centered. The title gets two lines and the rest one;
- * past that they are ellipsized, so the caption's height never changes.
+ * Title in Libre Caslon, then "artist · year", then the museum in small
+ * spaced caps, all centered. The title gets two lines and "artist · year"
+ * one; past that they are ellipsized. The museum is never cut: it wraps.
  */
 @Composable
 private fun EraCaption(
@@ -440,12 +452,11 @@ private fun EraCaption(
         }
         Spacer(modifier = Modifier.height(4.dp))
         Text(
-            text = stop.section.label.uppercase(),
+            text = museumName(stop.artwork.providerId).uppercase(),
             color = White40,
             fontSize = 11.sp,
             letterSpacing = 1.5.sp,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
+            textAlign = TextAlign.Center
         )
     }
 }
@@ -516,8 +527,8 @@ private fun OutlinedPill(
     ) {
         Text(
             text = label,
-            fontSize = 14.sp,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+            fontSize = 12.sp,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
         )
     }
 }

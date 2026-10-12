@@ -187,7 +187,7 @@ private fun ArtworkCaption(
     }
 }
 
-private fun museumName(providerId: String): String = when (providerId) {
+internal fun museumName(providerId: String): String = when (providerId) {
     "met" -> "The Met"
     "cleveland" -> "Cleveland Museum of Art"
     else -> providerId
