@@ -38,6 +38,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -143,17 +144,19 @@ fun ErasScreen(
     if (visibleIndex >= shownGroup.firstIndex && visibleIndex < eraEnd) {
         moreIndex = visibleIndex
     }
-    // The caption scales with the user's font size; the gap and the pill's
-    // touch target don't.
+    // The pill's click reads this, so it always opens the work on screen
+    // without the pill recomposing on every swipe.
+    val latestMoreIndex: State<Int> = rememberUpdatedState(moreIndex)
+    // The caption scales with the user's font size.
     val captionBlockHeight: Dp = with(LocalDensity.current) {
-        captionHeight() + 6.dp + PillRowHeight
+        captionHeight()
     }
 
-    // Frozen per work, so a caption fading out keeps its own stop and index.
+    // Frozen per work, so a caption fading out keeps its own stop.
     var captionTarget: CaptionTarget? = null
     val visibleStop: TimelineStop? = state.stops.getOrNull(moreIndex)
     if (visibleStop != null) {
-        captionTarget = CaptionTarget(index = moreIndex, stop = visibleStop)
+        captionTarget = CaptionTarget(stop = visibleStop)
     }
 
     Column(
@@ -213,26 +216,48 @@ fun ErasScreen(
                     .height(captionBlockHeight)
                     .padding(horizontal = ReelsGutter)
             ) { target: CaptionTarget? ->
-                // The pill rides with the caption. Its 48dp touch target adds
-                // about 10dp above the drawn pill, so the 6dp spacer shows as
-                // a 16dp gap.
                 if (target != null) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        // Fades out as the image slides away and in as the next
-                        // one slides in: invisible at the halfway point, where
-                        // the text swaps. Driven by the finger, so it can't
-                        // lead or lag.
-                        EraCaption(
-                            stop = target.stop,
-                            modifier = Modifier.graphicsLayer {
-                                val fraction: Float = abs(worksOffset())
-                                alpha = (1f - 2f * fraction).coerceIn(0f, 1f)
-                            }
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
+                    // Fades out as the image slides away and in as the next
+                    // one slides in: invisible at the halfway point, where
+                    // the text swaps. Driven by the finger, so it can't
+                    // lead or lag.
+                    EraCaption(
+                        stop = target.stop,
+                        modifier = Modifier.graphicsLayer {
+                            val fraction: Float = abs(worksOffset())
+                            alpha = (1f - 2f * fraction).coerceIn(0f, 1f)
+                        }
+                    )
+                }
+            }
+
+            // The pill sits in its own fixed row, so it never moves with the
+            // caption. Its 48dp touch target adds about 10dp above the drawn
+            // pill, so the 6dp spacer shows as a 16dp gap. The row keeps its
+            // height in empty eras too, so the art never jumps.
+            Spacer(modifier = Modifier.height(6.dp))
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(PillRowHeight)
+            ) {
+                // Keyed on the era, so a swipe within an era leaves it alone.
+                AnimatedContent(
+                    targetState = shownGroup,
+                    contentKey = { group: EraGroup -> group.era },
+                    transitionSpec = {
+                        fadeIn(tween(150)).togetherWith(fadeOut(tween(100)))
+                    },
+                    label = "eraPill",
+                    contentAlignment = Alignment.Center
+                ) { group: EraGroup ->
+                    if (group.stops.isNotEmpty()) {
                         OutlinedPill(
-                            label = "More from " + eraSpan(target.stop.era),
-                            onClick = { onIntent(ErasIntent.MoreClicked(target.index)) }
+                            label = "More from " + eraSpan(group.era),
+                            onClick = {
+                                onIntent(ErasIntent.MoreClicked(latestMoreIndex.value))
+                            }
                         )
                     }
                 }
@@ -469,8 +494,8 @@ private fun EraArtwork(
     }
 }
 
-/** The work the caption shows, and its index into the stops. */
-private class CaptionTarget(val index: Int, val stop: TimelineStop)
+/** The work the caption shows. */
+private class CaptionTarget(val stop: TimelineStop)
 
 /**
  * Title in Libre Caslon, then "artist · year", then the museum in small

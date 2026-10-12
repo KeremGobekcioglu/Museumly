@@ -80,9 +80,9 @@ internal fun Density.captionHeight(): Dp {
 }
 
 /**
- * The pill's share of the fixed caption block: its full 48dp touch target.
- * In dp, since a touch target doesn't scale with font size. The block keeps
- * it in empty eras too, so the art never jumps.
+ * The height of the fixed pill row under the caption: the pill's full 48dp
+ * touch target. In dp, since a touch target doesn't scale with font size.
+ * The row keeps it in empty eras too, so the art never jumps.
  */
 internal val PillRowHeight: Dp = 48.dp
 
