@@ -421,6 +421,83 @@ class ArtworkRepositoryImplTest {
     }
 
     @Test
+    fun `loadTimeline fetches only eras whose list holds fewer than three works`() = runTest {
+        // Only European has a department, so only the table's European eras
+        // (1400s, 1600s, 1800s, 1900s) can reach the provider at all.
+        val met = FakeArtworkProvider("met") { section ->
+            if (section == Section.EUROPEAN) listOf("11") else emptyList()
+        }
+        met.enqueue(
+            PageResult(
+                listOf(sampleArtwork("met:1"), sampleArtwork("met:2"), sampleArtwork("met:3")),
+                listOf(sampleDetail(), sampleDetail(), sampleDetail()),
+                next = "3",
+                status = PageStatus.OK
+            )
+        )
+        met.enqueue(PageResult(listOf(sampleArtwork("met:4")), listOf(sampleDetail()), next = "1", status = PageStatus.OK))
+        met.enqueue(PageResult(listOf(sampleArtwork("met:5")), listOf(sampleDetail()), next = "1", status = PageStatus.OK))
+        met.enqueue(PageResult(listOf(sampleArtwork("met:6")), listOf(sampleDetail()), next = "1", status = PageStatus.OK))
+
+        val repository = repository(setOf(met))
+        // 1600s now holds three works.
+        repository.loadMore(Section.EUROPEAN, size = 3, era = Era.Y1600)
+
+        val outcome: LoadOutcome = repository.loadTimeline()
+
+        assertEquals(LoadOutcome.Loaded, outcome)
+        // After the setup call, 1600s is never asked for again; the other
+        // European eras, still empty, each get one fetch.
+        assertEquals(listOf<Era?>(Era.Y1600, Era.Y1400, Era.Y1800, Era.Y1900), met.requestedEras)
+    }
+
+    @Test
+    fun `timelineStops gives at most three stops per era, in era order, with the table's section`() = runTest {
+        // One department per section, so no two sections share a cursor.
+        val met = FakeArtworkProvider("met") { section -> listOf(section.id) }
+        met.enqueue(
+            PageResult(
+                listOf(sampleArtwork("met:e1"), sampleArtwork("met:e2"), sampleArtwork("met:e3"), sampleArtwork("met:e4")),
+                listOf(sampleDetail(), sampleDetail(), sampleDetail(), sampleDetail()),
+                next = "4",
+                status = PageStatus.OK
+            )
+        )
+        met.enqueue(
+            PageResult(
+                listOf(sampleArtwork("met:a1"), sampleArtwork("met:a2")),
+                listOf(sampleDetail(), sampleDetail()),
+                next = "2",
+                status = PageStatus.OK
+            )
+        )
+        met.enqueue(PageResult(listOf(sampleArtwork("met:p1")), listOf(sampleDetail()), next = "1", status = PageStatus.OK))
+        met.enqueue(PageResult(listOf(sampleArtwork("met:x1")), listOf(sampleDetail()), next = "1", status = PageStatus.OK))
+
+        val repository = repository(setOf(met))
+        repository.loadMore(Section.EUROPEAN, size = 20, era = Era.Y1600)
+        repository.loadMore(Section.ASIA, size = 20, era = Era.Y1700)
+        repository.loadMore(Section.EGYPT_NEAR_EAST, size = 20, era = Era.PREHISTORIC)
+        // The table gives 1700s to Asia, so European's 1700s list must not appear.
+        repository.loadMore(Section.EUROPEAN, size = 20, era = Era.Y1700)
+
+        val stops = repository.timelineStops().first()
+
+        val actual: List<String> = stops.map { it.artwork.id + "|" + it.section + "|" + it.era }
+        assertEquals(
+            listOf(
+                "met:p1|EGYPT_NEAR_EAST|PREHISTORIC",
+                "met:e1|EUROPEAN|Y1600",
+                "met:e2|EUROPEAN|Y1600",
+                "met:e3|EUROPEAN|Y1600",
+                "met:a1|ASIA|Y1700",
+                "met:a2|ASIA|Y1700"
+            ),
+            actual
+        )
+    }
+
+    @Test
     fun `an exhausted department skips only itself, not its provider's other departments`() = runTest {
         cursorDao.put(ProviderCursor(providerId = "met:11", next = null))
         val met = FakeArtworkProvider("met") { listOf("11", "12") }

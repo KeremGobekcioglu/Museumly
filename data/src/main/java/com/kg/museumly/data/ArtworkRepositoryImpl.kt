@@ -26,7 +26,9 @@ import com.kg.museumly.domain.model.ArtworkDetail
 import com.kg.museumly.domain.model.ArtworkWithDetail
 import com.kg.museumly.domain.model.Era
 import com.kg.museumly.domain.model.Section
+import com.kg.museumly.domain.model.TimelineStop
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -95,6 +97,9 @@ class ArtworkRepositoryImpl @Inject constructor(
         // at all. This is that ceiling, generous relative to the 10s
         // per-call one since it has to cover the whole page.
         const val PROVIDER_FETCH_TIMEOUT_MS: Long = 20_000
+
+        // How many works the timeline shows per era.
+        const val TIMELINE_WORKS_PER_ERA: Int = 3
     }
 
     /**
@@ -426,6 +431,96 @@ class ArtworkRepositoryImpl @Inject constructor(
         val favorite = favoritesDao.byId(id) ?: return null
         val entity = artworkDao.byId(id) ?: return null
         return ArtworkMapper.toDomain(entity)
+    }
+
+    /**
+     * The one section the timeline shows for each era.
+     *
+     * Each section here must contain the era in Era.erasFor(section).
+     * Otherwise the timeline fills a list the era grid of that section
+     * never shows.
+     *
+     * No else branch: a new Era does not compile until it gets a section.
+     */
+    private fun timelineSectionFor(era: Era): Section {
+        return when (era) {
+            Era.PREHISTORIC, Era.BC_3000, Era.BC_2000 -> Section.EGYPT_NEAR_EAST
+            Era.BC_1000, Era.BC_500, Era.AD_0 -> Section.GREEK_ROMAN
+            Era.AD_500 -> Section.AFRICA_OCEANIA_AMERICAS
+            Era.AD_1000 -> Section.ASIA
+            Era.AD_1200 -> Section.MEDIEVAL
+            Era.Y1400 -> Section.EUROPEAN
+            Era.Y1500 -> Section.ISLAMIC
+            Era.Y1600 -> Section.EUROPEAN
+            Era.Y1700 -> Section.ASIA
+            Era.Y1800, Era.Y1900 -> Section.EUROPEAN
+            Era.Y2000 -> Section.ASIA
+        }
+    }
+
+    /**
+     * Fills every era's list up to TIMELINE_WORKS_PER_ERA works, era by era.
+     *
+     * An era that already holds enough works is skipped without a network
+     * call. The rest go through loadMore, so the works land in the normal
+     * era list ("european@1600s") and the era grid later continues from them.
+     *
+     * No mutex here: loadMore locks it itself, and Kotlin's Mutex is not
+     * reentrant, so locking it here too would freeze forever.
+     *
+     * A failed era does not stop the others. Every failure reason is kept
+     * and returned together at the end.
+     */
+    override suspend fun loadTimeline(): LoadOutcome {
+        val failures: MutableList<String> = ArrayList()
+        for (era in Era.entries) {
+            val section: Section = timelineSectionFor(era)
+            val existing: Int = count(section, era)
+            if (existing >= TIMELINE_WORKS_PER_ERA) {
+                continue
+            }
+            val outcome: LoadOutcome = loadMore(section, TIMELINE_WORKS_PER_ERA, era)
+            if (outcome is LoadOutcome.Failed) {
+                failures.add(outcome.reason)
+            }
+        }
+        if (failures.isNotEmpty()) {
+            return LoadOutcome.Failed(failures.joinToString("; "))
+        }
+        return LoadOutcome.Loaded
+    }
+
+    /**
+     * The first TIMELINE_WORKS_PER_ERA works of every era's list, eras in
+     * timeline order, works in list order inside an era. An era with no
+     * works adds nothing.
+     *
+     * One Flow per era, combined, so the timeline updates when any era's
+     * list changes.
+     */
+    override fun timelineStops(): Flow<List<TimelineStop>> {
+        val perEra: MutableList<Flow<List<TimelineStop>>> = ArrayList()
+        for (era in Era.entries) {
+            val section: Section = timelineSectionFor(era)
+            val stops: Flow<List<TimelineStop>> = artworks(section, era).map { artworks: List<Artwork> ->
+                val result: MutableList<TimelineStop> = ArrayList()
+                for (artwork in artworks) {
+                    if (result.size >= TIMELINE_WORKS_PER_ERA) {
+                        break
+                    }
+                    result.add(TimelineStop(artwork, section, era))
+                }
+                result
+            }
+            perEra.add(stops)
+        }
+        return combine(perEra) { lists: Array<List<TimelineStop>> ->
+            val result: MutableList<TimelineStop> = ArrayList()
+            for (list in lists) {
+                result.addAll(list)
+            }
+            result
+        }
     }
 
 }

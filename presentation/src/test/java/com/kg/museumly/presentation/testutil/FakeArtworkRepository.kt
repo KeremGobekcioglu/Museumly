@@ -6,6 +6,7 @@ import com.kg.museumly.domain.model.Artwork
 import com.kg.museumly.domain.model.ArtworkWithDetail
 import com.kg.museumly.domain.model.Era
 import com.kg.museumly.domain.model.Section
+import com.kg.museumly.domain.model.TimelineStop
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -113,5 +114,23 @@ class FakeArtworkRepository : ArtworkRepository {
 
     override suspend fun favoritesCount(): Int {
         return 0
+    }
+
+    private val timelineStopsFlow: MutableStateFlow<List<TimelineStop>> = MutableStateFlow(emptyList())
+
+    var loadTimelineOutcome: LoadOutcome = LoadOutcome.Loaded
+    var loadTimelineCallCount: Int = 0
+
+    fun setTimelineStops(stops: List<TimelineStop>) {
+        timelineStopsFlow.value = stops
+    }
+
+    override fun timelineStops(): Flow<List<TimelineStop>> {
+        return timelineStopsFlow
+    }
+
+    override suspend fun loadTimeline(): LoadOutcome {
+        loadTimelineCallCount += 1
+        return loadTimelineOutcome
     }
 }

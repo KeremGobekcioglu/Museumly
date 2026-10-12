@@ -4,6 +4,7 @@ import com.kg.museumly.domain.model.Artwork
 import com.kg.museumly.domain.model.ArtworkWithDetail
 import com.kg.museumly.domain.model.Era
 import com.kg.museumly.domain.model.Section
+import com.kg.museumly.domain.model.TimelineStop
 import kotlinx.coroutines.flow.Flow
 
 interface ArtworkRepository {
@@ -43,4 +44,10 @@ interface ArtworkRepository {
     suspend fun favoritesCount() : Int
 
     suspend fun rememberAspectRatio(id: String, ratio: Float)
+
+    /** The works the timeline slides through, oldest first. Empty until loaded once. */
+    fun timelineStops(): Flow<List<TimelineStop>>
+
+    /** Fetches the timeline's works once. Does nothing if they are already stored. */
+    suspend fun loadTimeline(): LoadOutcome
 }
