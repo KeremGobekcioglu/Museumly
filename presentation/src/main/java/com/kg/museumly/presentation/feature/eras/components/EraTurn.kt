@@ -83,6 +83,9 @@ internal fun rememberEraLabelAlpha(rulerState: PagerState, shownPage: Int): Stat
  * new one rises a little from below and fades in just after, so the two
  * barely overlap and no frame goes black. Back in time runs the other way.
  */
+/**
+ * The eraTurn fade delay, 120 versus the slide’s 60.
+ */
 internal fun eraTurn(forward: Boolean): ContentTransform {
     val sign: Int = if (forward) 1 else -1
     val enter: EnterTransition =
