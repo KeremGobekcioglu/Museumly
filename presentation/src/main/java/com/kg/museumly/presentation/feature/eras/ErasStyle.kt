@@ -86,8 +86,12 @@ internal fun Density.captionHeight(): Dp {
  */
 internal val PillRowHeight: Dp = 48.dp
 
-/** How long the playhead must rest on an era before its art is shown. */
-internal const val ShownEraDwellMillis: Long = 100L
+/**
+ * How long the playhead must rest on an era before its card turns. The
+ * scrubber's label answers the finger at once, so the card can wait for it
+ * to settle and turn once per landing.
+ */
+internal const val ShownEraDwellMillis: Long = 250L
 
 /** How far the works pager slides to show there is a next work. */
 internal val NudgeDistance: Dp = 24.dp

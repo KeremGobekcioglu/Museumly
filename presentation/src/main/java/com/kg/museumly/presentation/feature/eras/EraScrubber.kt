@@ -57,6 +57,14 @@ private val AnchorLabelStyle: TextStyle = TextStyle(
     color = White60,
 )
 
+/** The label above the playhead while the finger moves. */
+private val EraLabelGap: Dp = 4.dp
+private val EraLabelStyle: TextStyle = TextStyle(
+    fontSize = 11.sp,
+    letterSpacing = 0.5.sp,
+    color = Color.White,
+)
+
 /**
  * The scrubber. The ruler's HorizontalPager is the invisible drag engine:
  * one empty 64dp page per era, so fling, snap, settledPage and haptics work
@@ -73,6 +81,7 @@ private val AnchorLabelStyle: TextStyle = TextStyle(
 internal fun EraScrubber(
     groups: List<EraGroup>,
     rulerState: PagerState,
+    labelAlpha: () -> Float,
     onJump: (Int) -> Unit,
 )
 {
@@ -99,6 +108,16 @@ internal fun EraScrubber(
             if (index >= 0) {
                 result.add(Pair(index, textMeasurer.measure(text, AnchorLabelStyle)))
             }
+        }
+        result
+    }
+
+    // One label per era, measured once: the hero's words, e.g. "AD 500".
+    val eraLabels: List<TextLayoutResult> = remember(groups.size, textMeasurer) {
+        val result: MutableList<TextLayoutResult> = ArrayList()
+        for (group in groups) {
+            val words: String = heroDescription(heroParts(group.era))
+            result.add(textMeasurer.measure(words, EraLabelStyle))
         }
         result
     }
@@ -193,6 +212,23 @@ internal fun EraScrubber(
                 size = Size(slitWidth, slitHeight),
                 cornerRadius = CornerRadius(slitWidth / 2)
             )
+
+            // The era under the playhead, riding above it. Read here, in the
+            // draw phase, like the playhead. Drawn above the scrubber's top
+            // edge, into the spacer over it.
+            val alpha: Float = labelAlpha()
+            if (alpha > 0f) {
+                val page: Int = rulerState.currentPage.coerceIn(0, lastIndex)
+                val label: TextLayoutResult = eraLabels[page]
+                val labelX: Float = (x - label.size.width / 2f)
+                    .coerceIn(0f, size.width - label.size.width)
+                val labelY: Float = y - slitHeight / 2 - EraLabelGap.toPx() - label.size.height
+                drawText(
+                    textLayoutResult = label,
+                    topLeft = Offset(labelX, labelY),
+                    alpha = alpha
+                )
+            }
         }
     }
 }

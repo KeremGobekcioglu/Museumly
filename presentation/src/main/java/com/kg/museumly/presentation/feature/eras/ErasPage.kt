@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
@@ -169,13 +170,12 @@ fun ErasScreen(
 }
 
 /**
- * Top to bottom: the art, the era, the caption, the pill, the scrubber.
+ * Top to bottom: the era's card (art, era, caption, pill), the scrubber.
  *
- * The hero follows the finger: it reads the ruler's currentPage and rolls
- * through every era live. The art, caption and pill follow the era the
- * playhead rests on for ShownEraDwellMillis (100 ms), so a slow drag flips
- * through every era and a fling lands on its destination without loading
- * the eras in between. Each era opens on its first work.
+ * The card is one piece: it turns as a whole when the playhead rests on an
+ * era for ShownEraDwellMillis (250 ms), so the number never runs ahead of
+ * the art. While the finger moves, the scrubber's label names the era under
+ * the playhead. Each era opens on its first work.
  *
  * The ruler's PagerState is saved across rotation by rememberPagerState.
  */
@@ -201,10 +201,8 @@ private fun ErasTimeline(
         }
     }
 
-    val draggingGroup: EraGroup = groups[rulerState.currentPage.coerceIn(0, lastIndex)]
-
     // The era the playhead rests on. A new page cancels the wait, so eras
-    // passed in a fast scrub never reach the art.
+    // passed in a fast scrub never reach the card.
     var shownPage: Int by remember { mutableIntStateOf(rulerState.currentPage) }
     LaunchedEffect(rulerState) {
         snapshotFlow { rulerState.currentPage }.collectLatest { page: Int ->
@@ -214,39 +212,28 @@ private fun ErasTimeline(
     }
     val shownGroup: EraGroup = groups[shownPage.coerceIn(0, lastIndex)]
 
-    // The global index (into state.stops) of the work on screen. The slot
-    // inside AnimatedContent reports it; the caption and the pill read it.
-    var visibleIndex: Int by remember { mutableIntStateOf(-1) }
+    // A card that outlives its era (still turning away, or kept by an
+    // interrupted turn) asks this before it nudges.
+    val latestShownEra: State<Era> = rememberUpdatedState(shownGroup.era)
 
-    // Reads how far the works pager is between two works. The slot on screen
-    // hands it over; the caption reads it in the draw phase, so following the
-    // finger never recomposes.
-    var worksOffset: () -> Float by remember { mutableStateOf<() -> Float>({ 0f }) }
+    // The label shows while the finger moves and until the card has turned.
+    var labelTarget: Float = 0f
+    if (rulerState.isScrollInProgress || rulerState.currentPage != shownPage) {
+        labelTarget = 1f
+    }
+    val labelAlpha: Float by animateFloatAsState(
+        targetValue = labelTarget,
+        animationSpec = tween(250),
+        label = "eraLabelAlpha"
+    )
 
     // Eras whose works pager already nudged. Written only from the slot's
     // effect, never during composition, so it needs no snapshot state.
     val nudgedEras: MutableSet<Era> = remember { HashSet() }
 
-    // Fall back to the era's first work until the slot reports one of this
-    // era's own works. -1 when the era has none.
-    var moreIndex: Int = shownGroup.firstIndex
-    val eraEnd: Int = shownGroup.firstIndex + shownGroup.stops.size
-    if (visibleIndex >= shownGroup.firstIndex && visibleIndex < eraEnd) {
-        moreIndex = visibleIndex
-    }
-    // The pill's click reads this, so it always opens the work on screen
-    // without the pill recomposing on every swipe.
-    val latestMoreIndex: State<Int> = rememberUpdatedState(moreIndex)
     // The caption scales with the user's font size.
     val captionBlockHeight: Dp = with(LocalDensity.current) {
         captionHeight()
-    }
-
-    // Frozen per work, so a caption fading out keeps its own stop.
-    var captionTarget: CaptionTarget? = null
-    val visibleStop: TimelineStop? = state.stops.getOrNull(moreIndex)
-    if (visibleStop != null) {
-        captionTarget = CaptionTarget(stop = visibleStop)
     }
 
     Column(
@@ -260,103 +247,25 @@ private fun ErasTimeline(
             targetState = shownGroup,
             contentKey = { group: EraGroup -> group.era },
             transitionSpec = {
-                // A flipbook: quick enough to keep up with a scrub.
-                fadeIn(tween(150)).togetherWith(fadeOut(tween(100)))
+                val forward: Boolean = targetState.era.ordinal > initialState.era.ordinal
+                eraTurn(forward)
             },
-            label = "eraWorks",
+            label = "eraCard",
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
         ) { group: EraGroup ->
-            EraSlot(
+            EraCard(
                 group = group,
+                isShownEra = { latestShownEra.value == group.era },
                 isLoading = state.isLoading,
                 // The error outlives a retry's start; while it runs the slot
                 // says "Arriving…" without the button.
                 hasError = state.errorMessage != null && !state.isLoading,
+                captionBlockHeight = captionBlockHeight,
                 nudgedEras = nudgedEras,
-                onIntent = onIntent,
-                onVisibleIndex = { index: Int -> visibleIndex = index },
-                onWorksOffset = { reader: () -> Float -> worksOffset = reader }
+                onIntent = onIntent
             )
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-        EraHero(
-            era = draggingGroup.era,
-            hasWorks = draggingGroup.stops.isNotEmpty(),
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = ReelsGutter)
-        )
-
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Spacer(modifier = Modifier.height(8.dp))
-            AnimatedContent(
-                targetState = captionTarget,
-                contentKey = { target: CaptionTarget? -> target?.stop?.artwork?.id },
-                transitionSpec = {
-                    if (initialState?.stop?.era == targetState?.stop?.era) {
-                        return@AnimatedContent EnterTransition.None togetherWith ExitTransition.None
-                    }
-                    fadeIn(tween(150)).togetherWith(fadeOut(tween(100)))
-                },
-                label = "eraCaption",
-                contentAlignment = Alignment.TopCenter,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(captionBlockHeight)
-                    .padding(horizontal = ReelsGutter)
-            ) { target: CaptionTarget? ->
-                if (target != null) {
-                    // Fades out as the image slides away and in as the next
-                    // one slides in: invisible at the halfway point, where
-                    // the text swaps. Driven by the finger, so it can't
-                    // lead or lag.
-                    EraCaption(
-                        stop = target.stop,
-                        modifier = Modifier.graphicsLayer {
-                            val fraction: Float = abs(worksOffset())
-                            alpha = (1f - 2.5f * fraction).coerceIn(0f, 1f)
-                        }
-                    )
-                }
-            }
-
-            // The pill sits in its own fixed row, so it never moves with the
-            // caption. Its 48dp touch target adds about 10dp above the drawn
-            // pill, so the 6dp spacer shows as a 16dp gap. The row keeps its
-            // height in empty eras too, so the art never jumps.
-            Spacer(modifier = Modifier.height(6.dp))
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(PillRowHeight)
-            ) {
-                // Keyed on the era, so a swipe within an era leaves it alone.
-                AnimatedContent(
-                    targetState = shownGroup,
-                    contentKey = { group: EraGroup -> group.era },
-                    transitionSpec = {
-                        fadeIn(tween(150)).togetherWith(fadeOut(tween(100)))
-                    },
-                    label = "eraPill",
-                    contentAlignment = Alignment.Center
-                ) { group: EraGroup ->
-                    if (group.stops.isNotEmpty()) {
-                        OutlinedPill(
-                            label = "More from " + eraSpan(group.era),
-                            onClick = {
-                                onIntent(ErasIntent.MoreClicked(latestMoreIndex.value))
-                            }
-                        )
-                    }
-                }
-            }
         }
 
         Spacer(modifier = Modifier.height(12.dp))
@@ -364,12 +273,126 @@ private fun ErasTimeline(
         EraScrubber(
             groups = groups,
             rulerState = rulerState,
+            labelAlpha = { labelAlpha },
             onJump = { page: Int ->
                 scope.launch {
                     rulerState.animateScrollToPage(page)
                 }
             }
         )
+    }
+}
+
+/**
+ * One era as a single piece: its works, the era, the caption, the pill.
+ * Reads only its own group, so while it turns away it keeps showing its own
+ * era, work and caption.
+ */
+@Composable
+private fun EraCard(
+    group: EraGroup,
+    isShownEra: () -> Boolean,
+    isLoading: Boolean,
+    hasError: Boolean,
+    captionBlockHeight: Dp,
+    nudgedEras: MutableSet<Era>,
+    onIntent: (ErasIntent) -> Unit,
+)
+{
+    // The work on screen, as a page of this era's works pager.
+    var page: Int by remember { mutableIntStateOf(0) }
+
+    // Reads how far the works pager is between two works, for the caption's
+    // fade. Read in the draw phase, so following the finger never recomposes.
+    var worksOffset: () -> Float by remember { mutableStateOf<() -> Float>({ 0f }) }
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.fillMaxSize()
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+        ) {
+            EraSlot(
+                group = group,
+                isShownEra = isShownEra,
+                isLoading = isLoading,
+                hasError = hasError,
+                nudgedEras = nudgedEras,
+                onIntent = onIntent,
+                onVisibleIndex = { index: Int -> page = index - group.firstIndex },
+                onWorksOffset = { reader: () -> Float -> worksOffset = reader }
+            )
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+        EraHero(
+            era = group.era,
+            hasWorks = group.stops.isNotEmpty(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = ReelsGutter)
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+        // Frozen per work, so a caption fading out keeps its own stop.
+        var captionTarget: CaptionTarget? = null
+        val visibleStop: TimelineStop? = group.stops.getOrNull(page)
+        if (visibleStop != null) {
+            captionTarget = CaptionTarget(stop = visibleStop)
+        }
+        AnimatedContent(
+            targetState = captionTarget,
+            contentKey = { target: CaptionTarget? -> target?.stop?.artwork?.id },
+            transitionSpec = {
+                EnterTransition.None togetherWith ExitTransition.None
+            },
+            label = "eraCaption",
+            contentAlignment = Alignment.TopCenter,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(captionBlockHeight)
+                .padding(horizontal = ReelsGutter)
+        ) { target: CaptionTarget? ->
+            if (target != null) {
+                // Fades out as the image slides away and in as the next
+                // one slides in: invisible at the halfway point, where
+                // the text swaps. Driven by the finger, so it can't
+                // lead or lag.
+                EraCaption(
+                    stop = target.stop,
+                    modifier = Modifier.graphicsLayer {
+                        val fraction: Float = abs(worksOffset())
+                        alpha = (1f - 2.5f * fraction).coerceIn(0f, 1f)
+                    }
+                )
+            }
+        }
+
+        // The pill sits in its own fixed row, so it never moves with the
+        // caption. Its 48dp touch target adds about 10dp above the drawn
+        // pill, so the 6dp spacer shows as a 16dp gap. The row keeps its
+        // height in empty eras too, so the art never jumps.
+        Spacer(modifier = Modifier.height(6.dp))
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(PillRowHeight)
+        ) {
+            if (group.stops.isNotEmpty()) {
+                OutlinedPill(
+                    label = "More from " + eraSpan(group.era),
+                    // Reads page on click, so it opens the work on screen
+                    // without the pill recomposing on every swipe.
+                    onClick = {
+                        onIntent(ErasIntent.MoreClicked(group.firstIndex + page))
+                    }
+                )
+            }
+        }
     }
 }
 
@@ -381,6 +404,7 @@ private fun ErasTimeline(
 @Composable
 private fun EraSlot(
     group: EraGroup,
+    isShownEra: () -> Boolean,
     isLoading: Boolean,
     hasError: Boolean,
     nudgedEras: MutableSet<Era>,
@@ -434,6 +458,11 @@ private fun EraSlot(
             return@LaunchedEffect
         }
         delay(650)
+        // A slot still composed after its era left the screen must not
+        // spend that era's nudge.
+        if (!isShownEra()) {
+            return@LaunchedEffect
+        }
         if (worksState.isScrollInProgress || worksState.currentPage != 0) {
             return@LaunchedEffect
         }
@@ -681,6 +710,24 @@ private fun EraHero(
                 .clearAndSetSemantics { contentDescription = heroDescription(parts) }
         )
     }
+}
+
+/**
+ * The card turns like a page of time: the old era drifts up and fades, the
+ * new one rises a little from below and fades in just after, so the two
+ * barely overlap and no frame goes black. Back in time runs the other way.
+ */
+private fun eraTurn(forward: Boolean): ContentTransform {
+    val sign: Int = if (forward) 1 else -1
+    val enter: EnterTransition =
+        slideInVertically(tween(420, delayMillis = 120, easing = FastOutSlowInEasing)) { height: Int ->
+            sign * height / 16
+        } + fadeIn(tween(320, delayMillis = 120))
+    val exit: ExitTransition =
+        slideOutVertically(tween(260, easing = FastOutLinearInEasing)) { height: Int ->
+            -sign * height / 16
+        } + fadeOut(tween(200))
+    return enter.togetherWith(exit)
 }
 
 private fun heroTransform(forward: Boolean): ContentTransform {
