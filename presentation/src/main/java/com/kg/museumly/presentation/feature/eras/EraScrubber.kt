@@ -38,8 +38,6 @@ import com.kg.museumly.domain.model.Era
 import com.kg.museumly.presentation.ui.theme.White60
 import kotlin.math.roundToInt
 
-/** One invisible ruler page per era. It is the drag engine; the Canvas draws the scrubber. */
-private val TickPageWidth: Dp = 64.dp
 private val ScrubberHeight: Dp = 64.dp
 /** The track's inset from both edges. */
 private val TrackInset: Dp = 24.dp
@@ -67,8 +65,9 @@ private val EraLabelStyle: TextStyle = TextStyle(
 
 /**
  * The scrubber. The ruler's HorizontalPager is the invisible drag engine:
- * one empty 64dp page per era, so fling, snap, settledPage and haptics work
- * as before. reverseLayout makes dragging right move forward in time.
+ * one empty page per era, exactly one track step wide, so the playhead
+ * stays under the thumb 1:1. Fling, snap, settledPage and haptics work as
+ * before. reverseLayout makes dragging right move forward in time.
  *
  * A Canvas on top draws what the user sees, and takes no input:
  *  - a hairline from 24dp to width - 24dp, one segment per era, brighter
@@ -139,10 +138,16 @@ internal fun EraScrubber(
                 }
             }
     ) {
-        val sidePadding: Dp = (maxWidth - TickPageWidth) / 2
+        // One page per track step, so the drag moves the playhead 1:1. A lone
+        // era has no step; its page spans the track.
+        var step: Dp = maxWidth - TrackInset * 2
+        if (lastIndex > 0) {
+            step = step / lastIndex
+        }
+        val sidePadding: Dp = (maxWidth - step) / 2
         HorizontalPager(
             state = rulerState,
-            pageSize = PageSize.Fixed(TickPageWidth),
+            pageSize = PageSize.Fixed(step),
             contentPadding = PaddingValues(horizontal = sidePadding),
             reverseLayout = true,
             flingBehavior = PagerDefaults.flingBehavior(

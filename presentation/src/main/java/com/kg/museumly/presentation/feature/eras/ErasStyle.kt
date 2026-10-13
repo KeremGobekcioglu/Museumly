@@ -89,9 +89,11 @@ internal val PillRowHeight: Dp = 48.dp
 /**
  * How long the playhead must rest on an era before its card turns. The
  * scrubber's label answers the finger at once, so the card can wait for it
- * to settle and turn once per landing.
+ * to settle and turn once per landing. Above 300 ms, so a slow drag (about
+ * one era per 300 ms) waits for the pause instead of stacking turns. Only
+ * while the ruler moves: once it stops, the card turns at once.
  */
-internal const val ShownEraDwellMillis: Long = 250L
+internal const val ShownEraDwellMillis: Long = 200L
 
 /** How far the works pager slides to show there is a next work. */
 internal val NudgeDistance: Dp = 24.dp

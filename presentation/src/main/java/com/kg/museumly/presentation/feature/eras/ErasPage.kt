@@ -19,6 +19,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.animateScrollBy
+import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -172,9 +173,9 @@ fun ErasScreen(
 /**
  * Top to bottom: the era's card (art, era, caption, pill), the scrubber.
  *
- * The card is one piece: it turns as a whole when the playhead rests on an
- * era for ShownEraDwellMillis (250 ms), so the number never runs ahead of
- * the art. While the finger moves, the scrubber's label names the era under
+ * The card is one piece: it turns as a whole when the ruler stops, or when
+ * the playhead rests on an era for ShownEraDwellMillis (350 ms) while the
+ * ruler still moves, so the number never runs ahead of the art. While the finger moves, the scrubber's label names the era under
  * the playhead. Each era opens on its first work.
  *
  * The ruler's PagerState is saved across rotation by rememberPagerState.
@@ -201,14 +202,26 @@ private fun ErasTimeline(
         }
     }
 
-    // The era the playhead rests on. A new page cancels the wait, so eras
-    // passed in a fast scrub never reach the card.
+    // The era the playhead rests on. While the ruler moves (a held finger
+    // counts), a page must stay for ShownEraDwellMillis, and a new page
+    // cancels the wait, so eras passed in a scrub never reach the card.
+    // When the ruler stops, the wait is cancelled and the card turns at once.
+// Only a finger on the ruler needs the dwell; once it lifts, the ruler
+// already knows where it will land.
+    val isDragged: Boolean by rulerState.interactionSource.collectIsDraggedAsState()
     var shownPage: Int by remember { mutableIntStateOf(rulerState.currentPage) }
     LaunchedEffect(rulerState) {
-        snapshotFlow { rulerState.currentPage }.collectLatest { page: Int ->
-            delay(ShownEraDwellMillis)
-            shownPage = page
-        }
+        snapshotFlow { RulerMoment(rulerState.currentPage, rulerState.targetPage, isDragged) }
+            .collectLatest { moment: RulerMoment ->
+                if (moment.dragging) {
+                    delay(ShownEraDwellMillis)
+                    shownPage = moment.page
+                    return@collectLatest
+                }
+                // Finger up (a release, a fling or a tap-jump): turn to where the
+                // ruler will land, while the playhead is still travelling there.
+                shownPage = moment.target
+            }
     }
     val shownGroup: EraGroup = groups[shownPage.coerceIn(0, lastIndex)]
 
@@ -276,7 +289,12 @@ private fun ErasTimeline(
             labelAlpha = { labelAlpha },
             onJump = { page: Int ->
                 scope.launch {
-                    rulerState.animateScrollToPage(page)
+                    val distance: Int = abs(page - rulerState.currentPage)
+                    val duration: Int = (180 + distance * 40).coerceAtMost(650)
+                    rulerState.animateScrollToPage(
+                        page = page,
+                        animationSpec = tween(durationMillis = duration, easing = FastOutSlowInEasing)
+                    )
                 }
             }
         )
@@ -624,7 +642,8 @@ private fun EraArtwork(
 
 /** The work the caption shows. */
 private class CaptionTarget(val stop: TimelineStop)
-
+/** The ruler at one moment: the page under the playhead, where it will land, and whether a finger holds it. */
+private data class RulerMoment(val page: Int, val target: Int, val dragging: Boolean)
 /**
  * Title in Libre Caslon, then "artist · year", then the museum in small
  * spaced caps, all centered. The title gets three lines and "artist · year"
@@ -673,9 +692,9 @@ private fun EraCaption(
 }
 
 /**
- * The hero: the era under the scrubber's playhead. Follows the ruler live.
- * Going forward in time it slides up and fades; going back it slides down.
- * Dims to 40% while the era under the playhead has no works.
+ * The hero: the card's era. It turns with the card, so it has no motion of
+ * its own. Dims to 40% while the era has no works, and brightens if they
+ * arrive while the card is on screen.
  */
 @Composable
 private fun EraHero(
@@ -689,27 +708,16 @@ private fun EraHero(
         animationSpec = tween(200),
         label = "heroAlpha"
     )
-    AnimatedContent(
-        targetState = era,
-        transitionSpec = {
-            val forward: Boolean = targetState.ordinal > initialState.ordinal
-            heroTransform(forward)
-        },
-        contentAlignment = Alignment.Center,
-        label = "eraHero",
-        modifier = modifier.graphicsLayer { this.alpha = alpha }
-    ) { shown: Era ->
-        val parts: HeroParts = heroParts(shown)
-        Text(
-            text = heroText(parts),
-            style = HeroNumberStyle,
-            maxLines = 1,
-            softWrap = false,
-            modifier = Modifier
-                .fillMaxWidth()
-                .clearAndSetSemantics { contentDescription = heroDescription(parts) }
-        )
-    }
+    val parts: HeroParts = heroParts(era)
+    Text(
+        text = heroText(parts),
+        style = HeroNumberStyle,
+        maxLines = 1,
+        softWrap = false,
+        modifier = modifier
+            .graphicsLayer { this.alpha = alpha }
+            .clearAndSetSemantics { contentDescription = heroDescription(parts) }
+    )
 }
 
 /**
@@ -720,20 +728,13 @@ private fun EraHero(
 private fun eraTurn(forward: Boolean): ContentTransform {
     val sign: Int = if (forward) 1 else -1
     val enter: EnterTransition =
-        slideInVertically(tween(420, delayMillis = 120, easing = FastOutSlowInEasing)) { height: Int ->
+        slideInVertically(tween(320, delayMillis = 60, easing = FastOutSlowInEasing)) { height: Int ->
             sign * height / 16
-        } + fadeIn(tween(320, delayMillis = 120))
+        } + fadeIn(tween(240, delayMillis = 120))
     val exit: ExitTransition =
-        slideOutVertically(tween(260, easing = FastOutLinearInEasing)) { height: Int ->
+        slideOutVertically(tween(200, easing = FastOutLinearInEasing)) { height: Int ->
             -sign * height / 16
-        } + fadeOut(tween(200))
-    return enter.togetherWith(exit)
-}
-
-private fun heroTransform(forward: Boolean): ContentTransform {
-    val sign: Int = if (forward) 1 else -1
-    val enter = slideInVertically(tween(180)) { height: Int -> sign * height / 3 } + fadeIn(tween(180))
-    val exit = slideOutVertically(tween(150)) { height: Int -> -sign * height / 3 } + fadeOut(tween(120))
+        } + fadeOut(tween(160))
     return enter.togetherWith(exit)
 }
 
