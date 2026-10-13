@@ -1,4 +1,4 @@
-package com.kg.museumly.presentation.feature.eras
+package com.kg.museumly.presentation.feature.eras.components
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -38,7 +38,7 @@ import com.kg.museumly.domain.model.Era
 import com.kg.museumly.presentation.ui.theme.White60
 import kotlin.math.roundToInt
 
-private val ScrubberHeight: Dp = 64.dp
+private val SliderHeight: Dp = 64.dp
 /** The track's inset from both edges. */
 private val TrackInset: Dp = 24.dp
 private val TrackY: Dp = 22.dp
@@ -64,7 +64,7 @@ private val EraLabelStyle: TextStyle = TextStyle(
 )
 
 /**
- * The scrubber. The ruler's HorizontalPager is the invisible drag engine:
+ * The slider. The ruler's HorizontalPager is the invisible drag engine:
  * one empty page per era, exactly one track step wide, so the playhead
  * stays under the thumb 1:1. Fling, snap, settledPage and haptics work as
  * before. reverseLayout makes dragging right move forward in time.
@@ -74,10 +74,10 @@ private val EraLabelStyle: TextStyle = TextStyle(
  *    the more works the era holds, so it lights up as eras arrive;
  *  - the playhead, a white slit with a soft halo, read in the draw phase;
  *  - four anchor labels.
- * A tap anywhere on the scrubber jumps to the nearest era.
+ * A tap anywhere on the slider jumps to the nearest era.
  */
 @Composable
-internal fun EraScrubber(
+internal fun EraSlider(
     groups: List<EraGroup>,
     rulerState: PagerState,
     labelAlpha: () -> Float,
@@ -102,7 +102,7 @@ internal fun EraScrubber(
     val textMeasurer: TextMeasurer = rememberTextMeasurer()
     val anchors: List<Pair<Int, TextLayoutResult>> = remember(groups.size, textMeasurer) {
         val result: MutableList<Pair<Int, TextLayoutResult>> = ArrayList()
-        for ((era, text) in ScrubberAnchors) {
+        for ((era, text) in SliderAnchors) {
             val index: Int = groups.indexOfFirst { group: EraGroup -> group.era == era }
             if (index >= 0) {
                 result.add(Pair(index, textMeasurer.measure(text, AnchorLabelStyle)))
@@ -126,7 +126,7 @@ internal fun EraScrubber(
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxWidth()
-            .height(ScrubberHeight)
+            .height(SliderHeight)
             .pointerInput(lastIndex) {
                 detectTapGestures { tap: Offset ->
                     val start: Float = TrackInset.toPx()
@@ -156,7 +156,7 @@ internal fun EraScrubber(
             ),
             modifier = Modifier.fillMaxSize()
         ) { _: Int ->
-            // Draws nothing; the Canvas below is the scrubber.
+            // Draws nothing; the Canvas below is the slider.
         }
 
         Canvas(modifier = Modifier.fillMaxSize()) {
@@ -219,7 +219,7 @@ internal fun EraScrubber(
             )
 
             // The era under the playhead, riding above it. Read here, in the
-            // draw phase, like the playhead. Drawn above the scrubber's top
+            // draw phase, like the playhead. Drawn above the slider's top
             // edge, into the spacer over it.
             val alpha: Float = labelAlpha()
             if (alpha > 0f) {
@@ -238,8 +238,8 @@ internal fun EraScrubber(
     }
 }
 
-/** The scrubber's four labels: where the timeline's big turns are. */
-private val ScrubberAnchors: List<Pair<Era, String>> = listOf(
+/** The slider's four labels: where the timeline's big turns are. */
+private val SliderAnchors: List<Pair<Era, String>> = listOf(
     Pair(Era.BC_3000, "3000 BC"),
     Pair(Era.AD_0, "AD 1"),
     Pair(Era.Y1400, "1400s"),

@@ -1,4 +1,4 @@
-package com.kg.museumly.presentation.feature.eras
+package com.kg.museumly.presentation.feature.eras.components
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.AnnotatedString

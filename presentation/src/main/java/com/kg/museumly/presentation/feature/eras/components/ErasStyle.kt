@@ -1,4 +1,4 @@
-package com.kg.museumly.presentation.feature.eras
+package com.kg.museumly.presentation.feature.eras.components
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.SpanStyle
@@ -88,7 +88,7 @@ internal val PillRowHeight: Dp = 48.dp
 
 /**
  * How long the playhead must rest on an era before its card turns. The
- * scrubber's label answers the finger at once, so the card can wait for it
+ * slider's label answers the finger at once, so the card can wait for it
  * to settle and turn once per landing. Only while a finger holds the ruler:
  * once it lifts, the card turns at once to where the ruler will land.
  */

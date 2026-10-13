@@ -1,4 +1,4 @@
-package com.kg.museumly.presentation.feature.eras
+package com.kg.museumly.presentation.feature.eras.components
 
 import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.EnterTransition
@@ -60,7 +60,7 @@ internal fun rememberShownPage(rulerState: PagerState): State<Int> {
 }
 
 /**
- * The scrubber's era label alpha. It returns a value, so it has no recompose
+ * The slider's era label alpha. It returns a value, so it has no recompose
  * scope of its own: its reads of the ruler land in the caller's, as before.
  */
 @Composable

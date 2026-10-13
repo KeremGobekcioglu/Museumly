@@ -1,4 +1,4 @@
-package com.kg.museumly.presentation.feature.eras
+package com.kg.museumly.presentation.feature.eras.components
 
 import com.kg.museumly.domain.model.Era
 import com.kg.museumly.domain.model.TimelineStop

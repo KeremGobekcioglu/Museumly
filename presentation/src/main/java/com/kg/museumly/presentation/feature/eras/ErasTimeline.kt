@@ -29,17 +29,24 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.kg.museumly.domain.model.Era
+import com.kg.museumly.presentation.feature.eras.components.EraGroup
+import com.kg.museumly.presentation.feature.eras.components.EraSlider
+import com.kg.museumly.presentation.feature.eras.components.captionHeight
+import com.kg.museumly.presentation.feature.eras.components.eraTurn
+import com.kg.museumly.presentation.feature.eras.components.groupByEra
+import com.kg.museumly.presentation.feature.eras.components.rememberEraLabelAlpha
+import com.kg.museumly.presentation.feature.eras.components.rememberShownPage
+import kotlin.math.abs
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
-import kotlin.math.abs
 
 /**
- * Top to bottom: the era's card (art, era, caption, pill), the scrubber.
+ * Top to bottom: the era's card (art, era, caption, pill), the slider.
  *
  * The card is one piece: it turns as a whole when the finger lifts, or when
  * the playhead rests on an era for ShownEraDwellMillis (200 ms) while the
  * finger still holds the ruler, so the number never runs ahead of the art.
- * While the finger moves, the scrubber's label names the era under the
+ * While the finger moves, the slider's label names the era under the
  * playhead. Each era opens on its first work.
  *
  * The ruler's PagerState is saved across rotation by rememberPagerState.
@@ -75,7 +82,7 @@ internal fun ErasTimeline(
     // interrupted turn) asks this before it nudges.
     val latestShownEra: State<Era> = rememberUpdatedState(shownGroup.era)
 
-    // Never read here: the scrubber's Canvas reads it in the draw phase.
+    // Never read here: the slider's Canvas reads it in the draw phase.
     val labelAlphaState: State<Float> = rememberEraLabelAlpha(rulerState, shownPage)
 
     // Eras whose works pager already nudged. Written only from EraWorks'
@@ -121,7 +128,7 @@ internal fun ErasTimeline(
 
         Spacer(modifier = Modifier.height(12.dp))
         val scope: CoroutineScope = rememberCoroutineScope()
-        EraScrubber(
+        EraSlider(
             groups = groups,
             rulerState = rulerState,
             labelAlpha = { labelAlphaState.value },

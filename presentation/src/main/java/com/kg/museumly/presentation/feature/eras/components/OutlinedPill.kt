@@ -1,4 +1,4 @@
-package com.kg.museumly.presentation.feature.eras
+package com.kg.museumly.presentation.feature.eras.components
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.padding

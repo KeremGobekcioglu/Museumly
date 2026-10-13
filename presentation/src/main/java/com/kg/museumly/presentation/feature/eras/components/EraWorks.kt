@@ -1,4 +1,4 @@
-package com.kg.museumly.presentation.feature.eras
+package com.kg.museumly.presentation.feature.eras.components
 
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
@@ -43,9 +43,10 @@ import coil3.compose.AsyncImage
 import com.kg.museumly.domain.model.Artwork
 import com.kg.museumly.domain.model.Era
 import com.kg.museumly.presentation.feature.detail.ArtworkFrame
+import com.kg.museumly.presentation.feature.eras.ErasIntent
 import com.kg.museumly.presentation.feature.scroll.presentation.components.ReelsGutter
-import kotlinx.coroutines.delay
 import kotlin.math.abs
+import kotlinx.coroutines.delay
 
 /**
  * The works pager: one era's works and their dots, the part of the card
