@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.kg.museumly.domain.ArtworkPrefetcher
 import com.kg.museumly.domain.ArtworkRepository
 import com.kg.museumly.domain.LoadOutcome
+import com.kg.museumly.domain.NetworkMonitor
 import com.kg.museumly.domain.model.TimelineStop
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
@@ -12,6 +13,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -20,7 +22,8 @@ import javax.inject.Inject
 @HiltViewModel
 class ErasViewModel @Inject constructor(
     private val repository: ArtworkRepository,
-    private val prefetcher: ArtworkPrefetcher
+    private val prefetcher: ArtworkPrefetcher,
+    private val networkMonitor: NetworkMonitor
 ) : ViewModel()
 {
     private val _uiState = MutableStateFlow(ErasUiState())
@@ -35,8 +38,25 @@ class ErasViewModel @Inject constructor(
         viewModelScope.launch {
             repository.timelineStops().collect {
                 stops: List<TimelineStop> ->
-                    _uiState.update { it.copy(stops = stops) }
+                    _uiState.update { it.copy(stops = stops, stopsReady = true) }
             }
+        }
+        // Picks the failure copy; never blocks a request.
+        viewModelScope.launch {
+            networkMonitor.isOnline.collect { online: Boolean ->
+                _uiState.update { it.copy(isOnline = online) }
+            }
+        }
+        // auto retry. drop(1) skips the current value, so only a real
+        // change back to online retries, not the screen opening.
+        viewModelScope.launch {
+            networkMonitor.isOnline
+                .drop(1)
+                .collect { online: Boolean ->
+                    if (online && _uiState.value.errorMessage != null) {
+                        load()
+                    }
+                }
         }
         // Eras already filled are skipped inside loadTimeline, so opening the
         // screen again costs no network.
@@ -48,7 +68,9 @@ class ErasViewModel @Inject constructor(
             return
         }
         loadJob = viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+            // The error stays until this attempt ends, so the placard doesn't
+            // vanish under the user's tap.
+            _uiState.update { it.copy(isLoading = true, isRetrying = it.errorMessage != null) }
             var message : String? = null
             try {
                 val outcome : LoadOutcome = repository.loadTimeline()
@@ -65,7 +87,7 @@ class ErasViewModel @Inject constructor(
             {
                 message = e.message ?: "Couldn't load the timeline"
             }
-            _uiState.update { it.copy(isLoading = false, errorMessage = message) }
+            _uiState.update { it.copy(isLoading = false, isRetrying = false, errorMessage = message) }
         }
     }
 

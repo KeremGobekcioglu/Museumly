@@ -67,3 +67,90 @@ private fun ErasScreenPreview() {
         )
     }
 }
+
+// Cold states: nothing in Room, so the gallery screens take the whole page.
+
+@Preview(name = "Eras · loading", showBackground = true, device = "spec:width=411dp,height=891dp")
+@Composable
+private fun ErasLoadingPreview() {
+    ErasScreen(
+        state = ErasUiState(stopsReady = true, isLoading = true),
+        onIntent = {},
+    )
+}
+
+@Preview(name = "Eras · failed", showBackground = true, device = "spec:width=411dp,height=891dp")
+@Composable
+private fun ErasFailedPreview() {
+    ErasScreen(
+        state = ErasUiState(stopsReady = true, isLoading = false, errorMessage = "HTTP 503"),
+        onIntent = {},
+    )
+}
+
+@Preview(name = "Eras · failed, retrying", showBackground = true, device = "spec:width=411dp,height=891dp")
+@Composable
+private fun ErasRetryingPreview() {
+    ErasScreen(
+        state = ErasUiState(
+            stopsReady = true,
+            isLoading = true,
+            isRetrying = true,
+            errorMessage = "HTTP 503",
+        ),
+        onIntent = {},
+    )
+}
+
+@Preview(name = "Eras · offline", showBackground = true, device = "spec:width=411dp,height=891dp")
+@Composable
+private fun ErasOfflinePreview() {
+    ErasScreen(
+        state = ErasUiState(
+            stopsReady = true,
+            isLoading = false,
+            errorMessage = "Unable to resolve host",
+            isOnline = false,
+        ),
+        onIntent = {},
+    )
+}
+
+@Preview(name = "Eras · empty", showBackground = true, device = "spec:width=411dp,height=891dp")
+@Composable
+private fun ErasEmptyPreview() {
+    ErasScreen(
+        state = ErasUiState(stopsReady = true, isLoading = false),
+        onIntent = {},
+    )
+}
+
+// Partial states: some eras have works, so the timeline stays and the empty
+// era the ruler opens on (3000 BC) shows EmptyEra in its slot.
+
+@Preview(name = "Eras · partial, still loading", showBackground = true, device = "spec:width=411dp,height=891dp")
+@Composable
+private fun ErasPartialLoadingPreview() {
+    WithPreviewImages {
+        ErasScreen(
+            state = ErasUiState(stops = fakeStops(), stopsReady = true, isLoading = true),
+            onIntent = {},
+        )
+    }
+}
+
+@Preview(name = "Eras · partial, failed", showBackground = true, device = "spec:width=411dp,height=891dp")
+@Composable
+private fun ErasPartialFailedPreview() {
+    WithPreviewImages {
+        ErasScreen(
+            state = ErasUiState(
+                stops = fakeStops(),
+                stopsReady = true,
+                isLoading = false,
+                errorMessage = "HTTP 503",
+            ),
+            onIntent = {},
+        )
+    }
+}

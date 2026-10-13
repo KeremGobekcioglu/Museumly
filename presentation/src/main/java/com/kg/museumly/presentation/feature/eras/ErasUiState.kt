@@ -6,8 +6,14 @@ import com.kg.museumly.domain.model.TimelineStop
 
 data class ErasUiState(
     val stops: List<TimelineStop> = emptyList(),
+    // False until Room's first emission. Until then an empty stops list
+    // means "not read yet", not "nothing cached".
+    val stopsReady: Boolean = false,
     val isLoading: Boolean = true,
-    val errorMessage: String? = null
+    // Kept through a retry, so the failure placard stays up with its spinner.
+    val errorMessage: String? = null,
+    val isRetrying: Boolean = false,
+    val isOnline: Boolean = true
 )
 
 sealed interface ErasIntent {

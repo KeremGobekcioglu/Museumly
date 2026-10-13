@@ -70,7 +70,10 @@ import coil3.compose.AsyncImage
 import com.kg.museumly.domain.model.Artwork
 import com.kg.museumly.domain.model.Era
 import com.kg.museumly.domain.model.TimelineStop
+import com.kg.museumly.presentation.BuildConfig
 import com.kg.museumly.presentation.feature.detail.ArtworkFrame
+import com.kg.museumly.presentation.feature.scroll.presentation.components.GalleryLoading
+import com.kg.museumly.presentation.feature.scroll.presentation.components.GalleryNotice
 import com.kg.museumly.presentation.feature.scroll.presentation.components.ReelsGutter
 import com.kg.museumly.presentation.feature.scroll.presentation.components.TopBarChipOutline
 import com.kg.museumly.presentation.feature.scroll.presentation.components.museumName
@@ -80,6 +83,90 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlin.math.abs
+
+/**
+ * Which screen ErasScreen shows. Every mode but Timeline is the cold state:
+ * no era has a single work yet, so there is nothing to scrub through and
+ * the gallery screens take the whole page, as on the feed. Once one era has
+ * works, the timeline stays, and an empty era shows EmptyEra in its slot.
+ */
+private enum class ErasMode { Waiting, Loading, Failed, Empty, Timeline }
+
+private fun ErasUiState.mode(): ErasMode {
+    if (stops.isNotEmpty()) {
+        return ErasMode.Timeline
+    }
+    // Room hasn't answered yet. Showing GalleryLoading here would flash it
+    // on every visit with a cached timeline.
+    if (!stopsReady) {
+        return ErasMode.Waiting
+    }
+    // Checked before isLoading: a retry keeps the placard up, spinner on.
+    if (errorMessage != null) {
+        return ErasMode.Failed
+    }
+    if (isLoading) {
+        return ErasMode.Loading
+    }
+    return ErasMode.Empty
+}
+
+private fun failedTitle(isOnline: Boolean): String {
+    if (!isOnline) {
+        return "No connection"
+    }
+    return "The timeline didn't open"
+}
+
+private fun failedBody(isOnline: Boolean): String {
+    if (!isOnline) {
+        return "We'll pick this back up once you're back online."
+    }
+    return "Something went wrong loading the collection."
+}
+
+/**
+ * Crossfades between modes like the feed's ReelsContent. contentKey = mode()
+ * means only a change of screen animates, and the screen fading out keeps
+ * the state it last had.
+ */
+@Composable
+fun ErasScreen(
+    state: ErasUiState,
+    onIntent: (ErasIntent) -> Unit,
+)
+{
+    AnimatedContent(
+        targetState = state,
+        contentKey = { it.mode() },
+        transitionSpec = { fadeIn(tween(300)) togetherWith fadeOut(tween(300)) },
+        label = "eras-mode",
+    ) { slotState: ErasUiState ->
+        when (slotState.mode()) {
+            ErasMode.Waiting -> Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black)
+            )
+            ErasMode.Loading -> GalleryLoading("Hanging the timeline")
+            ErasMode.Failed -> GalleryNotice(
+                title = failedTitle(slotState.isOnline),
+                body = failedBody(slotState.isOnline),
+                actionLabel = if (slotState.isOnline) "Retry" else "Try anyway",
+                onAction = { onIntent(ErasIntent.RetryClicked) },
+                isBusy = slotState.isRetrying,
+                debugDetail = if (BuildConfig.DEBUG) slotState.errorMessage else null,
+            )
+            ErasMode.Empty -> GalleryNotice(
+                title = "Nothing on the walls",
+                body = "No works came back for the timeline.",
+                actionLabel = "Retry",
+                onAction = { onIntent(ErasIntent.RetryClicked) },
+            )
+            ErasMode.Timeline -> ErasTimeline(state = slotState, onIntent = onIntent)
+        }
+    }
+}
 
 /**
  * Top to bottom: the art, the era, the caption, the pill, the scrubber.
@@ -93,7 +180,7 @@ import kotlin.math.abs
  * The ruler's PagerState is saved across rotation by rememberPagerState.
  */
 @Composable
-fun ErasScreen(
+private fun ErasTimeline(
     state: ErasUiState,
     onIntent: (ErasIntent) -> Unit,
 )
@@ -184,7 +271,9 @@ fun ErasScreen(
             EraSlot(
                 group = group,
                 isLoading = state.isLoading,
-                hasError = state.errorMessage != null,
+                // The error outlives a retry's start; while it runs the slot
+                // says "Arriving…" without the button.
+                hasError = state.errorMessage != null && !state.isLoading,
                 nudgedEras = nudgedEras,
                 onIntent = onIntent,
                 onVisibleIndex = { index: Int -> visibleIndex = index },
