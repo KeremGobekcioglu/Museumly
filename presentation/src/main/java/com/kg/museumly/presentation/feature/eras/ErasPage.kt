@@ -173,10 +173,11 @@ fun ErasScreen(
 /**
  * Top to bottom: the era's card (art, era, caption, pill), the scrubber.
  *
- * The card is one piece: it turns as a whole when the ruler stops, or when
- * the playhead rests on an era for ShownEraDwellMillis (350 ms) while the
- * ruler still moves, so the number never runs ahead of the art. While the finger moves, the scrubber's label names the era under
- * the playhead. Each era opens on its first work.
+ * The card is one piece: it turns as a whole when the finger lifts, or when
+ * the playhead rests on an era for ShownEraDwellMillis (200 ms) while the
+ * finger still holds the ruler, so the number never runs ahead of the art.
+ * While the finger moves, the scrubber's label names the era under the
+ * playhead. Each era opens on its first work.
  *
  * The ruler's PagerState is saved across rotation by rememberPagerState.
  */
@@ -202,12 +203,10 @@ private fun ErasTimeline(
         }
     }
 
-    // The era the playhead rests on. While the ruler moves (a held finger
-    // counts), a page must stay for ShownEraDwellMillis, and a new page
-    // cancels the wait, so eras passed in a scrub never reach the card.
-    // When the ruler stops, the wait is cancelled and the card turns at once.
-// Only a finger on the ruler needs the dwell; once it lifts, the ruler
-// already knows where it will land.
+    // The era the card shows. While a finger holds the ruler, a page must
+    // stay for ShownEraDwellMillis, and a new page cancels the wait, so eras
+    // passed in a scrub never reach the card. Once the finger lifts, the
+    // ruler already knows where it will land, so the card turns there at once.
     val isDragged: Boolean by rulerState.interactionSource.collectIsDraggedAsState()
     var shownPage: Int by remember { mutableIntStateOf(rulerState.currentPage) }
     LaunchedEffect(rulerState) {
@@ -642,8 +641,13 @@ private fun EraArtwork(
 
 /** The work the caption shows. */
 private class CaptionTarget(val stop: TimelineStop)
-/** The ruler at one moment: the page under the playhead, where it will land, and whether a finger holds it. */
+
+/**
+ * The ruler at one moment: the page under the playhead, where it will land,
+ * and whether a finger holds it.
+ */
 private data class RulerMoment(val page: Int, val target: Int, val dragging: Boolean)
+
 /**
  * Title in Libre Caslon, then "artist · year", then the museum in small
  * spaced caps, all centered. The title gets three lines and "artist · year"
