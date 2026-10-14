@@ -2,6 +2,7 @@ package com.kg.museumly.data.di
 
 import com.kg.museumly.data.local.EraPositionSource
 import com.kg.museumly.data.local.FeedPositionSource
+import com.kg.museumly.domain.EraPositionSourceInterface
 import com.kg.museumly.domain.FeedPositionSourceInterface
 import dagger.Binds
 import dagger.Module
@@ -16,5 +17,5 @@ abstract class EraPositionSourceModule {
     @Singleton
     abstract fun bindEraPositionSource(
         impl: EraPositionSource
-    ) : EraPositionSource
+    ) : EraPositionSourceInterface
 }

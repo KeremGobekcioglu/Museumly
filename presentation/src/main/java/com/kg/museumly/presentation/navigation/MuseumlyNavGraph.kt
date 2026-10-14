@@ -10,6 +10,7 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -23,11 +24,13 @@ import com.kg.museumly.domain.model.Section
 import com.kg.museumly.presentation.feature.detail.DetailScreen
 import com.kg.museumly.presentation.feature.detail.DetailUiState
 import com.kg.museumly.presentation.feature.detail.DetailViewModel
+import com.kg.museumly.presentation.feature.eras.era.EraEffect
+import com.kg.museumly.presentation.feature.eras.era.EraScreen
+import com.kg.museumly.presentation.feature.eras.era.EraViewModel
 import com.kg.museumly.presentation.feature.scroll.presentation.components.WallColor
 
 @Composable
-fun MuseumlyNavGraph()
-{
+fun MuseumlyNavGraph() {
     val navController: NavHostController = rememberNavController()
     NavHost(
         modifier = Modifier
@@ -46,7 +49,7 @@ fun MuseumlyNavGraph()
             popEnterTransition = { EnterTransition.None }
         ) {
             MainShell(
-                onOpenDetail = { id : String -> navController.navigate(DetailPage(id))},
+                onOpenDetail = { id: String -> navController.navigate(DetailPage(id)) },
                 onOpenEra = { section: Section, era: Era ->
                     navController.navigate(EraPage(eraId = era.id, sectionId = section.id)) {
                         launchSingleTop = true
@@ -77,7 +80,27 @@ fun MuseumlyNavGraph()
         }
 
         composable<EraPage> {
-            // EraViewModel and EraScreen come next. A plain Text here for now.
+            val viewModel: EraViewModel = hiltViewModel()
+            val state by viewModel.uiState.collectAsStateWithLifecycle()
+            LaunchedEffect(Unit) {
+                viewModel.effects.collect { effect: EraEffect ->
+                    when (effect) {
+                        EraEffect.Back -> {
+                            // Pops only EraPage: a second tap during the exit
+                            // finds no EraPage and does nothing, instead of
+                            // popping MainPage and leaving a blank screen.
+                            navController.popBackStack<EraPage>(inclusive = true)
+                        }
+
+                        is EraEffect.OpenDetail -> {
+                            navController.navigate(DetailPage(effect.artworkId)) {
+                                launchSingleTop = true
+                            }
+                        }
+                    }
+                }
+            }
+            EraScreen(state = state, onIntent = viewModel::onIntent)
         }
     }
 }
