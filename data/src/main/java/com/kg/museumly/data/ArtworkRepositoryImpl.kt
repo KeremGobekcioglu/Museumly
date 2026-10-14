@@ -476,6 +476,27 @@ class ArtworkRepositoryImpl @Inject constructor(
     }
 
     /**
+     * The eras the timeline fills and shows: every era except the 2000s.
+     *
+     * The slider dropped the 2000s, but filling its stop still scanned Met
+     * dept 6, where most 2000s objects are rejected. That scan sent about
+     * 86 Met requests in 9 s and tripped the 403 on every Eras open, since a
+     * failed scan saves no cursor and starts over next time.
+     *
+     * loadTimeline and timelineStops both read this, so they can't disagree
+     * about which eras the timeline has.
+     */
+    private fun timelineEras(): List<Era> {
+        val result: MutableList<Era> = ArrayList()
+        for (era in Era.entries) {
+            if (era != Era.Y2000) {
+                result.add(era)
+            }
+        }
+        return result
+    }
+
+    /**
      * Fills every era's list up to TIMELINE_WORKS_PER_ERA works, era by era.
      *
      * An era that already holds enough works is skipped without a network
@@ -490,7 +511,7 @@ class ArtworkRepositoryImpl @Inject constructor(
      */
     override suspend fun loadTimeline(): LoadOutcome {
         val failures: MutableList<String> = ArrayList()
-        for (era in Era.entries) {
+        for (era in timelineEras()) {
             val section: Section = timelineSectionFor(era)
             val existing: Int = count(section, era)
             if (existing >= TIMELINE_WORKS_PER_ERA) {
@@ -517,7 +538,7 @@ class ArtworkRepositoryImpl @Inject constructor(
      */
     override fun timelineStops(): Flow<List<TimelineStop>> {
         val perEra: MutableList<Flow<List<TimelineStop>>> = ArrayList()
-        for (era in Era.entries) {
+        for (era in timelineEras()) {
             val section: Section = timelineSectionFor(era)
             val stops: Flow<List<TimelineStop>> = artworks(section, era).map { artworks: List<Artwork> ->
                 val result: MutableList<TimelineStop> = ArrayList()

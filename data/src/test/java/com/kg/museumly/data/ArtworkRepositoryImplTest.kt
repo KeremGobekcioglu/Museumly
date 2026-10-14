@@ -730,6 +730,49 @@ class ArtworkRepositoryImplTest {
         // Exhaustion is per scope: the era ran out, the feed didn't.
         assertFalse(repository.isExhausted(Section.EUROPEAN))
     }
+
+    /** A page of three works with ids unique to this prefix. */
+    private fun threeWorks(prefix: String): PageResult {
+        val items = listOf(sampleArtwork("met:$prefix-1"), sampleArtwork("met:$prefix-2"), sampleArtwork("met:$prefix-3"))
+        val details = listOf(sampleDetail(), sampleDetail(), sampleDetail())
+        return PageResult(items, details, next = "3", status = PageStatus.OK)
+    }
+
+    @Test
+    fun `loadTimeline never fetches for the 2000s`() = runTest {
+        val met = FakeArtworkProvider("met")
+        // One page per timeline era, plus one spare: a 2000s fetch would get
+        // the spare and show up in requestedEras instead of crashing the fake.
+        for (i in 0..Era.entries.size) {
+            met.enqueue(threeWorks("p$i"))
+        }
+        val repository: ArtworkRepositoryImpl = repository(setOf(met))
+
+        repository.loadTimeline()
+
+        assertFalse(met.requestedEras.contains(Era.Y2000))
+        // Every other era was filled, so the 2000s wasn't skipped by accident.
+        assertEquals(Era.entries.size - 1, met.requestedEras.size)
+    }
+
+    @Test
+    fun `timelineStops has no 2000s stop even when the 2000s list holds works`() = runTest {
+        val met = FakeArtworkProvider("met")
+        met.enqueue(threeWorks("y2000"))
+        met.enqueue(threeWorks("y1700"))
+        val repository: ArtworkRepositoryImpl = repository(setOf(met))
+        // The era page can fill asia@2000s; the timeline must still leave it out.
+        repository.loadMore(Section.ASIA, size = 3, era = Era.Y2000)
+        repository.loadMore(Section.ASIA, size = 3, era = Era.Y1700)
+
+        val stops = repository.timelineStops().first()
+
+        for (stop in stops) {
+            assertNotEquals(Era.Y2000, stop.era)
+        }
+        // The 1700s works came through, so the flow itself works.
+        assertEquals(3, stops.size)
+    }
 }
 
 /**

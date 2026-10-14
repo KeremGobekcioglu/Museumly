@@ -138,6 +138,11 @@ class EraViewModel @Inject constructor(
     private var enterJob: Job? = null
     private var loadJob: Job? = null
 
+    // The last tile the grid reported on screen, -1 until the first report.
+    // A report can arrive while a load runs and be skipped; loadMore reads
+    // this when the load ends, so that report still counts.
+    private var reportedLastVisible: Int = -1
+
     init {
         enter(startSection)
         viewModelScope.launch {
@@ -220,7 +225,36 @@ class EraViewModel @Inject constructor(
                 next = runLoad(target)
             }
             tail.value = next
+
+            // A first page too short to scroll: the grid reported once while
+            // this load ran, that report was skipped above, and with nothing
+            // to scroll no second report ever comes. So keep loading here
+            // while the user is still near the end.
+            //
+            // countFor, not uiState's list: with detail on top, uiState stops
+            // collecting after 5 s and its size freezes, which would keep this
+            // loading forever. A fresh count grows each page while
+            // reportedLastVisible stays put, so the loop stops after one page.
+            //
+            // Ends on Exhausted or Failed (tail isn't Idle), on a switch (this
+            // job is cancelled), or once the end is out of reach.
+            while (tail.value == TailState.Idle && isNearEnd(target)) {
+                tail.value = TailState.Loading
+                tail.value = runLoad(target)
+            }
         }
+    }
+
+    /** True while the last reported tile is within LOAD_AHEAD of the end of target's list. */
+    private suspend fun isNearEnd(target: Section?): Boolean {
+        if (reportedLastVisible < 0) {
+            return false
+        }
+        if (selected.value != target) {
+            return false
+        }
+        val count: Int = countFor(target)
+        return count - reportedLastVisible <= LOAD_AHEAD
     }
 
     private suspend fun runLoad(target: Section?): TailState {
@@ -409,6 +443,8 @@ class EraViewModel @Inject constructor(
         }
         // Step 2: a load for the old selection is the old selection's business.
         loadJob?.cancel()
+        // The old grid's last report says nothing about the new list.
+        reportedLastVisible = -1
         // Step 3: the grid must not build until the new index is known.
         restored.value = null
         tail.value = TailState.Loading
@@ -425,6 +461,9 @@ class EraViewModel @Inject constructor(
         if (state.selected != selected.value) {
             return
         }
+        // Kept even if the load trigger below skips this report: a load
+        // already running reads it when it ends.
+        reportedLastVisible = lastVisible
 
         // Step 2: remember the furthest row reached. The store ignores
         // anything lower than what it has.
