@@ -61,6 +61,28 @@ enum class Era(val id: String, val begin: Int, val end: Int) {
             }
             return result
         }
+        /** The era with this id, or null for an unknown one. */
+        fun fromId(id: String): Era? {
+            for (era in entries) {
+                if (era.id == id)
+                    return era
+            }
+            return null
+        }
+
+        /**
+         * The other direction of erasFor: the sections whose slider holds
+         * this era. The era page's picker lists these, and "All" walks over
+         * them. Section declaration order, so the walk is the same every time.
+         */
+        fun sectionsFor(era: Era): List<Section> {
+            val result: MutableList<Section> = ArrayList()
+            for (section in Section.entries) {
+                if (era in erasFor(section))
+                    result.add(section)
+            }
+            return result
+        }
     }
 }
 

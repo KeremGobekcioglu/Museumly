@@ -25,6 +25,8 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.kg.museumly.domain.model.Era
+import com.kg.museumly.domain.model.Section
 import com.kg.museumly.presentation.feature.eras.ErasEffect
 import com.kg.museumly.presentation.feature.eras.ErasScreen
 import com.kg.museumly.presentation.feature.eras.ErasUiState
@@ -40,7 +42,8 @@ import com.kg.museumly.presentation.feature.scroll.presentation.components.WallC
 
 @Composable
 fun MainShell(
-    onOpenDetail: (String) -> Unit
+    onOpenDetail: (String) -> Unit,
+    onOpenEra: (Section, Era) -> Unit,
 )
 {
     val tabNavController = rememberNavController()
@@ -127,7 +130,7 @@ fun MainShell(
                                 onOpenDetail(effect.artworkId)
                             }
                             is ErasEffect.OpenEra -> {
-                                // TODO: navigate to the era grid once it has a route.
+                                onOpenEra(effect.section, effect.era)
                             }
                         }
                     }

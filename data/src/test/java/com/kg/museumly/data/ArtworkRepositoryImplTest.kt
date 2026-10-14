@@ -35,6 +35,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -699,6 +700,35 @@ class ArtworkRepositoryImplTest {
 
         // With REPLACE the second insert rewrote the row with a null ratio.
         assertEquals(1.5f, artworkDao.byId("met:1")?.aspectRatio)
+    }
+
+    @Test
+    fun `isExhausted is false before any load`() = runTest {
+        val met = FakeArtworkProvider("met")
+        val cleveland = FakeArtworkProvider("cleveland")
+        val repository: ArtworkRepositoryImpl = repository(setOf(met, cleveland))
+
+        // No cursor rows yet: a department never fetched is live.
+        assertFalse(repository.isExhausted(Section.EUROPEAN, Era.Y1600))
+        assertEquals(0, met.callCount)
+        assertEquals(0, cleveland.callCount)
+    }
+
+    @Test
+    fun `isExhausted is true once every source has returned next = null`() = runTest {
+        val end = PageResult(emptyList(), emptyList(), next = null, status = PageStatus.EXHAUSTED)
+        val met: FakeArtworkProvider = provider("met", end)
+        val cleveland: FakeArtworkProvider = provider("cleveland", end)
+        val repository: ArtworkRepositoryImpl = repository(setOf(met, cleveland))
+
+        // Empty pages deliver nothing, so one load tries both sources and
+        // writes both exhaustion markers.
+        val outcome: LoadOutcome = repository.loadMore(Section.EUROPEAN, size = 20, era = Era.Y1600)
+
+        assertEquals(LoadOutcome.Exhausted, outcome)
+        assertTrue(repository.isExhausted(Section.EUROPEAN, Era.Y1600))
+        // Exhaustion is per scope: the era ran out, the feed didn't.
+        assertFalse(repository.isExhausted(Section.EUROPEAN))
     }
 }
 

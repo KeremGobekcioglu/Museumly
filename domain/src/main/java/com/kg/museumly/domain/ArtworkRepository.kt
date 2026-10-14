@@ -50,4 +50,10 @@ interface ArtworkRepository {
 
     /** Fetches the timeline's works once. Does nothing if they are already stored. */
     suspend fun loadTimeline(): LoadOutcome
+
+    /**
+     * True when every department of this list has reached its end.
+     * Reads cursor rows only, never the network.
+     */
+    suspend fun isExhausted(section: Section, era: Era? = null): Boolean
 }

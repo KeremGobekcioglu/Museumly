@@ -133,4 +133,10 @@ class FakeArtworkRepository : ArtworkRepository {
         loadTimelineCallCount += 1
         return loadTimelineOutcome
     }
+
+    var exhaustedValue: Boolean = false
+
+    override suspend fun isExhausted(section: Section, era: Era?): Boolean {
+        return exhaustedValue
+    }
 }

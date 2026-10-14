@@ -18,3 +18,6 @@ object MainPage
 
 @Serializable
 object ErasPage
+
+@Serializable
+data class EraPage(val eraId: String, val sectionId: String)

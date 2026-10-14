@@ -18,6 +18,8 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.kg.museumly.domain.model.Era
+import com.kg.museumly.domain.model.Section
 import com.kg.museumly.presentation.feature.detail.DetailScreen
 import com.kg.museumly.presentation.feature.detail.DetailUiState
 import com.kg.museumly.presentation.feature.detail.DetailViewModel
@@ -44,7 +46,12 @@ fun MuseumlyNavGraph()
             popEnterTransition = { EnterTransition.None }
         ) {
             MainShell(
-                onOpenDetail = { id : String -> navController.navigate(DetailPage(id))}
+                onOpenDetail = { id : String -> navController.navigate(DetailPage(id))},
+                onOpenEra = { section: Section, era: Era ->
+                    navController.navigate(EraPage(eraId = era.id, sectionId = section.id)) {
+                        launchSingleTop = true
+                    }
+                },
             )
         }
 
@@ -67,6 +74,10 @@ fun MuseumlyNavGraph()
                 onInspected = viewmodel::onInspected,
                 setFavorite = viewmodel::setFavorite,
             )
+        }
+
+        composable<EraPage> {
+            // EraViewModel and EraScreen come next. A plain Text here for now.
         }
     }
 }

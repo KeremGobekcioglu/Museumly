@@ -123,6 +123,11 @@ class ArtworkRepositoryImpl @Inject constructor(
      * Exhaustion is per scope: a department finished in one era still has a
      * slot in the feed and in every other era, because each reads its own cursor.
      */
+    /**
+     *  * Reads only. load calls it under the mutex; isExhausted calls it
+     *  * without, which is safe because a cursor never goes back from
+     *  * exhausted to live.
+     */
     private suspend fun sourcesFor(scope: ListScope): List<Source> {
         val ordered: List<ArtworkProvider> = providers.sortedBy { it.id }
 
@@ -386,6 +391,18 @@ class ArtworkRepositoryImpl @Inject constructor(
     override suspend fun count(section: Section, era: Era?): Int {
         val scope = ListScope(section, era)
         return placementDao.count(scope.listKey)
+    }
+
+    /**
+     * sourcesFor already leaves out every department whose cursor says
+     * exhausted, so no sources means the whole list is done.
+     * No mutex: sourcesFor only reads, and a cursor never goes back from
+     * exhausted to live, so a read during a load can at worst answer
+     * "not yet". The next loadMore then returns Exhausted at once.
+     */
+    override suspend fun isExhausted(section: Section, era: Era?): Boolean {
+        val sources: List<Source> = sourcesFor(ListScope(section, era))
+        return sources.isEmpty()
     }
 
     override fun getFavorites(section: Section?): Flow<List<Artwork>> {
