@@ -39,14 +39,14 @@ import com.kg.museumly.presentation.feature.scroll.presentation.components.Reels
 import com.kg.museumly.presentation.feature.scroll.presentation.components.SectionPicker
 import com.kg.museumly.presentation.feature.scroll.presentation.components.TopBarChipOutline
 import com.kg.museumly.presentation.feature.scroll.presentation.components.label
-private fun failedTitle(isOnline: Boolean, isTail: Boolean): String {
+internal fun failedTitle(isOnline: Boolean, isTail: Boolean): String {
     if (!isOnline) {
         return if (isTail) "Lost the connection" else "No connection"
     }
     return if (isTail) "Couldn't reach the next room" else "The gallery didn't open"
 }
 
-private fun failedBody(isOnline: Boolean, isTail: Boolean): String {
+internal fun failedBody(isOnline: Boolean, isTail: Boolean): String {
     if (!isOnline) {
         return if (isTail) "We'll fetch the next works once you're back online."
         else "We'll pick this back up once you're back online."

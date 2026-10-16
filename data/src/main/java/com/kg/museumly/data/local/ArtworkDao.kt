@@ -9,27 +9,29 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface ArtworkDao
 {
-    @Query(" SELECT * FROM artworks WHERE sectionId = :sectionId ORDER BY position ASC")
-    fun observeBySection(sectionId: String) : Flow<List<ArtworkEntity>>
+    /**
+     * artworks.*, not *: a bare * also returns the placement columns, which
+     * don't belong to ArtworkEntity. The query reads both tables, so the Flow
+     * re-emits when either one changes.
+     */
+    @Query("""
+        SELECT artworks.* FROM artworks
+        INNER JOIN placements ON placements.artworkId = artworks.id
+        WHERE placements.listKey = :listKey
+        ORDER BY placements.position ASC
+    """)
+    fun observeByList(listKey: String) : Flow<List<ArtworkEntity>>
 
     @Query("SELECT * FROM artworks WHERE id = :id")
     suspend fun byId(id : String) : ArtworkEntity?
 
-    @Query("SELECT COUNT(*) FROM artworks WHERE sectionId = :sectionId")
-    suspend fun count(sectionId: String) : Int
-
     /**
-     * COALESCE(MAX(position), -1) returns -1 on an empty table,
-     * so the first ++position lands on 0. Without it we would get a null and a crash on first run.
+     * ignore, not replace. Replace deletes the old row first, and the cascade
+     * on placements would then delete this work from every list it is in.
+     * Ignore also keeps an aspectRatio measured earlier, which a fresh copy
+     * from the API (still null) would otherwise overwrite.
      */
-    @Query("SELECT COALESCE(MAX(position) , -1) FROM artworks WHERE sectionId = :sectionId")
-    suspend fun maxPosition(sectionId : String) : Int
-
-    /**
-     * replace : deletes than inserts. duplicate artworks
-     * will go to end.
-     */
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertAll(items: List<ArtworkEntity>)
 
     @Query("UPDATE artworks SET aspectRatio = :ratio WHERE id = :id AND aspectRatio IS NULL")

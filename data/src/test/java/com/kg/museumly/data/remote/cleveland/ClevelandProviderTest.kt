@@ -2,6 +2,7 @@ package com.kg.museumly.data.remote.cleveland
 
 import com.kg.museumly.domain.PageResult
 import com.kg.museumly.domain.PageStatus
+import com.kg.museumly.domain.model.Era
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
@@ -77,7 +78,7 @@ class ClevelandProviderTest {
     fun `empty data array is the only exhaustion signal`() = runTest {
         server.enqueue(MockResponse().setBody("""{"info": {"total": 0}, "data": []}"""))
 
-        val page: PageResult = provider.fetchPage(cursor = "40", size = 20, department = "Chinese Art")
+        val page: PageResult = provider.fetchPage(cursor = "40", size = 20, department = "Chinese Art", era = null)
 
         assertEquals(PageStatus.EXHAUSTED, page.status)
         assertNull(page.next)
@@ -89,7 +90,7 @@ class ClevelandProviderTest {
         server.enqueue(MockResponse().setResponseCode(500))
         server.enqueue(MockResponse().setResponseCode(500))
 
-        val page: PageResult = provider.fetchPage(cursor = "40", size = 20, department = "Chinese Art")
+        val page: PageResult = provider.fetchPage(cursor = "40", size = 20, department = "Chinese Art", era = null)
 
         assertEquals(PageStatus.FAILED, page.status)
         assertTrue(page.items.isEmpty())
@@ -112,7 +113,7 @@ class ClevelandProviderTest {
         // size = 2 so the two accepted records (101, 103) already satisfy
         // the page and no second request is issued — isolates this to one
         // batch of 3 raw records.
-        val page: PageResult = provider.fetchPage(cursor = "0", size = 2, department = "Chinese Art")
+        val page: PageResult = provider.fetchPage(cursor = "0", size = 2, department = "Chinese Art", era = null)
 
         assertEquals(2, page.items.size)
         // 3 raw records consumed, not 2 accepted ones — otherwise record 102
@@ -125,7 +126,7 @@ class ClevelandProviderTest {
         server.enqueue(MockResponse().setResponseCode(503))
         server.enqueue(MockResponse().setBody("""{"info": {"total": 1}, "data": [${record(id = 201)}]}"""))
 
-        val page: PageResult = provider.fetchPage(cursor = "0", size = 1, department = "Chinese Art")
+        val page: PageResult = provider.fetchPage(cursor = "0", size = 1, department = "Chinese Art", era = null)
 
         assertEquals(PageStatus.OK, page.status)
         assertEquals(1, page.items.size)
@@ -136,9 +137,30 @@ class ClevelandProviderTest {
     fun `the department is sent to the search API`() = runTest {
         server.enqueue(MockResponse().setBody("""{"info": {"total": 1}, "data": [${record(id = 301)}]}"""))
 
-        provider.fetchPage(cursor = "0", size = 1, department = "Chinese Art")
+        provider.fetchPage(cursor = "0", size = 1, department = "Chinese Art", era = null)
 
         val request = server.takeRequest()
         assertEquals("Chinese Art", request.requestUrl?.queryParameter("department"))
+    }
+
+    @Test
+    fun `an era puts both dates on every request, including the retry, and the feed puts neither`() = runTest {
+        // First attempt 503, so the retry is a second request with the same era.
+        server.enqueue(MockResponse().setResponseCode(503))
+        server.enqueue(MockResponse().setBody("""{"info": {"total": 1}, "data": [${record(id = 401)}]}"""))
+        server.enqueue(MockResponse().setBody("""{"info": {"total": 1}, "data": [${record(id = 402)}]}"""))
+
+        provider.fetchPage(cursor = "0", size = 1, department = "Chinese Art", era = Era.Y1600)
+        provider.fetchPage(cursor = "0", size = 1, department = "Chinese Art", era = null)
+
+        val first = server.takeRequest().requestUrl
+        val retry = server.takeRequest().requestUrl
+        val feed = server.takeRequest().requestUrl
+        assertEquals("1600", first?.queryParameter("created_after"))
+        assertEquals("1699", first?.queryParameter("created_before"))
+        assertEquals("1600", retry?.queryParameter("created_after"))
+        assertEquals("1699", retry?.queryParameter("created_before"))
+        assertNull(feed?.queryParameter("created_after"))
+        assertNull(feed?.queryParameter("created_before"))
     }
 }

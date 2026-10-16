@@ -7,4 +7,5 @@
 -->
 <full-backup-content>
     <exclude domain="file" path="datastore/feed_position.preferences_pb"/>
+    <exclude domain="file" path="datastore/era_position.preferences_pb"/>
 </full-backup-content>

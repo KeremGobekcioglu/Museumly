@@ -8,6 +8,7 @@ import com.kg.museumly.domain.PageResult
 import com.kg.museumly.domain.PageStatus
 import com.kg.museumly.domain.model.Artwork
 import com.kg.museumly.domain.model.ArtworkDetail
+import com.kg.museumly.domain.model.Era
 import com.kg.museumly.domain.model.Section
 import kotlinx.coroutines.delay
 import retrofit2.HttpException
@@ -37,15 +38,27 @@ class ClevelandProvider @Inject constructor(
         val parsed = cursor.toIntOrNull() ?: return 0
         return parsed
     }
-    private suspend fun fetchDtos(skip: Int, limit: Int, department: String) : ApiResult<List<ClevelandArtworkDto>>
+    /**
+     * No era: no date filter, both dates null. With an era, only works whose
+     * earliest date falls inside [era.begin, era.end].
+     */
+    private suspend fun fetchDtos(skip: Int, limit: Int, department: String, era: Era?) : ApiResult<List<ClevelandArtworkDto>>
     {
+        var createdAfter: Int? = null
+        var createdBefore: Int? = null
+        if (era != null) {
+            createdAfter = era.begin
+            createdBefore = era.end
+        }
         return try {
             val response = api.searchArtworks(
                 hasImage = 1,
                 skip = skip,
                 limit = limit,
                 department = department,
-                fields = null
+                fields = null,
+                createdAfter = createdAfter,
+                createdBefore = createdBefore
             )
             ApiResult.Success(response.data)
         }
@@ -80,7 +93,8 @@ class ClevelandProvider @Inject constructor(
     override suspend fun fetchPage(
         cursor: String?,
         size: Int,
-        department: String
+        department: String,
+        era: Era?
     ): PageResult {
         // we do get some items and skip them to not get again( move cursor)
         var skip : Int = parseCursor(cursor)
@@ -95,11 +109,11 @@ class ClevelandProvider @Inject constructor(
         {
             // first pass, need is 20. if 13 of items rejected, need will be 13.
             val need = size - items.size
-            var outcome = fetchDtos(skip, need, department)
+            var outcome = fetchDtos(skip, need, department, era)
             if (outcome is ApiResult.Failed && outcome.worthRetrying()) {
                 Log.d("CLEVELANDPROVIDER", "retrying skip=$skip after transient failure: ${outcome.cause.message}")
                 delay(RETRY_DELAY)
-                outcome = fetchDtos(skip, need, department)
+                outcome = fetchDtos(skip, need, department, era)
             }
             val dtos = when(outcome)
             {

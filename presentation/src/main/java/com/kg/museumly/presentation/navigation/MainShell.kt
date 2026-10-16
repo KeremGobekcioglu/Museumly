@@ -17,6 +17,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavDestination
 import androidx.navigation.NavDestination.Companion.hasRoute
@@ -24,6 +25,12 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.kg.museumly.domain.model.Era
+import com.kg.museumly.domain.model.Section
+import com.kg.museumly.presentation.feature.eras.ErasEffect
+import com.kg.museumly.presentation.feature.eras.ErasScreen
+import com.kg.museumly.presentation.feature.eras.ErasUiState
+import com.kg.museumly.presentation.feature.eras.ErasViewModel
 import com.kg.museumly.presentation.feature.favorites.FavoritesEffect
 import com.kg.museumly.presentation.feature.favorites.FavoritesScreen
 import com.kg.museumly.presentation.feature.favorites.FavoritesUIState
@@ -35,7 +42,8 @@ import com.kg.museumly.presentation.feature.scroll.presentation.components.WallC
 
 @Composable
 fun MainShell(
-    onOpenDetail: (String) -> Unit
+    onOpenDetail: (String) -> Unit,
+    onOpenEra: (Section, Era) -> Unit,
 )
 {
     val tabNavController = rememberNavController()
@@ -107,6 +115,29 @@ fun MainShell(
                     state = state,
                     onIntent = viewmodel::onIntent,
                     onBack = { tabNavController.popBackStack() },
+                )
+            }
+
+            composable<ErasPage>
+            {
+                val viewmodel : ErasViewModel = hiltViewModel()
+                val state : ErasUiState by viewmodel.state.collectAsStateWithLifecycle()
+                LaunchedEffect(Unit) {
+                    viewmodel.effects.collect { effect: ErasEffect ->
+                        when(effect)
+                        {
+                            is ErasEffect.OpenDetail -> {
+                                onOpenDetail(effect.artworkId)
+                            }
+                            is ErasEffect.OpenEra -> {
+                                onOpenEra(effect.section, effect.era)
+                            }
+                        }
+                    }
+                }
+                ErasScreen(
+                    state = state,
+                    onIntent = viewmodel::onIntent,
                 )
             }
         }

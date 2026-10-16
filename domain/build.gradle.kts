@@ -20,4 +20,6 @@ dependencies {
      * so modules that depend on :domain must see it too.
      */
     api(libs.kotlinx.coroutines.core)
+
+    testImplementation(libs.junit)
 }

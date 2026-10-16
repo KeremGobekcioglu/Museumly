@@ -9,6 +9,11 @@ interface MetApi {
     /**
      * later isOnView can be added to see which artworks are
      * actually showed in the museum now.
+     *
+     * dateBegin and dateEnd: send both or neither. The Met ignores a single
+     * one without an error and returns the unfiltered result (checked
+     * 2026-10-10). With both, a work matches only if its whole date span
+     * fits inside the range. Null leaves the parameter out of the URL.
      */
     @GET("v1.1/search")
     suspend fun search(
@@ -16,7 +21,9 @@ interface MetApi {
         //@Query("isHighlight") isHighlight: Boolean = true,
         @Query("hasImages") hasImages: Boolean = true,
         @Query("offset") offset: Int,
-        @Query("limit") limit: Int
+        @Query("limit") limit: Int,
+        @Query("dateBegin") dateBegin: Int?,
+        @Query("dateEnd") dateEnd: Int?,
         //@Query("isOnView") isOnView: Boolean = true
     ) : MetSearchDto
 

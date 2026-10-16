@@ -62,21 +62,24 @@ fun SectionPicker(
         allLabel = null,
         // Core only emits null when an "All" row exists, so this is safe.
         onSelected = { it?.let(onSectionSelected) },
-        modifier = modifier
+        modifier = modifier,
+        sections = Section.entries
     )
 }
 
-/** Favorites: null means "show everything". */
+/** Favorites and the era page: null means "show everything". */
 @Composable
 fun SectionPicker(
     selected: Section?,
     allLabel: String,
     onSectionSelected: (Section?) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    sections: List<Section>  = Section.entries
 ) {
     SectionPickerCore(
         selected = selected,
         allLabel = allLabel,
+        sections = sections,
         onSelected = onSectionSelected,
         modifier = modifier
     )
@@ -88,7 +91,8 @@ private fun SectionPickerCore(
     selected: Section?,
     allLabel: String?,
     onSelected: (Section?) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    sections: List<Section>
 ) {
     var sheetOpen by rememberSaveable { mutableStateOf(false) }
 
@@ -127,7 +131,7 @@ private fun SectionPickerCore(
         val scope = rememberCoroutineScope()
         // null entry = the "All" row, only present when allLabel is given.
         val options: List<Section?> =
-            if (allLabel != null) listOf(null) + Section.entries else Section.entries
+            if (allLabel != null) listOf(null) + sections else sections
 
         ModalBottomSheet(
             onDismissRequest = { sheetOpen = false },

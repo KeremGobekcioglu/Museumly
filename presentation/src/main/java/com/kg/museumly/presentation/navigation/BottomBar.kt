@@ -23,11 +23,14 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.HourglassFull
 import androidx.compose.material.icons.filled.Museum
 import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material.icons.outlined.HourglassEmpty
 import androidx.compose.material.icons.outlined.Museum
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -103,6 +106,7 @@ internal data class MainTab(
 internal val MainTabs: List<MainTab> = listOf(
     MainTab(ScrollPage, "Gallery", Icons.Outlined.Museum, Icons.Filled.Museum),
     MainTab(FavoritesPage, "Favorites", Icons.Outlined.FavoriteBorder, Icons.Filled.Favorite),
+    MainTab(ErasPage, label = "Eras", icon = Icons.Outlined.HourglassEmpty, selectedIcon = Icons.Filled.HourglassFull)
 )
 
 @Composable

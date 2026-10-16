@@ -4,7 +4,9 @@ import com.kg.museumly.domain.ArtworkRepository
 import com.kg.museumly.domain.LoadOutcome
 import com.kg.museumly.domain.model.Artwork
 import com.kg.museumly.domain.model.ArtworkWithDetail
+import com.kg.museumly.domain.model.Era
 import com.kg.museumly.domain.model.Section
+import com.kg.museumly.domain.model.TimelineStop
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -53,7 +55,7 @@ class FakeArtworkRepository : ArtworkRepository {
         favoritesFlowFor(section).value = items
     }
 
-    override fun artworks(section: Section): Flow<List<Artwork>> {
+    override fun artworks(section: Section, era: Era?): Flow<List<Artwork>> {
         return flowFor(section)
     }
 
@@ -68,7 +70,7 @@ class FakeArtworkRepository : ArtworkRepository {
         return null
     }
 
-    override suspend fun loadMore(section: Section, size: Int): LoadOutcome {
+    override suspend fun loadMore(section: Section, size: Int, era: Era?): LoadOutcome {
         loadMoreSections.add(section)
         if (loadMoreDelayMs > 0) {
             delay(loadMoreDelayMs.milliseconds)
@@ -80,7 +82,7 @@ class FakeArtworkRepository : ArtworkRepository {
         return loadMoreOutcome
     }
 
-    override suspend fun count(section: Section): Int {
+    override suspend fun count(section: Section, era: Era?): Int {
         return countValue
     }
 
@@ -112,5 +114,29 @@ class FakeArtworkRepository : ArtworkRepository {
 
     override suspend fun favoritesCount(): Int {
         return 0
+    }
+
+    private val timelineStopsFlow: MutableStateFlow<List<TimelineStop>> = MutableStateFlow(emptyList())
+
+    var loadTimelineOutcome: LoadOutcome = LoadOutcome.Loaded
+    var loadTimelineCallCount: Int = 0
+
+    fun setTimelineStops(stops: List<TimelineStop>) {
+        timelineStopsFlow.value = stops
+    }
+
+    override fun timelineStops(): Flow<List<TimelineStop>> {
+        return timelineStopsFlow
+    }
+
+    override suspend fun loadTimeline(): LoadOutcome {
+        loadTimelineCallCount += 1
+        return loadTimelineOutcome
+    }
+
+    var exhaustedValue: Boolean = false
+
+    override suspend fun isExhausted(section: Section, era: Era?): Boolean {
+        return exhaustedValue
     }
 }

@@ -13,5 +13,16 @@ enum class Section(val id: String)
     MEDIEVAL("medieval"),
     EUROPEAN("european"),
     ASIA("asia"),
-    AFRICA_OCEANIA_AMERICAS("africa_oceania_americas")
+    AFRICA_OCEANIA_AMERICAS("africa_oceania_americas");
+
+    companion object {
+        /** The section with this id, or null for an unknown one. */
+        fun fromId(id: String): Section? {
+            for (section in entries) {
+                if (section.id == id)
+                    return section
+            }
+            return null
+        }
+    }
 }

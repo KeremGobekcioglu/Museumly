@@ -1,5 +1,6 @@
 package com.kg.museumly.domain
 
+import com.kg.museumly.domain.model.Era
 import com.kg.museumly.domain.model.Section
 
 interface ArtworkProvider {
@@ -9,8 +10,12 @@ interface ArtworkProvider {
     /**
      * pages should be fetched by department. because users need
      * some sort of filtering. everyone has different taste.
+     *
+     * era == null is the feed: no date filter. With an era, only works from
+     * that era's years. The cursor belongs to that one query, so a feed
+     * cursor must never be used for an era page or the other way round.
      */
-    suspend fun fetchPage(cursor: String?, size: Int, department: String) : PageResult
+    suspend fun fetchPage(cursor: String?, size: Int, department: String, era: Era?) : PageResult
 
     /**
      * Different providers will have different departments for sections.
