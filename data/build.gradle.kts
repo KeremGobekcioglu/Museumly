@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("museumly.android.library")
     alias(libs.plugins.kotlin.serialization)
@@ -5,10 +7,19 @@ plugins {
     alias(libs.plugins.hilt.android)
 }
 
+val localProps = Properties().apply {
+    rootProject.file("local.properties").takeIf { it.exists() }?.inputStream()?.use(::load)
+}
+
 android {
     namespace = "com.kg.museumly.data"
     buildFeatures {
         buildConfig = true
+    }
+    defaultConfig {
+        val baseUrl = (localProps["API_BASE_URL"] ?: System.getenv("API_BASE_URL")) as String?
+            ?: error("API_BASE_URL missing: add it to local.properties or set it as an env var")
+        buildConfigField("String", "API_BASE_URL", "\"$baseUrl\"")
     }
 }
 

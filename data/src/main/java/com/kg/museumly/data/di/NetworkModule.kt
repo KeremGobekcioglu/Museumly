@@ -3,6 +3,7 @@ package com.kg.museumly.data.di
 import com.kg.museumly.data.BuildConfig
 import com.kg.museumly.data.remote.cleveland.ClevelandApi
 import com.kg.museumly.data.remote.met.MetApi
+import com.kg.museumly.data.remote.museumly.MuseumlyApi
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -86,5 +87,16 @@ object NetworkModule
             json
         )
         return retrofit.create(ClevelandApi::class.java)
+    }
+
+    @Provides
+    @Singleton
+    fun provideMuseumlyApi(okHttpClient: OkHttpClient, json: Json): MuseumlyApi {
+        val retrofit: Retrofit = buildRetrofit(
+            BuildConfig.API_BASE_URL,
+            okHttpClient,
+            json
+        )
+        return retrofit.create(MuseumlyApi::class.java)
     }
 }
