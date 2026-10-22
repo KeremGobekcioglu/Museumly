@@ -40,6 +40,11 @@ jobs:
       # If this step gets slow or flaky, Robolectric downloading its
       # android-all jars on a cold cache is the likely culprit.
       - run: ./gradlew testDebugUnitTest
+        env:
+          # data/build.gradle.kts fails the build without API_BASE_URL. Tests
+          # never call the network, so a fake host (.invalid never resolves)
+          # keeps this job secret-free and working for fork PRs.
+          API_BASE_URL: https://placeholder.invalid/
 
       # Upload the HTML test report. `if: always()` runs this even when the
       # step above fails, which is exactly when you need the report.
