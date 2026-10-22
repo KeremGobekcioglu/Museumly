@@ -19,6 +19,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import android.content.Context
 import com.kg.museumly.presentation.BuildConfig
+import com.kg.museumly.presentation.auth.AuthViewModel
 import com.kg.museumly.presentation.auth.requestGoogleIdToken
 import com.kg.museumly.presentation.feature.scroll.presentation.components.GalleryLoading
 import com.kg.museumly.presentation.feature.scroll.presentation.components.GalleryNotice
@@ -74,7 +75,7 @@ private fun failedBody(isOnline: Boolean): String {
 @Composable
 fun ErasScreen(
     state: ErasUiState,
-    onIntent: (ErasIntent) -> Unit,
+    onIntent: (ErasIntent) -> Unit
 )
 {
     // TEMP: debug Google sign-in trigger, remove once real sign-in UI exists.
@@ -111,19 +112,6 @@ fun ErasScreen(
                 )
                 ErasMode.Timeline -> ErasTimeline(state = slotState, onIntent = onIntent)
             }
-        }
-
-        Button(
-            onClick = {
-                scope.launch {
-                    requestGoogleIdToken(context)
-                }
-            },
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .statusBarsPadding(),
-        ) {
-            Text("Google sign-in (debug)")
         }
     }
 }
