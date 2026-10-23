@@ -1,4 +1,4 @@
-package com.kg.museumly.presentation.auth
+package com.kg.museumly.presentation.feature.auth
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope

@@ -1,4 +1,4 @@
-package com.kg.museumly.presentation.auth
+package com.kg.museumly.presentation.feature.auth
 
 import android.content.Context
 import android.util.Log
@@ -68,6 +68,6 @@ suspend fun requestGoogleIdToken(context: Context): GoogleIdTokenResult
     }
 
     val idToken: String = googleCredential.idToken
-    Log.d(TAG, "Got ID token for ${googleCredential.id}: $idToken")
+    //Log.d(TAG, "Got ID token for ${googleCredential.id}: $idToken")
     return GoogleIdTokenResult.Success(idToken = idToken)
 }

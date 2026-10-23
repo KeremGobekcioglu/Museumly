@@ -8,23 +8,16 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.material3.Button
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import android.content.Context
 import com.kg.museumly.presentation.BuildConfig
-import com.kg.museumly.presentation.auth.AuthViewModel
-import com.kg.museumly.presentation.auth.requestGoogleIdToken
 import com.kg.museumly.presentation.feature.scroll.presentation.components.GalleryLoading
 import com.kg.museumly.presentation.feature.scroll.presentation.components.GalleryNotice
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
 
 /**
  * Which screen ErasScreen shows. Every mode but Timeline is the cold state:

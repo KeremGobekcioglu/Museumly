@@ -1,4 +1,4 @@
-package com.kg.museumly.presentation.auth
+package com.kg.museumly.presentation.feature.auth
 
 data class AuthUiState(
     val isLoading: Boolean = false,
