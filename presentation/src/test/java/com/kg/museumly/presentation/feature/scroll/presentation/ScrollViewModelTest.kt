@@ -1,8 +1,10 @@
 package com.kg.museumly.presentation.feature.scroll.presentation
 
 import app.cash.turbine.test
+import com.kg.museumly.domain.AuthRepository
 import com.kg.museumly.domain.FeedPositionSourceInterface
 import com.kg.museumly.domain.LoadOutcome
+import com.kg.museumly.domain.SignInPromptSourceInterface
 import com.kg.museumly.presentation.testutil.FakeArtworkPrefetcher
 import com.kg.museumly.presentation.testutil.FakeArtworkRepository
 import com.kg.museumly.presentation.testutil.FakeNetworkMonitor
@@ -12,10 +14,12 @@ import com.kg.museumly.presentation.testutil.sampleArtwork
 import io.mockk.Runs
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -63,6 +67,9 @@ class ScrollViewModelTest {
     private lateinit var positionStore: FeedPositionSourceInterface
     private lateinit var prefetcher: FakeArtworkPrefetcher
     private lateinit var networkMonitor: FakeNetworkMonitor
+    private lateinit var authRepository: AuthRepository
+    private lateinit var signInPromptSource: SignInPromptSourceInterface
+    private val signedIn = MutableStateFlow(false)
 
     @Before
     fun setUp() {
@@ -77,10 +84,19 @@ class ScrollViewModelTest {
 
         prefetcher = FakeArtworkPrefetcher()
         networkMonitor = FakeNetworkMonitor(initiallyOnline = true)
+
+        signedIn.value = false
+        authRepository = mockk()
+        every { authRepository.isSignedIn } returns signedIn
+        signInPromptSource = mockk()
+        coEvery { signInPromptSource.hasAsked() } returns false
+        coEvery { signInPromptSource.setAsked() } just Runs
     }
 
     private fun buildViewModel(): ScrollViewModel {
-        return ScrollViewModel(repository, positionStore, prefetcher, networkMonitor)
+        return ScrollViewModel(
+            repository, positionStore, prefetcher, networkMonitor, authRepository, signInPromptSource
+        )
     }
 
     // uiState is WhileSubscribed — keep a collector alive for the whole test
@@ -391,5 +407,77 @@ class ScrollViewModelTest {
         viewModel.setFavorite("met:1", false)
         advanceUntilIdle()
         assertEquals(emptySet<String>(), viewModel.uiState.value.favoriteIds)
+    }
+
+    @Test
+    fun `first favorite while signed out shows the sign-in sheet and records the ask`() = runTest {
+        repository.countValue = 5
+
+        val viewModel = buildViewModel()
+        collect(viewModel)
+        advanceUntilIdle()
+
+        viewModel.setFavorite("met:1", true)
+        advanceUntilIdle()
+
+        assertTrue(viewModel.uiState.value.showSignInSheet)
+        assertEquals(setOf("met:1"), viewModel.uiState.value.favoriteIds)
+        coVerify(exactly = 1) { signInPromptSource.setAsked() }
+    }
+
+    @Test
+    fun `dismissing or accepting clears the sheet and the next favorite does not reopen it`() = runTest {
+        repository.countValue = 5
+
+        val viewModel = buildViewModel()
+        collect(viewModel)
+        advanceUntilIdle()
+
+        viewModel.setFavorite("met:1", true)
+        advanceUntilIdle()
+        viewModel.onSignInDismissed()
+        advanceUntilIdle()
+        assertEquals(false, viewModel.uiState.value.showSignInSheet)
+
+        // The real store now answers true; the mock has to say the same.
+        coEvery { signInPromptSource.hasAsked() } returns true
+        viewModel.setFavorite("met:2", true)
+        advanceUntilIdle()
+        assertEquals(false, viewModel.uiState.value.showSignInSheet)
+
+        viewModel.onSignInAccepted()
+        advanceUntilIdle()
+        assertEquals(false, viewModel.uiState.value.showSignInSheet)
+    }
+
+    @Test
+    fun `removing a favorite never shows the sheet`() = runTest {
+        repository.countValue = 5
+
+        val viewModel = buildViewModel()
+        collect(viewModel)
+        advanceUntilIdle()
+
+        viewModel.setFavorite("met:1", false)
+        advanceUntilIdle()
+
+        assertEquals(false, viewModel.uiState.value.showSignInSheet)
+        coVerify(exactly = 0) { signInPromptSource.setAsked() }
+    }
+
+    @Test
+    fun `signed in users never see the sheet`() = runTest {
+        repository.countValue = 5
+        signedIn.value = true
+
+        val viewModel = buildViewModel()
+        collect(viewModel)
+        advanceUntilIdle()
+
+        viewModel.setFavorite("met:1", true)
+        advanceUntilIdle()
+
+        assertEquals(false, viewModel.uiState.value.showSignInSheet)
+        coVerify(exactly = 0) { signInPromptSource.setAsked() }
     }
 }

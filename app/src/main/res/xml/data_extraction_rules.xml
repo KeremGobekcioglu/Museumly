@@ -9,9 +9,11 @@
              worth restoring across reinstalls/devices. -->
         <exclude domain="file" path="datastore/feed_position.preferences_pb"/>
         <exclude domain="file" path="datastore/auth_preferences.preferences_pb"/>
+        <exclude domain="file" path="datastore/sign_in_prompt.preferences_pb"/>
     </cloud-backup>
     <device-transfer>
         <exclude domain="file" path="datastore/feed_position.preferences_pb"/>
         <exclude domain="file" path="datastore/auth_preferences.preferences_pb"/>
+        <exclude domain="file" path="datastore/sign_in_prompt.preferences_pb"/>
     </device-transfer>
 </data-extraction-rules>

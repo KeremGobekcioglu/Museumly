@@ -37,6 +37,7 @@ import com.kg.museumly.presentation.feature.scroll.presentation.components.Galle
 import com.kg.museumly.presentation.feature.scroll.presentation.components.GalleryNotice
 import com.kg.museumly.presentation.feature.scroll.presentation.components.ReelsGutter
 import com.kg.museumly.presentation.feature.scroll.presentation.components.SectionPicker
+import com.kg.museumly.presentation.feature.scroll.presentation.components.SignInSheet
 import com.kg.museumly.presentation.feature.scroll.presentation.components.TopBarChipOutline
 import com.kg.museumly.presentation.feature.scroll.presentation.components.label
 internal fun failedTitle(isOnline: Boolean, isTail: Boolean): String {
@@ -87,6 +88,8 @@ fun ArtworkReelsScreen(
     onDetailPage: (String) -> Unit,
     onSectionSelected: (Section) -> Unit,
     setFavorite: (String, Boolean) -> Unit,
+    onSignIn: () -> Unit,
+    onDismissSignIn: () -> Unit,
 ) {
     Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
         ReelsContent(
@@ -113,6 +116,9 @@ fun ArtworkReelsScreen(
                         .padding(start = ReelsGutter, top = 12.dp)
                 )
             }
+        }
+        if (state.showSignInSheet) {
+            SignInSheet(onSignIn = onSignIn, onDismiss = onDismissSignIn)
         }
     }
 }

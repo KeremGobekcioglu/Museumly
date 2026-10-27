@@ -46,7 +46,7 @@ fun MuseumlyNavGraph() {
         modifier = Modifier
             .fillMaxSize()
             .background(WallColor),
-            startDestination = AuthPage,
+            startDestination = MainPage,
         navController = navController,
         enterTransition = { fadeIn(tween(250)) },
         exitTransition = { fadeOut(tween(180)) },
@@ -62,6 +62,11 @@ fun MuseumlyNavGraph() {
                 onOpenDetail = { id: String -> navController.navigate(DetailPage(id)) },
                 onOpenEra = { section: Section, era: Era ->
                     navController.navigate(EraPage(eraId = era.id, sectionId = section.id)) {
+                        launchSingleTop = true
+                    }
+                },
+                onOpenAuth = {
+                    navController.navigate(AuthPage) {
                         launchSingleTop = true
                     }
                 },
@@ -120,18 +125,17 @@ fun MuseumlyNavGraph() {
             val scope = rememberCoroutineScope()
             var requesting by remember { mutableStateOf(false) }
 
-            val openMain: () -> Unit = {
-                navController.navigate(MainPage)
-                {
-                    popUpTo<AuthPage> { inclusive = true}
-                }
+            // Auth is opened from the feed's sign-in sheet, so both outcomes go
+            // back to the feed that is still underneath instead of stacking a new one.
+            val closeAuth: () -> Unit = {
+                navController.popBackStack<AuthPage>(inclusive = true)
             }
             LaunchedEffect(Unit) {
                 viewmodel.effects.collect {
                     when(it)
                     {
                         AuthEffect.SignedIn -> {
-                            openMain()
+                            closeAuth()
                         }
                     }
                 }
@@ -150,7 +154,7 @@ fun MuseumlyNavGraph() {
                         }
                     }
                 },
-                onNotNow = openMain
+                onNotNow = closeAuth
             )
         }
     }

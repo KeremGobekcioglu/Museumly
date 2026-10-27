@@ -1,7 +1,6 @@
 package com.kg.museumly.data
 
 import android.util.Log
-import com.kg.museumly.data.local.AuthTokenStore
 import com.kg.museumly.data.remote.museumly.GoogleLoginRequest
 import com.kg.museumly.data.remote.museumly.LoginResponse
 import com.kg.museumly.data.remote.museumly.MuseumlyApi
@@ -42,7 +41,6 @@ class AuthRepositoryImpl @Inject constructor(
             return false
         }
         authTokenStore.save(response.accessToken)
-        Log.d(TAG, "Got access token: ${response.accessToken}")
         return true
     }
 

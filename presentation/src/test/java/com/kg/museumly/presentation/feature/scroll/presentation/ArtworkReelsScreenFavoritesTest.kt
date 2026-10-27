@@ -50,6 +50,8 @@ class ArtworkReelsScreenFavoriteTest {
                     tappedId = id
                     tappedValue = value
                 },
+                onSignIn = {},
+                onDismissSignIn = {},
             )
         }
     }
