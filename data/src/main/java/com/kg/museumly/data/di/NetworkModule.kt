@@ -3,6 +3,7 @@ package com.kg.museumly.data.di
 import com.kg.museumly.data.BuildConfig
 import com.kg.museumly.data.remote.cleveland.ClevelandApi
 import com.kg.museumly.data.remote.met.MetApi
+import com.kg.museumly.data.remote.museumly.AuthInterceptor
 import com.kg.museumly.data.remote.museumly.MuseumlyApi
 import dagger.Module
 import dagger.Provides
@@ -45,6 +46,19 @@ object NetworkModule
             .readTimeout(8, TimeUnit.SECONDS)
             // Limit for the whole request.
             .callTimeout(10, TimeUnit.SECONDS)
+            .build()
+    }
+
+    @Provides
+    @Singleton
+    @MuseumlyHttpClient
+    fun provideMuseumlyOkHttpClient(
+        okHttpClient: OkHttpClient,
+        authInterceptor: AuthInterceptor
+    ) : OkHttpClient
+    {
+        return okHttpClient.newBuilder()
+            .addInterceptor(authInterceptor)
             .build()
     }
 
@@ -91,7 +105,7 @@ object NetworkModule
 
     @Provides
     @Singleton
-    fun provideMuseumlyApi(okHttpClient: OkHttpClient, json: Json): MuseumlyApi {
+    fun provideMuseumlyApi(@MuseumlyHttpClient okHttpClient: OkHttpClient, json: Json): MuseumlyApi {
         val retrofit: Retrofit = buildRetrofit(
             BuildConfig.API_BASE_URL,
             okHttpClient,
