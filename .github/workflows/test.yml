@@ -1,12 +1,19 @@
 # Runs the JVM unit test suite (JUnit + Robolectric) on every push to main and
 # on every pull request. No emulator or device involved.
+#
+# Skipped when the change touches only Markdown files (README, TESTING, ...).
+# A push or PR that includes any other file still runs the tests.
 name: Unit tests
 
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - '**.md'
   # No branch filter: runs for PRs targeting any branch.
   pull_request:
+    paths-ignore:
+      - '**.md'
 
 jobs:
   test:
