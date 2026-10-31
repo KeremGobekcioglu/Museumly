@@ -44,6 +44,7 @@ import com.kg.museumly.presentation.feature.scroll.presentation.components.WallC
 fun MainShell(
     onOpenDetail: (String) -> Unit,
     onOpenEra: (Section, Era) -> Unit,
+    onOpenAuth: () -> Unit,
 )
 {
     val tabNavController = rememberNavController()
@@ -83,7 +84,12 @@ fun MainShell(
                     onPageChanged = viewModel::onPageChanged,
                     onDetailPage = onOpenDetail,
                     onSectionSelected = viewModel::selectSection,
-                    setFavorite = viewModel::setFavorite
+                    setFavorite = viewModel::setFavorite,
+                    onSignIn = {
+                        viewModel.onSignInAccepted()
+                        onOpenAuth()
+                    },
+                    onDismissSignIn = viewModel::onSignInDismissed
                 )
             }
 

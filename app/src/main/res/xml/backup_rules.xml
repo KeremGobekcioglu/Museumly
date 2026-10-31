@@ -8,4 +8,6 @@
 <full-backup-content>
     <exclude domain="file" path="datastore/feed_position.preferences_pb"/>
     <exclude domain="file" path="datastore/era_position.preferences_pb"/>
+    <exclude domain="file" path="datastore/auth_preferences.preferences_pb"/>
+    <exclude domain="file" path="datastore/sign_in_prompt.preferences_pb"/>
 </full-backup-content>

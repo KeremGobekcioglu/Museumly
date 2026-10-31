@@ -12,7 +12,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
@@ -21,6 +26,10 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.kg.museumly.domain.model.Era
 import com.kg.museumly.domain.model.Section
+import com.kg.museumly.presentation.feature.auth.AuthEffect
+import com.kg.museumly.presentation.feature.auth.AuthScreen
+import com.kg.museumly.presentation.feature.auth.AuthViewModel
+import com.kg.museumly.presentation.feature.auth.requestGoogleIdToken
 import com.kg.museumly.presentation.feature.detail.DetailScreen
 import com.kg.museumly.presentation.feature.detail.DetailUiState
 import com.kg.museumly.presentation.feature.detail.DetailViewModel
@@ -28,6 +37,7 @@ import com.kg.museumly.presentation.feature.eras.era.EraEffect
 import com.kg.museumly.presentation.feature.eras.era.EraScreen
 import com.kg.museumly.presentation.feature.eras.era.EraViewModel
 import com.kg.museumly.presentation.feature.scroll.presentation.components.WallColor
+import kotlinx.coroutines.launch
 
 @Composable
 fun MuseumlyNavGraph() {
@@ -36,7 +46,7 @@ fun MuseumlyNavGraph() {
         modifier = Modifier
             .fillMaxSize()
             .background(WallColor),
-        startDestination = MainPage,
+            startDestination = MainPage,
         navController = navController,
         enterTransition = { fadeIn(tween(250)) },
         exitTransition = { fadeOut(tween(180)) },
@@ -52,6 +62,11 @@ fun MuseumlyNavGraph() {
                 onOpenDetail = { id: String -> navController.navigate(DetailPage(id)) },
                 onOpenEra = { section: Section, era: Era ->
                     navController.navigate(EraPage(eraId = era.id, sectionId = section.id)) {
+                        launchSingleTop = true
+                    }
+                },
+                onOpenAuth = {
+                    navController.navigate(AuthPage) {
                         launchSingleTop = true
                     }
                 },
@@ -101,6 +116,46 @@ fun MuseumlyNavGraph() {
                 }
             }
             EraScreen(state = state, onIntent = viewModel::onIntent)
+        }
+
+        composable<AuthPage> {
+            val viewmodel : AuthViewModel = hiltViewModel()
+            val state by viewmodel.state.collectAsStateWithLifecycle()
+            val context = LocalContext.current
+            val scope = rememberCoroutineScope()
+            var requesting by remember { mutableStateOf(false) }
+
+            // Auth is opened from the feed's sign-in sheet, so both outcomes go
+            // back to the feed that is still underneath instead of stacking a new one.
+            val closeAuth: () -> Unit = {
+                navController.popBackStack<AuthPage>(inclusive = true)
+            }
+            LaunchedEffect(Unit) {
+                viewmodel.effects.collect {
+                    when(it)
+                    {
+                        AuthEffect.SignedIn -> {
+                            closeAuth()
+                        }
+                    }
+                }
+            }
+            AuthScreen(
+                state = state,
+                onGoogleLogin = {
+                    if (!requesting && !state.isLoading) {
+                        requesting = true
+                        scope.launch {
+                            try {
+                                viewmodel.onGoogleIdTokenResult(requestGoogleIdToken(context))
+                            } finally {
+                                requesting = false
+                            }
+                        }
+                    }
+                },
+                onNotNow = closeAuth
+            )
         }
     }
 }

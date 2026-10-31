@@ -9,7 +9,8 @@ data class ScrollUiState(
     val initialPage: Int? = null,
     val tail: TailState = TailState.Loading,
     val isOnline: Boolean = true,
-    val favoriteIds: Set<String> = emptySet()
+    val favoriteIds: Set<String> = emptySet(),
+    val showSignInSheet: Boolean = false
 )
 
 sealed interface TailState {

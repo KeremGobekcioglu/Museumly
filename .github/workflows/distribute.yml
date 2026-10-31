@@ -35,4 +35,8 @@ jobs:
           echo "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/firebase-sa.json"
           echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/firebase-sa.json" >> "$GITHUB_ENV"
 
+      # data/build.gradle.kts bakes this into BuildConfig and fails the build
+      # if it's missing.
       - run: ./gradlew assembleDebug appDistributionUploadDebug
+        env:
+          API_BASE_URL: ${{ secrets.API_BASE_URL }}

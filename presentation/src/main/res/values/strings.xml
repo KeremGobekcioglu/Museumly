@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <string name="google_web_client_id" translatable="false">1057344497240-av316rha473pnc31eeglphsfcdq80eid.apps.googleusercontent.com</string>
+    <!-- Auth screen -->
+    <string name="auth_title" translatable="false">Museumly</string>
+    <string name="auth_tagline">Travel through collections</string>
+    <string name="auth_artwork_description">The Harvesters, Pieter Bruegel the Elder, 1565</string>
+    <string name="auth_artwork_caption" translatable="false">The Harvesters · Pieter Bruegel the Elder, 1565</string>
+    <string name="auth_continue_with_google">Continue with Google</string>
+    <string name="auth_not_now">Not now</string>
+    <string name="auth_signing_in">Signing in</string>
+    <string name="auth_no_account">Add a Google account to sign in</string>
+    <string name="auth_error">Couldn\'t sign in. Try again.</string>
+</resources>

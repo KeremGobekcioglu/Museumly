@@ -5,9 +5,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kg.museumly.domain.ArtworkPrefetcher
 import com.kg.museumly.domain.ArtworkRepository
+import com.kg.museumly.domain.AuthRepository
 import com.kg.museumly.domain.FeedPositionSourceInterface
 import com.kg.museumly.domain.LoadOutcome
 import com.kg.museumly.domain.NetworkMonitor
+import com.kg.museumly.domain.SignInPromptSourceInterface
 import com.kg.museumly.domain.model.Artwork
 import com.kg.museumly.domain.model.Section
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -59,7 +61,9 @@ class ScrollViewModel @Inject constructor(
     private val repository: ArtworkRepository,
     private val positionStore: FeedPositionSourceInterface,
     private val prefetcher: ArtworkPrefetcher,
-    private val networkMonitor: NetworkMonitor
+    private val networkMonitor: NetworkMonitor,
+    private val authRepository: AuthRepository,
+    private val signInPromptSource: SignInPromptSourceInterface
 ) : ViewModel() {
 
     private companion object {
@@ -70,6 +74,7 @@ class ScrollViewModel @Inject constructor(
     private val tail = MutableStateFlow<TailState>(TailState.Loading)
     private val initialPage = MutableStateFlow<Pair<Section, Int>?>(null)
     private val section = MutableStateFlow<Section?>(null)
+    private val showSignInSheet = MutableStateFlow(false)
 
     @OptIn(ExperimentalCoroutinesApi::class)
     private val feed: Flow<Pair<Section, List<Artwork>>> = section
@@ -99,6 +104,8 @@ class ScrollViewModel @Inject constructor(
             isOnline = online,
             favoriteIds = favorites
         )
+    }.combine(showSignInSheet) { ui: ScrollUiState, showSheet: Boolean ->
+        ui.copy(showSignInSheet = showSheet)
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
@@ -171,7 +178,25 @@ class ScrollViewModel @Inject constructor(
     {
         viewModelScope.launch {
             repository.setFavorite(artworkId,isFavorite)
+            // Asked once, and only when adding. The favorite is already saved,
+            // the sheet only offers to keep it across devices.
+            if (isFavorite
+                && !signInPromptSource.hasAsked()
+                && !authRepository.isSignedIn.first()
+            ) {
+                signInPromptSource.setAsked()
+                showSignInSheet.value = true
+            }
         }
+    }
+
+    /** Cleared before navigating, so the sheet isn't still open on return from auth. */
+    fun onSignInAccepted() {
+        showSignInSheet.value = false
+    }
+
+    fun onSignInDismissed() {
+        showSignInSheet.value = false
     }
     fun selectSection(target: Section) {
         if (target == section.value) {

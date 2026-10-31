@@ -9,11 +9,15 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import android.content.Context
 import com.kg.museumly.presentation.BuildConfig
 import com.kg.museumly.presentation.feature.scroll.presentation.components.GalleryLoading
 import com.kg.museumly.presentation.feature.scroll.presentation.components.GalleryNotice
+import kotlinx.coroutines.CoroutineScope
 
 /**
  * Which screen ErasScreen shows. Every mode but Timeline is the cold state:
@@ -64,37 +68,43 @@ private fun failedBody(isOnline: Boolean): String {
 @Composable
 fun ErasScreen(
     state: ErasUiState,
-    onIntent: (ErasIntent) -> Unit,
+    onIntent: (ErasIntent) -> Unit
 )
 {
-    AnimatedContent(
-        targetState = state,
-        contentKey = { it.mode() },
-        transitionSpec = { fadeIn(tween(300)) togetherWith fadeOut(tween(300)) },
-        label = "eras-mode",
-    ) { slotState: ErasUiState ->
-        when (slotState.mode()) {
-            ErasMode.Waiting -> Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black)
-            )
-            ErasMode.Loading -> GalleryLoading("Hanging the timeline")
-            ErasMode.Failed -> GalleryNotice(
-                title = failedTitle(slotState.isOnline),
-                body = failedBody(slotState.isOnline),
-                actionLabel = if (slotState.isOnline) "Retry" else "Try anyway",
-                onAction = { onIntent(ErasIntent.RetryClicked) },
-                isBusy = slotState.isRetrying,
-                debugDetail = if (BuildConfig.DEBUG) slotState.errorMessage else null,
-            )
-            ErasMode.Empty -> GalleryNotice(
-                title = "Nothing on the walls",
-                body = "No works came back for the timeline.",
-                actionLabel = "Retry",
-                onAction = { onIntent(ErasIntent.RetryClicked) },
-            )
-            ErasMode.Timeline -> ErasTimeline(state = slotState, onIntent = onIntent)
+    // TEMP: debug Google sign-in trigger, remove once real sign-in UI exists.
+    val context: Context = LocalContext.current
+    val scope: CoroutineScope = rememberCoroutineScope()
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        AnimatedContent(
+            targetState = state,
+            contentKey = { it.mode() },
+            transitionSpec = { fadeIn(tween(300)) togetherWith fadeOut(tween(300)) },
+            label = "eras-mode",
+        ) { slotState: ErasUiState ->
+            when (slotState.mode()) {
+                ErasMode.Waiting -> Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black)
+                )
+                ErasMode.Loading -> GalleryLoading("Hanging the timeline")
+                ErasMode.Failed -> GalleryNotice(
+                    title = failedTitle(slotState.isOnline),
+                    body = failedBody(slotState.isOnline),
+                    actionLabel = if (slotState.isOnline) "Retry" else "Try anyway",
+                    onAction = { onIntent(ErasIntent.RetryClicked) },
+                    isBusy = slotState.isRetrying,
+                    debugDetail = if (BuildConfig.DEBUG) slotState.errorMessage else null,
+                )
+                ErasMode.Empty -> GalleryNotice(
+                    title = "Nothing on the walls",
+                    body = "No works came back for the timeline.",
+                    actionLabel = "Retry",
+                    onAction = { onIntent(ErasIntent.RetryClicked) },
+                )
+                ErasMode.Timeline -> ErasTimeline(state = slotState, onIntent = onIntent)
+            }
         }
     }
 }
