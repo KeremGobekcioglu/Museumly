@@ -2,6 +2,7 @@ package com.kg.museumly.presentation.feature.onboarding
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.kg.museumly.domain.FeedWarmup
 import com.kg.museumly.domain.OnboardingSourceInterface
 import dagger.hilt.android.lifecycle.HiltViewModel
 import jakarta.inject.Inject
@@ -13,8 +14,15 @@ import kotlinx.coroutines.launch
 
 @HiltViewModel
 class OnboardingViewModel @Inject constructor(
-    private val onboardingSource: OnboardingSourceInterface
+    private val onboardingSource: OnboardingSourceInterface,
+    private val feedWarmup: FeedWarmup
 ) : ViewModel() {
+
+    init {
+        // Onboarding only shows on first run. The feed's first page loads
+        // while the user reads, instead of after they finish.
+        feedWarmup.start()
+    }
 
     private val _effects: Channel<OnboardingEffect> = Channel(Channel.BUFFERED)
     val effects: Flow<OnboardingEffect> = _effects.receiveAsFlow()
