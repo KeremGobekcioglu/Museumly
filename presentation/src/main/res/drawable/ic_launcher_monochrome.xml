@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Source: museumlyIcons/museumly_lamp_frame_mono.svg. Themed icon: only the alpha is used. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="1024"
+    android:viewportHeight="1024">
+
+    <path
+        android:fillColor="#000000"
+        android:pathData="M506,120 H518 V232 H506 Z" />
+    <path
+        android:fillColor="#000000"
+        android:pathData="M466,228 L558,228 L630,342 L394,342 Z"
+        android:strokeColor="#000000"
+        android:strokeLineJoin="round"
+        android:strokeWidth="10" />
+    <path
+        android:fillColor="#000000"
+        android:pathData="M476,342 a36,36 0 1,0 72,0 a36,36 0 1,0 -72,0 Z" />
+    <path
+        android:fillColor="#000000"
+        android:fillType="evenOdd"
+        android:pathData="M376,420 H648 V786 H376 Z M412,456 H612 V750 H412 Z" />
+</vector>
