@@ -111,7 +111,8 @@ class ScrollViewModel @Inject constructor(
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
-        initialValue = ScrollUiState()
+        // REVERT-HASLOADED (2/3): was ScrollUiState()
+        initialValue = ScrollUiState(hasLoaded = false)
     )
 
     init {

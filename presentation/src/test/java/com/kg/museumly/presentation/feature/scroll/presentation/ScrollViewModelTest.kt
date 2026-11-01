@@ -28,6 +28,7 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -118,6 +119,21 @@ class ScrollViewModelTest {
         advanceUntilIdle()
 
         assertEquals(1, repository.loadMoreCallCount)
+    }
+
+    // REVERT-HASLOADED: test for the loader-flash fix, delete with it.
+    @Test
+    fun `state is not loaded before anything is read, loaded once the feed emits`() = runTest {
+        repository.countValue = 5
+
+        val viewModel = buildViewModel()
+        // No collector yet: the screen would be handed the initial value.
+        assertFalse(viewModel.uiState.value.hasLoaded)
+
+        collect(viewModel)
+        advanceUntilIdle()
+
+        assertTrue(viewModel.uiState.value.hasLoaded)
     }
 
     @Test

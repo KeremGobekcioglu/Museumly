@@ -10,7 +10,11 @@ data class ScrollUiState(
     val tail: TailState = TailState.Loading,
     val isOnline: Boolean = true,
     val favoriteIds: Set<String> = emptySet(),
-    val showSignInSheet: Boolean = false
+    val showSignInSheet: Boolean = false,
+    // REVERT-HASLOADED (1/3): delete this field, with the other two markers, to undo the loader-flash fix.
+    // False only for the ViewModel's initial value: nothing has been read yet.
+    // Without it, "not read yet" looks the same as "empty and loading".
+    val hasLoaded: Boolean = true
 )
 
 sealed interface TailState {

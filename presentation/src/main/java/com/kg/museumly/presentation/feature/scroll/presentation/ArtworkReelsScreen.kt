@@ -64,6 +64,10 @@ internal fun failedBody(isOnline: Boolean, isTail: Boolean): String {
 private enum class ReelsMode { Loading, Notice, Waiting, Pager }
 
 private fun ScrollUiState.mode(): ReelsMode = when {
+    // REVERT-HASLOADED (3/3): delete this branch.
+    // Nothing read yet (DataStore, then Room). Show the bare wall: the loader
+    // here would flash for a moment even when the artworks are already stored.
+    !hasLoaded -> ReelsMode.Waiting
     // A fetch is in flight and there's nothing to show yet. tail defaults to
     // Loading at construction, so this covers the very first frame as well
     // as every fetch after it, including a retry.
@@ -130,7 +134,8 @@ fun ArtworkReelsScreen(
  * contentKey = mode() means only a change of screen animates, and the
  * screen fading out keeps the state it last had instead of the newest one.
  *
- * Waiting (initialPage == null, mid section switch) is an empty,
+ * Waiting (hasLoaded == false at start-up, or initialPage == null mid
+ * section switch) is an empty,
  * transparent box, so the wall shows through. Showing GalleryLoading there
  * would flash the loading screen on every cached switch.
  */
