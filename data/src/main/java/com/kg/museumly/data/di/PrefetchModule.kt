@@ -1,7 +1,9 @@
 package com.kg.museumly.data.di
 
 import com.kg.museumly.data.CoilArtworkPrefetcher
+import com.kg.museumly.data.FeedWarmupImpl
 import com.kg.museumly.domain.ArtworkPrefetcher
+import com.kg.museumly.domain.FeedWarmup
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -14,4 +16,8 @@ abstract class PrefetchModule {
     @Binds
     @Singleton
     abstract fun bindArtworkPrefetcher(impl: CoilArtworkPrefetcher): ArtworkPrefetcher
+
+    @Binds
+    @Singleton
+    abstract fun bindFeedWarmup(impl: FeedWarmupImpl): FeedWarmup
 }

@@ -53,6 +53,8 @@ dependencies {
     implementation(project(":data"))
     implementation(project(":presentation"))
     implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.core.splashscreen)
+    implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.coil)
 

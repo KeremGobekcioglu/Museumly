@@ -7,6 +7,7 @@ import com.kg.museumly.domain.ArtworkPrefetcher
 import com.kg.museumly.domain.ArtworkRepository
 import com.kg.museumly.domain.AuthRepository
 import com.kg.museumly.domain.FeedPositionSourceInterface
+import com.kg.museumly.domain.FeedWarmup
 import com.kg.museumly.domain.LoadOutcome
 import com.kg.museumly.domain.NetworkMonitor
 import com.kg.museumly.domain.SignInPromptSourceInterface
@@ -63,7 +64,8 @@ class ScrollViewModel @Inject constructor(
     private val prefetcher: ArtworkPrefetcher,
     private val networkMonitor: NetworkMonitor,
     private val authRepository: AuthRepository,
-    private val signInPromptSource: SignInPromptSourceInterface
+    private val signInPromptSource: SignInPromptSourceInterface,
+    private val feedWarmup: FeedWarmup
 ) : ViewModel() {
 
     private companion object {
@@ -109,7 +111,8 @@ class ScrollViewModel @Inject constructor(
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
-        initialValue = ScrollUiState()
+        // REVERT-HASLOADED (2/3): was ScrollUiState()
+        initialValue = ScrollUiState(hasLoaded = false)
     )
 
     init {
@@ -140,6 +143,9 @@ class ScrollViewModel @Inject constructor(
     private fun enter(target: Section) {
         enterJob?.cancel()
         enterJob = viewModelScope.launch {
+            // First run: onboarding already started this section's first load.
+            // Join it, so the count below sees its rows and no second load starts.
+            feedWarmup.awaitIfRunning()
             // Count first: the saved frontier can outlive Room's rows
             // (a schema bump wipes Room but keeps DataStore).
             // Ask the database directly. A Flow's first emission can't tell

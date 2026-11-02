@@ -20,6 +20,8 @@ object MainPage
 object AuthPage
 
 @Serializable
+data object OnboardingPage
+@Serializable
 object ErasPage
 
 @Serializable

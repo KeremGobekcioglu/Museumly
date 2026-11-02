@@ -6,6 +6,7 @@ import com.kg.museumly.domain.FeedPositionSourceInterface
 import com.kg.museumly.domain.LoadOutcome
 import com.kg.museumly.domain.SignInPromptSourceInterface
 import com.kg.museumly.presentation.testutil.FakeArtworkPrefetcher
+import com.kg.museumly.presentation.testutil.FakeFeedWarmup
 import com.kg.museumly.presentation.testutil.FakeArtworkRepository
 import com.kg.museumly.presentation.testutil.FakeNetworkMonitor
 import com.kg.museumly.presentation.testutil.MainDispatcherRule
@@ -27,6 +28,7 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -66,6 +68,7 @@ class ScrollViewModelTest {
     private lateinit var repository: FakeArtworkRepository
     private lateinit var positionStore: FeedPositionSourceInterface
     private lateinit var prefetcher: FakeArtworkPrefetcher
+    private lateinit var feedWarmup: FakeFeedWarmup
     private lateinit var networkMonitor: FakeNetworkMonitor
     private lateinit var authRepository: AuthRepository
     private lateinit var signInPromptSource: SignInPromptSourceInterface
@@ -83,6 +86,7 @@ class ScrollViewModelTest {
         coEvery { positionStore.setLastSection(any()) } just Runs
 
         prefetcher = FakeArtworkPrefetcher()
+        feedWarmup = FakeFeedWarmup()
         networkMonitor = FakeNetworkMonitor(initiallyOnline = true)
 
         signedIn.value = false
@@ -95,7 +99,7 @@ class ScrollViewModelTest {
 
     private fun buildViewModel(): ScrollViewModel {
         return ScrollViewModel(
-            repository, positionStore, prefetcher, networkMonitor, authRepository, signInPromptSource
+            repository, positionStore, prefetcher, networkMonitor, authRepository, signInPromptSource, feedWarmup
         )
     }
 
@@ -115,6 +119,21 @@ class ScrollViewModelTest {
         advanceUntilIdle()
 
         assertEquals(1, repository.loadMoreCallCount)
+    }
+
+    // REVERT-HASLOADED: test for the loader-flash fix, delete with it.
+    @Test
+    fun `state is not loaded before anything is read, loaded once the feed emits`() = runTest {
+        repository.countValue = 5
+
+        val viewModel = buildViewModel()
+        // No collector yet: the screen would be handed the initial value.
+        assertFalse(viewModel.uiState.value.hasLoaded)
+
+        collect(viewModel)
+        advanceUntilIdle()
+
+        assertTrue(viewModel.uiState.value.hasLoaded)
     }
 
     @Test
