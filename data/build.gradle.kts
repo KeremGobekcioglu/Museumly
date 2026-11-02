@@ -31,6 +31,9 @@ ksp {
 dependencies {
     implementation(project(":domain"))
 
+    // FileProvider, for AndroidShareManager
+    implementation(libs.androidx.core.ktx)
+
     // Hilt
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)

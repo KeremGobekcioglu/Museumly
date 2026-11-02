@@ -1,4 +1,5 @@
-package com.kg.museumly.presentation.feature.share.platform
+package com.kg.museumly.domain.share
+
 
 enum class ShareTarget {
     InstagramStories,

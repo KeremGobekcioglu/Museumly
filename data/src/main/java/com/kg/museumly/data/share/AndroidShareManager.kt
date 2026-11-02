@@ -1,4 +1,4 @@
-package com.kg.museumly.presentation.feature.share.platform
+package com.kg.museumly.data.share
 
 import android.content.ContentValues
 import android.content.Context
@@ -7,7 +7,10 @@ import android.net.Uri
 import android.os.Environment
 import android.provider.MediaStore
 import androidx.core.content.FileProvider
-import com.kg.museumly.presentation.R
+import com.kg.museumly.domain.share.ShareConfig
+import com.kg.museumly.domain.share.ShareManager
+import com.kg.museumly.domain.share.ShareResult
+import com.kg.museumly.domain.share.ShareTarget
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -32,15 +35,16 @@ private const val APP_FOLDER_NAME = "Museumly"
 @Singleton
 class AndroidShareManager @Inject constructor(
     @ApplicationContext private val context: Context,
+    config: ShareConfig,
 ) : ShareManager {
 
     @Volatile
     private var lastGrantedUri: Uri? = null
 
-    // Set in res/values/strings.xml. Blank means "not configured": the feature that needs it
-    // is hidden instead of launching an intent that would open an empty composer.
-    private val facebookAppId: String get() = context.getString(R.string.share_facebook_app_id)
-    private val landingUrl: String get() = context.getString(R.string.share_landing_url)
+    // Blank means "not configured": the feature that needs it is hidden instead of
+    // launching an intent that would open an empty composer.
+    private val facebookAppId: String = config.facebookAppId
+    private val landingUrl: String = config.landingUrl
 
     override fun isAvailable(target: ShareTarget): Boolean = when (target) {
         // Instagram rejects Story intents that don't name a registered Meta app.

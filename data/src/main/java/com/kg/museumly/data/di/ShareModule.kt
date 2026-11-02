@@ -1,5 +1,7 @@
-package com.kg.museumly.presentation.feature.share.platform
+package com.kg.museumly.data.di
 
+import com.kg.museumly.data.share.AndroidShareManager
+import com.kg.museumly.domain.share.ShareManager
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn

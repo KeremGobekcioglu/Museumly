@@ -28,9 +28,9 @@ import com.kg.museumly.presentation.feature.share.capture.CaptureHost
 import com.kg.museumly.presentation.feature.share.capture.ScaledShareCard
 import com.kg.museumly.presentation.feature.share.capture.ShareCardExportDensity
 import com.kg.museumly.presentation.feature.share.capture.toPngBytes
-import com.kg.museumly.presentation.feature.share.platform.ShareManager
-import com.kg.museumly.presentation.feature.share.platform.ShareResult
-import com.kg.museumly.presentation.feature.share.platform.ShareTarget
+import com.kg.museumly.domain.share.ShareManager
+import com.kg.museumly.domain.share.ShareResult
+import com.kg.museumly.domain.share.ShareTarget
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch

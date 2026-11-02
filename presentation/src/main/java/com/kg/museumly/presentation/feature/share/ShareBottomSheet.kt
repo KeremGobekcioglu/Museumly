@@ -42,7 +42,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kg.museumly.presentation.R
-import com.kg.museumly.presentation.feature.share.platform.ShareTarget
+import com.kg.museumly.domain.share.ShareTarget
 import compose.icons.FontAwesomeIcons
 import compose.icons.fontawesomeicons.Brands
 import compose.icons.fontawesomeicons.brands.Facebook
