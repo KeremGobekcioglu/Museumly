@@ -93,6 +93,7 @@ fun DetailScreen(
     onInspected: () -> Unit,
     setFavorite: (String, Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    onShare: ((Artwork) -> Unit)? = null,
 ) {
     // rememberSaveable so a rotation mid-inspection doesn't dump the user
     // back onto the wall.
@@ -123,6 +124,7 @@ fun DetailScreen(
                 onFavoriteClick = {
                     setFavorite(state.data.artwork.id, !state.isFavorite)
                 },
+                onShareClick = onShare?.let { share -> { share(state.data.artwork) } },
                 onInspect = {
                     inspecting = true
                     onInspected()
@@ -176,6 +178,7 @@ private fun DetailContent(
     showInspectHint: Boolean,
     isFavorite: Boolean,
     onFavoriteClick: () -> Unit,
+    onShareClick: (() -> Unit)?,
     onInspect: () -> Unit,
     onExit: () -> Unit,
     modifier: Modifier = Modifier,
@@ -290,7 +293,10 @@ private fun DetailContent(
                             onFavoriteClick()
                         }
                     },
-                    onShareClick = null,
+                    // Same guard as the heart: the actions are invisible while inspecting.
+                    onShareClick = onShareClick?.let { share ->
+                        { if (!inspecting) share() }
+                    },
                     verticalState = false,
                     modifier = Modifier
                         .align(Alignment.TopEnd)

@@ -21,4 +21,31 @@
     <string name="onboarding_work_department">European Paintings</string>
     <string name="onboarding_skip">Skip</string>
 
+    <!-- Share -->
+    <string name="share_title">Share this work</string>
+    <string name="share_instagram_stories">Stories</string>
+    <string name="share_whatsapp">WhatsApp</string>
+    <string name="share_facebook">Facebook</string>
+    <string name="share_more">More</string>
+    <string name="share_as_text">Share as text</string>
+    <string name="share_save_image">Save image</string>
+    <string name="share_close">CLOSE</string>
+    <string name="share_saved">Saved to Pictures/Museumly</string>
+    <string name="share_preparing">Preparing the image…</string>
+    <string name="share_error_generic">Couldn\'t share. Try again.</string>
+    <string name="share_error_image">The image didn\'t load, so there\'s nothing to share yet.</string>
+    <string name="share_card_app_name" translatable="false">Museumly</string>
+    <!-- Meta app id (numeric, no "fb" prefix). Sent as source_application on Instagram Story
+         intents. If this is ever blank, the Stories tile is hidden: Instagram rejects Story
+         intents without it. Facebook sharing itself needs no id. -->
+    <string name="share_facebook_app_id" translatable="false">911574718590392</string>
+    <!-- Landing page for the story link sticker and the shared text. Blank = no link. -->
+    <string name="share_landing_url" translatable="false"></string>
+
+    <string name="wallpaper_set">Wallpaper set</string>
+    <string name="wallpaper_error">Couldn\'t set the wallpaper</string>
+    <string name="share_set_wallpaper">Set as wallpaper</string>
+    <string name="wallpaper_home">Home screen</string>
+    <string name="wallpaper_lock">Lock screen</string>
+    <string name="wallpaper_both">Both</string>
 </resources>

@@ -1,5 +1,6 @@
 package com.kg.museumly.presentation.navigation
 
+import android.content.Context
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.tween
@@ -29,6 +30,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.kg.museumly.domain.model.Artwork
 import com.kg.museumly.domain.model.Era
 import com.kg.museumly.domain.model.Section
 import com.kg.museumly.presentation.feature.auth.AuthEffect
@@ -45,10 +47,29 @@ import com.kg.museumly.presentation.feature.onboarding.OnboardingEffect
 import com.kg.museumly.presentation.feature.onboarding.OnboardingScreen
 import com.kg.museumly.presentation.feature.onboarding.OnboardingViewModel
 import com.kg.museumly.presentation.feature.scroll.presentation.components.WallColor
+import com.kg.museumly.presentation.feature.share.ShareFlowHost
+import com.kg.museumly.presentation.feature.share.ShareFlowState
+import com.kg.museumly.presentation.feature.share.card.artworkShareContent
+import com.kg.museumly.presentation.feature.share.rememberShareFlowState
 import kotlinx.coroutines.launch
 
 @Composable
 fun MuseumlyNavGraph(onboardingDone: Boolean) {
+    val context: Context = LocalContext.current
+    val shareState: ShareFlowState = rememberShareFlowState()
+    Box(modifier = Modifier.fillMaxSize()) {
+        MuseumlyNavHost(
+            onboardingDone = onboardingDone,
+            onShare = { artwork: Artwork, wallpaperUrl: String -> shareState.open(artworkShareContent(context, artwork, wallpaperUrl)) },
+        )
+        // One host for the whole app, above every screen, so the sheet and its snackbar
+        // outlive the screen that opened them.
+        ShareFlowHost(state = shareState)
+    }
+}
+
+@Composable
+private fun MuseumlyNavHost(onboardingDone: Boolean, onShare: (Artwork, String) -> Unit) {
     val navController: NavHostController = rememberNavController()
     val startDestination: Any = if (onboardingDone) MainPage else OnboardingPage
     NavHost(
@@ -97,6 +118,7 @@ fun MuseumlyNavGraph(onboardingDone: Boolean) {
                         launchSingleTop = true
                     }
                 },
+                onShare = { artwork: Artwork -> onShare(artwork,artwork.imageUrl)},
             )
         }
 
@@ -118,6 +140,10 @@ fun MuseumlyNavGraph(onboardingDone: Boolean) {
                 onBack = { navController.popBackStack() },
                 onInspected = viewmodel::onInspected,
                 setFavorite = viewmodel::setFavorite,
+                onShare = { artwork: Artwork ->
+                    val highRes: String? = state.data?.detail?.highResImageUrl
+                    onShare(artwork, highRes ?: artwork.imageUrl)
+                },
             )
         }
 

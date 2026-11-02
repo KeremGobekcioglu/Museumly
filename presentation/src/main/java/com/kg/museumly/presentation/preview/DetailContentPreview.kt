@@ -59,6 +59,7 @@ private fun DetailScreenWidePreview() =
             onBack = {},
             onInspected = {},
             setFavorite = { _, _ -> },
+            onShare = {},
         )
     }
 
@@ -79,6 +80,7 @@ private fun DetailScreenTallPreview() =
             onBack = {},
             onInspected = {},
             setFavorite = { _, _ -> },
+            onShare = {},
         )
     }
 
@@ -99,5 +101,6 @@ private fun DetailScreenPortraitPreview() =
             onBack = {},
             onInspected = {},
             setFavorite = { _, _ -> },
+            onShare = {},
         )
     }

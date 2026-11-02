@@ -30,6 +30,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import com.kg.museumly.domain.model.Artwork
 import com.kg.museumly.domain.model.Section
 import com.kg.museumly.presentation.BuildConfig
 import com.kg.museumly.presentation.feature.scroll.presentation.components.ArtworkPageWithRestrainedBox
@@ -94,6 +95,7 @@ fun ArtworkReelsScreen(
     setFavorite: (String, Boolean) -> Unit,
     onSignIn: () -> Unit,
     onDismissSignIn: () -> Unit,
+    onShare: ((Artwork) -> Unit)? = null,
 ) {
     Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
         ReelsContent(
@@ -101,7 +103,8 @@ fun ArtworkReelsScreen(
             refresh = refresh,
             onPageChanged = onPageChanged,
             onDetailPage = onDetailPage,
-            setFavorite = setFavorite
+            setFavorite = setFavorite,
+            onShare = onShare,
         )
         // Same 300 ms as the gallery crossfade, so the pill and the
         // artwork appear together instead of the pill popping in on its own.
@@ -145,7 +148,8 @@ private fun ReelsContent(
     refresh: () -> Unit,
     onPageChanged: (Int) -> Unit,
     onDetailPage: (String) -> Unit,
-    setFavorite: (String, Boolean) -> Unit
+    setFavorite: (String, Boolean) -> Unit,
+    onShare: ((Artwork) -> Unit)?,
 ) {
     AnimatedContent(
         targetState = state,
@@ -162,7 +166,8 @@ private fun ReelsContent(
                 refresh = refresh,
                 onPageChanged = onPageChanged,
                 onDetailPage = onDetailPage,
-                setFavorite = setFavorite
+                setFavorite = setFavorite,
+                onShare = onShare,
             )
         }
     }
@@ -200,7 +205,8 @@ private fun ReelsPager(
     refresh: () -> Unit,
     onPageChanged: (Int) -> Unit,
     onDetailPage: (String) -> Unit,
-    setFavorite: (String, Boolean) -> Unit
+    setFavorite: (String, Boolean) -> Unit,
+    onShare: ((Artwork) -> Unit)?,
 ) {
     key(state.section) {
         val pagerState = rememberPagerState(
@@ -227,7 +233,8 @@ private fun ReelsPager(
                             artwork = artwork,
                             onDetailPage = onDetailPage,
                             isFavorite = state.favoriteIds.contains(artwork.id),
-                            setFavorite = setFavorite
+                            setFavorite = setFavorite,
+                            onShare = onShare,
                         )
                     }
                 } else {
