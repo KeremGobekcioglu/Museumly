@@ -55,6 +55,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.kg.museumly.domain.share.WallpaperTarget
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.compose.runtime.LaunchedEffect
 /** One round tile in the sheet's row of destinations. */
 class ShareOption(
     val target: ShareTarget,
@@ -214,6 +217,13 @@ fun ShareBottomSheetContent(
         ActionRow(Icons.Outlined.Download, stringResource(R.string.share_save_image), enabled, onSaveImageClick)
         if (showWallpaper) {
             var choicesOpen: Boolean by remember { mutableStateOf(false) }
+            val choicesRequester: BringIntoViewRequester = remember { BringIntoViewRequester() }
+
+            LaunchedEffect(choicesOpen) {
+                if (choicesOpen) {
+                    choicesRequester.bringIntoView()
+                }
+            }
 
             ActionRow(
                 Icons.Outlined.Wallpaper,
@@ -224,6 +234,7 @@ fun ShareBottomSheetContent(
             if (choicesOpen) {
                 Row(
                     modifier = Modifier
+                        .bringIntoViewRequester(choicesRequester)
                         .fillMaxWidth()
                         .padding(start = 60.dp, end = 24.dp, bottom = 12.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
