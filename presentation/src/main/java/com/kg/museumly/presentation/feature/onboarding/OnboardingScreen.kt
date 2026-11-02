@@ -11,7 +11,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.animateScrollBy
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -165,7 +164,8 @@ internal fun OnboardingContent(
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxWidth()
-                            .padding(vertical = 16.dp),
+                            // Sides only: a little air round the work; top and bottom as the feed.
+                            .padding(horizontal = 4.dp, vertical = 16.dp),
                         contentAlignment = Alignment.Center,
                     ) {
                         val painter: Painter = painterResource(R.drawable.harvesters)
@@ -242,7 +242,6 @@ internal fun OnboardingContent(
                                 translationY = (1f - promiseAlpha()) * 8.dp.toPx()
                             },
                             horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(14.dp),
                         ) {
                             Text(
                                 text = stringResource(R.string.onboarding_promise),
@@ -251,12 +250,6 @@ internal fun OnboardingContent(
                                 lineHeight = 32.sp,
                                 textAlign = TextAlign.Center,
                                 color = TextPrimary,
-                            )
-                            Text(
-                                text = stringResource(R.string.onboarding_source).uppercase(),
-                                fontSize = 12.sp,
-                                letterSpacing = 1.6.sp,
-                                color = TextMuted,
                             )
                         }
 

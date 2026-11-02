@@ -14,7 +14,6 @@
     <string name="auth_error">Couldn\'t sign in. Try again.</string>
     <string name="onboarding_look_closer">Look closer.</string>
     <string name="onboarding_promise">Hundreds of thousands of works.\nFree for everyone, forever.</string>
-    <string name="onboarding_source">Public domain · from The Met and Cleveland</string>
     <string name="onboarding_swipe_hint">Swipe up for the next work</string>
     <string name="onboarding_work_title">The Harvesters</string>
     <string name="onboarding_work_artist">Pieter Bruegel the Elder · 1565</string>
