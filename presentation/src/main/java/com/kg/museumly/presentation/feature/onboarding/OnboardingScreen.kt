@@ -265,7 +265,8 @@ internal fun OnboardingContent(
                                     ArtworkActions(
                                         isFavorite = false,
                                         onFavoriteClick = {},
-                                        onShareClick = null,
+                                        // Non-null so the stack has the feed's two buttons.
+                                        onShareClick = {},
                                         verticalState = true,
                                     )
                                 }

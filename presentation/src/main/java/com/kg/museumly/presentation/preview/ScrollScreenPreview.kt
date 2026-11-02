@@ -67,7 +67,9 @@ private fun ReelsPreview(state: ScrollUiState) = WithPreviewImages {
         onSectionSelected = {},
         setFavorite = {_,_ -> },
         onSignIn = {},
-        onDismissSignIn = {}
+        onDismissSignIn = {},
+        // Non-null, or the share button is left out of the caption.
+        onShare = {},
     )
 }
 

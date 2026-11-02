@@ -149,48 +149,51 @@ internal fun ArtworkCaption(
     actions: @Composable () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(
+    // The actions are a column beside the whole text block, not a part of
+    // one of its lines: a stacked pair inside the maker line's row would
+    // stretch that row and open a gap between the title and the museum.
+    Row(
         modifier = modifier
             .fillMaxWidth()
             .windowInsetsPadding(
                 WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom)
             )
             .padding(start = ReelsGutter, end = ReelsGutter, top = 8.dp, bottom = 24.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            text = title,
-            color = Color.White,
-            style = CaptionTitleStyle,
-        )
-        // The actions share the maker line's row, so they stay even when
-        // there's no artist or year to show.
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = makerLine.orEmpty(),
-                color = CaptionSecondaryColor,
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.weight(1f),
+                text = title,
+                color = Color.White,
+                style = CaptionTitleStyle,
             )
-            actions()
-        }
-        Text(
-            text = museum.uppercase(),
-            color = Color.White.copy(alpha = 0.5f),
-            style = MaterialTheme.typography.labelSmall,
-            letterSpacing = 1.5.sp,
-            modifier = Modifier.padding(top = 8.dp),
-        )
-        // No maxLines anywhere in the caption: a cut-off title, artist,
-        // museum or department reads as a bug. A long one wraps, and the
-        // artwork box gives up the height.
-        department?.let {
+            makerLine?.let {
+                Text(
+                    text = it,
+                    color = CaptionSecondaryColor,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
             Text(
-                text = it.uppercase(),
+                text = museum.uppercase(),
                 color = Color.White.copy(alpha = 0.5f),
                 style = MaterialTheme.typography.labelSmall,
                 letterSpacing = 1.5.sp,
+                modifier = Modifier.padding(top = 8.dp),
             )
+            // No maxLines anywhere in the caption: a cut-off title, artist,
+            // museum or department reads as a bug. A long one wraps, and the
+            // artwork box gives up the height.
+            department?.let {
+                Text(
+                    text = it.uppercase(),
+                    color = Color.White.copy(alpha = 0.5f),
+                    style = MaterialTheme.typography.labelSmall,
+                    letterSpacing = 1.5.sp,
+                )
+            }
         }
+        actions()
     }
 }
 
