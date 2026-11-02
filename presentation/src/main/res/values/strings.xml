@@ -19,6 +19,7 @@
     <string name="onboarding_work_title">The Harvesters</string>
     <string name="onboarding_work_artist">Pieter Bruegel the Elder · 1565</string>
     <string name="onboarding_work_description">The Harvesters by Pieter Bruegel the Elder</string>
+    <string name="onboarding_work_department">European Paintings</string>
     <string name="onboarding_skip">Skip</string>
 
 </resources>

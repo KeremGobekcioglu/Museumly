@@ -109,6 +109,9 @@ internal val MainTabs: List<MainTab> = listOf(
     MainTab(ErasPage, label = "Eras", icon = Icons.Outlined.HourglassEmpty, selectedIcon = Icons.Filled.HourglassFull)
 )
 
+/** The bar's minimum height. Onboarding adds it to its caption's bottom padding to match the feed. */
+internal val MainBottomBarHeight: Dp = 56.dp
+
 @Composable
 internal fun MainBottomBar(
     isSelected: (MainTab) -> Boolean,
@@ -125,7 +128,7 @@ internal fun MainBottomBar(
             .fillMaxWidth()
             .background(Color.Black)
             .windowInsetsPadding(WindowInsets.navigationBars)
-            .heightIn(min = 56.dp),
+            .heightIn(min = MainBottomBarHeight),
     ) {
         val slotWidth: Dp = maxWidth / MainTabs.size
         val targetX: Dp = slotWidth * selectedIndex + (slotWidth - 24.dp) / 2
@@ -150,7 +153,7 @@ internal fun MainBottomBar(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 56.dp)
+                .heightIn(min = MainBottomBarHeight)
                 .height(IntrinsicSize.Min),
         ) {
             for (tab in MainTabs) {

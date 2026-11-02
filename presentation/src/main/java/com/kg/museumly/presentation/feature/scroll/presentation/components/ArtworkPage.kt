@@ -51,7 +51,7 @@ internal val ReelsTopBarHeight = 60.dp
 internal val ReelsGutter = 16.dp
 
 /** Regular weight, a step below titleLarge: a label, not a headline. */
-private val CaptionTitleStyle: TextStyle = TextStyle(
+internal val CaptionTitleStyle: TextStyle = TextStyle(
     fontFamily = LibreCaslon,
     fontWeight = FontWeight.Normal,
     fontSize = 20.sp,
@@ -59,7 +59,7 @@ private val CaptionTitleStyle: TextStyle = TextStyle(
 )
 
 /** The caption's maker line, also used for the failed-image notice. */
-private val CaptionSecondaryColor: Color = Color.White.copy(alpha = 0.75f)
+internal val CaptionSecondaryColor: Color = Color.White.copy(alpha = 0.75f)
 
 /**
  * Three stacked regions — top bar, artwork, caption — instead of layers.

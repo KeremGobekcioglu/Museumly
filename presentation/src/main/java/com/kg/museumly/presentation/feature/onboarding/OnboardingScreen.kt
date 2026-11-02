@@ -14,17 +14,26 @@ import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.windowInsetsTopHeight
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -38,9 +47,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -49,6 +61,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kg.museumly.presentation.R
+import com.kg.museumly.presentation.navigation.MainBottomBarHeight
+import com.kg.museumly.presentation.feature.scroll.presentation.components.CaptionSecondaryColor
+import com.kg.museumly.presentation.feature.scroll.presentation.components.CaptionTitleStyle
+import com.kg.museumly.presentation.feature.scroll.presentation.components.ReelsGutter
+import com.kg.museumly.presentation.feature.scroll.presentation.components.ReelsTopBarHeight
+import com.kg.museumly.presentation.feature.scroll.presentation.components.museumName
 import com.kg.museumly.presentation.ui.theme.LibreCaslon
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -103,6 +121,33 @@ fun OnboardingScreen(onFinish: () -> Unit) {
             }
         }
     }
+    OnboardingContent(
+        pagerState = pagerState,
+        scale = { scale.value },
+        lookCloserAlpha = { lookCloserAlpha.value },
+        promiseAlpha = { promiseAlpha.value },
+        handoffAlpha = { handoffAlpha.value },
+        canSwipe = canSwipe,
+        showSkip = phase != OnboardingPhase.HANDOFF,
+        onSkip = onFinish,
+    )
+}
+
+/**
+ * The screen with its animation values passed in, so a preview can show any
+ * moment of the timeline. Values are lambdas: they are read at draw time.
+ */
+@Composable
+internal fun OnboardingContent(
+    pagerState: PagerState,
+    scale: () -> Float,
+    lookCloserAlpha: () -> Float,
+    promiseAlpha: () -> Float,
+    handoffAlpha: () -> Float,
+    canSwipe: Boolean,
+    showSkip: Boolean,
+    onSkip: () -> Unit,
+) {
     Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
         VerticalPager(
             state = pagerState,
@@ -110,67 +155,96 @@ fun OnboardingScreen(onFinish: () -> Unit) {
             userScrollEnabled = canSwipe,
         ) { page: Int ->
             if (page == 0) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .statusBarsPadding()
-                        .navigationBarsPadding()
-                ) {
-                    Spacer(modifier = Modifier.height(56.dp))
+                Column(modifier = Modifier.fillMaxSize()) {
+                    // Same top as a feed page: status bar + the pill's row.
+                    Spacer(modifier = Modifier.windowInsetsTopHeight(WindowInsets.safeDrawing))
+                    Spacer(modifier = Modifier.height(ReelsTopBarHeight))
 
-                    // Not clipped: at 6.5× the work spills over the whole screen.
+                    // Same artwork box as a feed page. Not clipped: at 6.5x the work spills over the screen.
                     Box(
-                        modifier = Modifier.weight(1f).fillMaxWidth(),
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                            .padding(vertical = 16.dp),
                         contentAlignment = Alignment.Center,
                     ) {
+                        val painter: Painter = painterResource(R.drawable.harvesters)
+                        val ratio: Float = painter.intrinsicSize.width / painter.intrinsicSize.height
                         Image(
-                            painter = painterResource(R.drawable.harvesters),
+                            painter = painter,
                             contentDescription = stringResource(R.string.onboarding_work_description),
                             contentScale = ContentScale.Fit,
+                            // Bounds = the painting itself, so transformOrigin points at paint, not letterbox.
                             modifier = Modifier
-                                .fillMaxWidth()
+                                .aspectRatio(ratio)
                                 .graphicsLayer {
-                                    scaleX = scale.value
-                                    scaleY = scale.value
-                                    transformOrigin = TransformOrigin(0.34f, 0.8f)
+                                    scaleX = scale()
+                                    scaleY = scale()
+                                    transformOrigin = TransformOrigin(0.18f, 0.72f)
                                 },
                         )
                     }
 
-                    // Drawn after the work, so the text sits on top of the zoomed image.
+                    // Same label slot as a feed page. Its height is the caption (the tallest
+                    // layer), so the artwork box is identical in every phase.
                     Box(
-                        modifier = Modifier.fillMaxWidth().height(200.dp),
-                        contentAlignment = Alignment.TopCenter,
-                    ) {
-                        // Look closer — gradient keeps it readable over the zoomed detail.
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .graphicsLayer { alpha = lookCloserAlpha.value }
-                                .background(
-                                    Brush.verticalGradient(
-                                        listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f))
-                                    )
-                                ),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Text(
-                                text = stringResource(R.string.onboarding_look_closer),
-                                fontFamily = LibreCaslon,
-                                fontStyle = FontStyle.Italic,
-                                fontSize = 32.sp,
-                                color = TextPrimary,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            // Full width, behind the gutter: keeps "Look closer." readable
+                            // over the zoomed detail. Alpha is read at draw time.
+                            .drawBehind {
+                                drawRect(
+                                    brush = Brush.verticalGradient(listOf(Color.Transparent, Color.Black)),
+                                    alpha = lookCloserAlpha() * 0.85f,
+                                )
+                            }
+                            .windowInsetsPadding(
+                                WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom)
                             )
-                        }
+                            // The feed's caption sits above the bottom bar, so add its height.
+                            .padding(
+                                start = ReelsGutter,
+                                end = ReelsGutter,
+                                top = 8.dp,
+                                bottom = 24.dp + MainBottomBarHeight,
+                            ),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        // Swipe hint: sits just above the caption without taking height from the
+                        // slot, so the title stays where the feed puts it.
+                        Text(
+                            text = stringResource(R.string.onboarding_swipe_hint),
+                            fontSize = 13.sp,
+                            color = TextPrimary,
+                            modifier = Modifier
+                                .align(Alignment.TopCenter)
+                                .layout { measurable, constraints ->
+                                    val placeable = measurable.measure(constraints)
+                                    val gap: Int = 8.dp.roundToPx()
+                                    layout(placeable.width, 0) { placeable.place(0, -placeable.height - gap) }
+                                }
+                                .graphicsLayer { alpha = handoffAlpha() }
+                                .background(Color(0xD1141413), RoundedCornerShape(50))
+                                .border(1.dp, TextPrimary.copy(alpha = 0.18f), RoundedCornerShape(50))
+                                .padding(horizontal = 14.dp, vertical = 8.dp),
+                        )
+
+                        // Look closer
+                        Text(
+                            text = stringResource(R.string.onboarding_look_closer),
+                            fontFamily = LibreCaslon,
+                            fontStyle = FontStyle.Italic,
+                            fontSize = 32.sp,
+                            color = TextPrimary,
+                            modifier = Modifier.graphicsLayer { alpha = lookCloserAlpha() },
+                        )
 
                         // Promise
                         Column(
-                            modifier = Modifier
-                                .padding(horizontal = 32.dp)
-                                .graphicsLayer {
-                                    alpha = promiseAlpha.value
-                                    translationY = (1f - promiseAlpha.value) * 8.dp.toPx()
-                                },
+                            modifier = Modifier.graphicsLayer {
+                                alpha = promiseAlpha()
+                                translationY = (1f - promiseAlpha()) * 8.dp.toPx()
+                            },
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(14.dp),
                         ) {
@@ -190,37 +264,42 @@ fun OnboardingScreen(onFinish: () -> Unit) {
                             )
                         }
 
-                        // Handoff — hint above the caption.
+                        // Handoff: the full museum label, as the feed shows it.
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 20.dp)
-                                .graphicsLayer { alpha = handoffAlpha.value },
-                            verticalArrangement = Arrangement.spacedBy(20.dp),
+                                .graphicsLayer { alpha = handoffAlpha() },
                         ) {
                             Text(
-                                text = stringResource(R.string.onboarding_swipe_hint),
-                                fontSize = 13.sp,
-                                color = TextPrimary,
-                                modifier = Modifier
-                                    .align(Alignment.CenterHorizontally)
-                                    .background(Color(0xD1141413), RoundedCornerShape(50))
-                                    .border(1.dp, TextPrimary.copy(alpha = 0.18f), RoundedCornerShape(50))
-                                    .padding(horizontal = 14.dp, vertical = 8.dp),
+                                text = stringResource(R.string.onboarding_work_title),
+                                color = Color.White,
+                                style = CaptionTitleStyle,
                             )
-                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Text(
-                                    text = stringResource(R.string.onboarding_work_title),
-                                    fontFamily = LibreCaslon,
-                                    fontSize = 21.sp,
-                                    color = TextPrimary,
-                                )
+                            // The feed's maker line shares a row with the 48dp heart; keep the row height.
+                            Row(
+                                modifier = Modifier.heightIn(min = 48.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
                                 Text(
                                     text = stringResource(R.string.onboarding_work_artist),
-                                    fontSize = 13.sp,
-                                    color = TextMuted,
+                                    color = CaptionSecondaryColor,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    modifier = Modifier.weight(1f),
                                 )
                             }
+                            Text(
+                                text = museumName("met").uppercase(),
+                                color = Color.White.copy(alpha = 0.5f),
+                                style = MaterialTheme.typography.labelSmall,
+                                letterSpacing = 1.5.sp,
+                                modifier = Modifier.padding(top = 8.dp),
+                            )
+                            Text(
+                                text = stringResource(R.string.onboarding_work_department).uppercase(),
+                                color = Color.White.copy(alpha = 0.5f),
+                                style = MaterialTheme.typography.labelSmall,
+                                letterSpacing = 1.5.sp,
+                            )
                         }
                     }
                 }
@@ -229,9 +308,9 @@ fun OnboardingScreen(onFinish: () -> Unit) {
             }
         }
 
-        if (phase != OnboardingPhase.HANDOFF) {
+        if (showSkip) {
             TextButton(
-                onClick = onFinish,
+                onClick = onSkip,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .statusBarsPadding()
