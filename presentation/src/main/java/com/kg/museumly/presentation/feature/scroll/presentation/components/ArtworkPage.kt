@@ -73,7 +73,8 @@ internal fun ArtworkPageWithRestrainedBox(
     modifier: Modifier = Modifier,
     onDetailPage: (String) -> Unit,
     setFavorite: (String, Boolean) -> Unit,
-    isFavorite: Boolean
+    isFavorite: Boolean,
+    onShare: ((Artwork) -> Unit)? = null,
 )  {
     Column(modifier = modifier.fillMaxSize()) {
         Spacer(modifier = Modifier.windowInsetsTopHeight(WindowInsets.safeDrawing))
@@ -126,7 +127,7 @@ internal fun ArtworkPageWithRestrainedBox(
                 ArtworkActions(
                     isFavorite = isFavorite,
                     onFavoriteClick = { setFavorite(artwork.id, !isFavorite) },
-                    onShareClick = null,
+                    onShareClick = onShare?.let { share -> { share(artwork) } },
                     verticalState = true,
                 )
             },
@@ -199,7 +200,7 @@ internal fun museumName(providerId: String): String = when (providerId) {
     else -> providerId
 }
 
-private fun captionLine(artist: String?, year: String?): String? {
+internal fun captionLine(artist: String?, year: String?): String? {
     if (artist != null && year != null) {
         return "$artist · $year"
     }
