@@ -126,6 +126,7 @@ private fun SheetPreview(
     enabled: Boolean = true,
     statusMessage: String? = null,
     isError: Boolean = false,
+    showWallpaper: Boolean = true,
 ) = WithPreviewImages {
     Box(Modifier.fillMaxWidth().background(SheetColor)) {
         ShareBottomSheetContent(
@@ -137,6 +138,9 @@ private fun SheetPreview(
             onOptionClick = {},
             onShareTextClick = {},
             onSaveImageClick = {},
+            showWallpaper = showWallpaper,
+            wallpaperEnabled = enabled,
+            onSetWallpaperClick = {},
             onDismiss = {},
         )
     }

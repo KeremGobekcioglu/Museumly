@@ -48,7 +48,13 @@ import compose.icons.fontawesomeicons.Brands
 import compose.icons.fontawesomeicons.brands.Facebook
 import compose.icons.fontawesomeicons.brands.Instagram
 import compose.icons.fontawesomeicons.brands.Whatsapp
-
+import androidx.compose.foundation.border
+import androidx.compose.material.icons.outlined.Wallpaper
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import com.kg.museumly.domain.share.WallpaperTarget
 /** One round tile in the sheet's row of destinations. */
 class ShareOption(
     val target: ShareTarget,
@@ -115,6 +121,9 @@ fun ShareBottomSheet(
     onShareTextClick: () -> Unit,
     onSaveImageClick: () -> Unit,
     onDismiss: () -> Unit,
+    showWallpaper: Boolean,
+    wallpaperEnabled: Boolean,
+    onSetWallpaperClick: (WallpaperTarget) -> Unit,
 ) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -133,6 +142,9 @@ fun ShareBottomSheet(
             onShareTextClick = onShareTextClick,
             onSaveImageClick = onSaveImageClick,
             onDismiss = onDismiss,
+            showWallpaper = showWallpaper,
+            wallpaperEnabled = wallpaperEnabled,
+            onSetWallpaperClick = onSetWallpaperClick,
         )
     }
 }
@@ -155,6 +167,9 @@ fun ShareBottomSheetContent(
     onSaveImageClick: () -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
+    showWallpaper: Boolean,
+    wallpaperEnabled: Boolean,
+    onSetWallpaperClick: (WallpaperTarget) -> Unit,
 ) {
     Column(
         modifier
@@ -197,7 +212,34 @@ fun ShareBottomSheetContent(
         HorizontalDivider(color = SheetBorder)
 
         ActionRow(Icons.Outlined.Download, stringResource(R.string.share_save_image), enabled, onSaveImageClick)
+        if (showWallpaper) {
+            var choicesOpen: Boolean by remember { mutableStateOf(false) }
 
+            ActionRow(
+                Icons.Outlined.Wallpaper,
+                stringResource(R.string.share_set_wallpaper),
+                wallpaperEnabled,
+            ) { choicesOpen = !choicesOpen }
+
+            if (choicesOpen) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 60.dp, end = 24.dp, bottom = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    WallpaperChoice(stringResource(R.string.wallpaper_home), wallpaperEnabled) {
+                        onSetWallpaperClick(WallpaperTarget.Home)
+                    }
+                    WallpaperChoice(stringResource(R.string.wallpaper_lock), wallpaperEnabled) {
+                        onSetWallpaperClick(WallpaperTarget.Lock)
+                    }
+                    WallpaperChoice(stringResource(R.string.wallpaper_both), wallpaperEnabled) {
+                        onSetWallpaperClick(WallpaperTarget.Both)
+                    }
+                }
+            }
+        }
         if (statusMessage != null) {
             Text(
                 text = statusMessage,
@@ -273,4 +315,18 @@ private fun ActionRow(icon: ImageVector, label: String, enabled: Boolean, onClic
         Spacer(Modifier.width(16.dp))
         Text(text = label, color = Color.White, style = MaterialTheme.typography.bodyLarge)
     }
+}
+@Composable
+private fun WallpaperChoice(label: String, enabled: Boolean, onClick: () -> Unit) {
+    Text(
+        text = label,
+        color = Color.White,
+        style = MaterialTheme.typography.labelMedium,
+        modifier = Modifier
+            .alpha(if (enabled) 1f else 0.4f)
+            .clip(RoundedCornerShape(50))
+            .border(1.dp, SheetBorder, RoundedCornerShape(50))
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 8.dp),
+    )
 }

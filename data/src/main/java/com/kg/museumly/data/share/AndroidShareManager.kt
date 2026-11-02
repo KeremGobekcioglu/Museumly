@@ -1,5 +1,6 @@
 package com.kg.museumly.data.share
 
+import android.app.WallpaperManager
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
@@ -11,13 +12,28 @@ import com.kg.museumly.domain.share.ShareConfig
 import com.kg.museumly.domain.share.ShareManager
 import com.kg.museumly.domain.share.ShareResult
 import com.kg.museumly.domain.share.ShareTarget
+import com.kg.museumly.domain.share.WallpaperTarget
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
-
+import android.hardware.display.DisplayManager
+import android.util.Size
+import android.view.Display
+import android.graphics.Bitmap
+import coil3.imageLoader
+import coil3.request.ImageRequest
+import coil3.request.ImageResult
+import coil3.request.SuccessResult
+import coil3.request.allowHardware
+import coil3.toBitmap
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.RectF
+import java.io.IOException
 private const val SHARE_FILE_PREFIX = "museumly"
 private const val INSTAGRAM_PACKAGE = "com.instagram.android"
 private const val WHATSAPP_PACKAGE = "com.whatsapp"
@@ -216,4 +232,90 @@ class AndroidShareManager @Inject constructor(
                 ShareResult.Failed(e)
             }
         }
+
+    override fun canSetWallpaper(): Boolean {
+        val wallpaperManager: WallpaperManager = WallpaperManager.getInstance(context)
+        return wallpaperManager.isWallpaperSupported && wallpaperManager.isSetWallpaperAllowed
+    }
+
+    override suspend fun setWallpaper(imageUrl: String, target: WallpaperTarget): ShareResult {
+        if(!canSetWallpaper())
+        {
+            return ShareResult.TargetUnavailable
+        }
+        val size: Size = screenSize()
+        val source: Bitmap? = loadBitmap(imageUrl,size)
+        if (source == null) {
+            return ShareResult.Failed(IllegalStateException("Could not load image for wallpaper"))
+        }
+        return withContext(Dispatchers.IO)
+        {
+            try {
+                val wallpaper: Bitmap = fitOnBlack(source,size)
+                val flags: Int = when (target) {
+                    WallpaperTarget.Home -> WallpaperManager.FLAG_SYSTEM
+                    WallpaperTarget.Lock -> WallpaperManager.FLAG_LOCK
+                    WallpaperTarget.Both -> WallpaperManager.FLAG_SYSTEM or WallpaperManager.FLAG_LOCK
+                }
+                val id: Int = WallpaperManager.getInstance(context).setBitmap(wallpaper, null, true, flags)
+                if (id == 0) {
+                    return@withContext ShareResult.Failed(IllegalStateException("setBitmap returned 0"))
+                }
+                return@withContext ShareResult.Success
+            }
+            catch (e: IOException)
+            {
+                return@withContext ShareResult.Failed(e)
+            }
+            catch (e: SecurityException)
+            {
+                return@withContext ShareResult.Failed(e)
+            }
+        }
+    }
+
+    private fun screenSize() : Size
+    {
+        val displayManager: DisplayManager = context.getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
+        val display: Display = displayManager.getDisplay(Display.DEFAULT_DISPLAY)
+        val mode: Display.Mode = display.mode
+        val width: Int = mode.physicalWidth
+        val height: Int = mode.physicalHeight
+        // Always portrait, whichever way the display reports itself.
+        return Size(minOf(width, height), maxOf(width, height))
+    }
+    private suspend fun loadBitmap(imageUrl: String, size: Size) : Bitmap?
+    {
+        val request: ImageRequest = ImageRequest.Builder(context)
+            .data(imageUrl)
+            .size(size.width, size.height)
+            .allowHardware(false)
+            .build()
+        val result: ImageResult = context.imageLoader.execute(request)
+        if (result is SuccessResult) {
+            return result.image.toBitmap()
+        }
+        return null
+    }
+    private fun fitOnBlack(source: Bitmap, size: Size): Bitmap {
+        val canvasWidth: Int = size.width
+        val canvasHeight: Int = size.height
+        val output: Bitmap = Bitmap.createBitmap(canvasWidth, canvasHeight, Bitmap.Config.ARGB_8888)
+        val canvas: Canvas = Canvas(output)
+        canvas.drawColor(Color.BLACK)
+
+        val scale: Float = minOf(
+            canvasWidth.toFloat() / source.width,
+            canvasHeight.toFloat() / source.height,
+        )
+        val drawnWidth: Float = source.width * scale
+        val drawnHeight: Float = source.height * scale
+        val left: Float = (canvasWidth - drawnWidth) / 2f
+        val top: Float = (canvasHeight - drawnHeight) / 2f
+        val destination: RectF = RectF(left, top, left + drawnWidth, top + drawnHeight)
+
+        val paint: Paint = Paint(Paint.FILTER_BITMAP_FLAG)
+        canvas.drawBitmap(source, null, destination, paint)
+        return output
+    }
 }

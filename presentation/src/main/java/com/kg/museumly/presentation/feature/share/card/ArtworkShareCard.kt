@@ -40,7 +40,7 @@ import com.kg.museumly.presentation.feature.share.capture.ShareCardWidth
 import com.kg.museumly.presentation.ui.theme.LibreCaslon
 
 /** Builds what the share flow needs for [artwork]. Call it from a click handler. */
-fun artworkShareContent(context: Context, artwork: Artwork): ShareContent =
+fun artworkShareContent(context: Context, artwork: Artwork, wallpaperUrl: String): ShareContent =
     ShareContent(
         text = artworkShareText(
             artwork = artwork,
@@ -48,6 +48,7 @@ fun artworkShareContent(context: Context, artwork: Artwork): ShareContent =
             landingUrl = context.getString(R.string.share_landing_url),
         ),
         card = { onImageLoaded -> ArtworkShareCard(artwork, onImageLoaded) },
+        wallpaperUrl = wallpaperUrl,
     )
 
 /** Plain-text share. The link is left out while no landing page is configured. */

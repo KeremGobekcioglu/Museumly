@@ -20,7 +20,11 @@ sealed interface ShareResult {
     data object TargetUnavailable : ShareResult
     data class Failed(val cause: Throwable?) : ShareResult
 }
-
+enum class WallpaperTarget {
+    Home,
+    Lock,
+    Both,
+}
 /**
  * Platform handoff for an already-rendered PNG. An interface (not a function in a composable)
  * so the Android specifics (Context, FileProvider, intents) stay out of the UI and the UI can be
@@ -37,4 +41,13 @@ interface ShareManager {
     suspend fun saveToGallery(png: ByteArray): ShareResult
 
     suspend fun shareText(text: String, target: ShareTarget): ShareResult
+
+    /** False when the device has no wallpaper support or a work policy blocks changing it. */
+    fun canSetWallpaper(): Boolean
+
+    /**
+     * Loads [imageUrl], fits it on black at the screen's size (never cropped), and sets it
+     * as the wallpaper for [target].
+     */
+    suspend fun setWallpaper(imageUrl: String, target: WallpaperTarget): ShareResult
 }

@@ -36,7 +36,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
-
+import com.kg.museumly.domain.share.WallpaperTarget
 private const val TAG = "ShareFlow"
 
 /**
@@ -70,7 +70,8 @@ fun ShareFlowHost(
     val genericError = stringResource(R.string.share_error_generic)
     val imageError = stringResource(R.string.share_error_image)
     val preparing = stringResource(R.string.share_preparing)
-
+    val wallpaperSetMessage: String = stringResource(R.string.wallpaper_set)
+    val wallpaperError: String = stringResource(R.string.wallpaper_error)
     Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
         val content = state.content
         if (content != null) {
@@ -84,6 +85,7 @@ fun ShareFlowHost(
             val availableTargets = remember(shareManager) {
                 ShareTarget.entries.filter(shareManager::isAvailable).toSet()
             }
+            val canSetWallpaper: Boolean = remember(shareManager) { shareManager.canSetWallpaper() }
             val options = rememberShareOptions().filter { it.target in availableTargets }
 
             // Offscreen export copy. Reports its real size (a zero-sized node is skipped in the
@@ -137,6 +139,32 @@ fun ShareFlowHost(
                 }
             }
 
+            fun setWallpaper(url: String, target: WallpaperTarget) {
+                if (isWorking) return // double-tap guard, shared with share and save
+                shareScope.launch {
+                    isWorking = true
+                    errorMessage = null
+                    try {
+                        val result: ShareResult = shareManager.setWallpaper(url, target)
+                        when (result) {
+                            ShareResult.Success -> {
+                                state.dismiss()
+                                snackbarScope.launch { snackbarHostState.showSnackbar(wallpaperSetMessage) }
+                            }
+                            ShareResult.TargetUnavailable -> {
+                                errorMessage = wallpaperError
+                            }
+                            is ShareResult.Failed -> {
+                                Log.w(TAG, "Set wallpaper failed", result.cause)
+                                errorMessage = wallpaperError
+                            }
+                        }
+                    } finally {
+                        isWorking = false
+                    }
+                }
+            }
+
             ShareBottomSheet(
                 preview = { ScaledShareCard { content.card {} } },
                 enabled = !isWorking && cardState == CardState.Ready,
@@ -164,6 +192,14 @@ fun ShareFlowHost(
                     }
                 },
                 onDismiss = state::dismiss,
+                showWallpaper = canSetWallpaper,
+                wallpaperEnabled = !isWorking,
+                onSetWallpaperClick = { target: WallpaperTarget ->
+                    val url: String? = content.wallpaperUrl
+                    if (url != null) {
+                        setWallpaper(url, target)
+                    }
+                },
             )
         }
 

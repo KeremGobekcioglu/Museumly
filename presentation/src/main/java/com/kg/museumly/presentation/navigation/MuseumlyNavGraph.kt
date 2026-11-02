@@ -60,7 +60,7 @@ fun MuseumlyNavGraph(onboardingDone: Boolean) {
     Box(modifier = Modifier.fillMaxSize()) {
         MuseumlyNavHost(
             onboardingDone = onboardingDone,
-            onShare = { artwork: Artwork -> shareState.open(artworkShareContent(context, artwork)) },
+            onShare = { artwork: Artwork, wallpaperUrl: String -> shareState.open(artworkShareContent(context, artwork, wallpaperUrl)) },
         )
         // One host for the whole app, above every screen, so the sheet and its snackbar
         // outlive the screen that opened them.
@@ -69,7 +69,7 @@ fun MuseumlyNavGraph(onboardingDone: Boolean) {
 }
 
 @Composable
-private fun MuseumlyNavHost(onboardingDone: Boolean, onShare: (Artwork) -> Unit) {
+private fun MuseumlyNavHost(onboardingDone: Boolean, onShare: (Artwork, String) -> Unit) {
     val navController: NavHostController = rememberNavController()
     val startDestination: Any = if (onboardingDone) MainPage else OnboardingPage
     NavHost(
@@ -118,7 +118,7 @@ private fun MuseumlyNavHost(onboardingDone: Boolean, onShare: (Artwork) -> Unit)
                         launchSingleTop = true
                     }
                 },
-                onShare = onShare,
+                onShare = { artwork: Artwork -> onShare(artwork,artwork.imageUrl)},
             )
         }
 
@@ -140,7 +140,10 @@ private fun MuseumlyNavHost(onboardingDone: Boolean, onShare: (Artwork) -> Unit)
                 onBack = { navController.popBackStack() },
                 onInspected = viewmodel::onInspected,
                 setFavorite = viewmodel::setFavorite,
-                onShare = onShare,
+                onShare = { artwork: Artwork ->
+                    val highRes: String? = state.data?.detail?.highResImageUrl
+                    onShare(artwork, highRes ?: artwork.imageUrl)
+                },
             )
         }
 

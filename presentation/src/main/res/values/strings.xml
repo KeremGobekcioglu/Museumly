@@ -42,4 +42,10 @@
     <!-- Landing page for the story link sticker and the shared text. Blank = no link. -->
     <string name="share_landing_url" translatable="false"></string>
 
+    <string name="wallpaper_set">Wallpaper set</string>
+    <string name="wallpaper_error">Couldn\'t set the wallpaper</string>
+    <string name="share_set_wallpaper">Set as wallpaper</string>
+    <string name="wallpaper_home">Home screen</string>
+    <string name="wallpaper_lock">Lock screen</string>
+    <string name="wallpaper_both">Both</string>
 </resources>

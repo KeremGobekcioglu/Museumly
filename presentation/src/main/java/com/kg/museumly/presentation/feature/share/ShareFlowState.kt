@@ -13,6 +13,7 @@ import androidx.compose.runtime.setValue
  *
  * @param text plain-text version, for "Share as text".
  * @param card the card to render. The host composes it twice — once scaled as the sheet's
+ * @param wallpaperUrl image to offer as a wallpaper. Null hides the option.
  * preview, once offscreen for the export — so it must be a pure function of its inputs.
  * It must call `onImageLoaded(true)` when everything it needs is drawn (or immediately if it
  * has nothing async), and `onImageLoaded(false)` if it failed. The host keeps the share options
@@ -21,6 +22,7 @@ import androidx.compose.runtime.setValue
 class ShareContent(
     val text: String,
     val card: @Composable (onImageLoaded: (Boolean) -> Unit) -> Unit,
+    val wallpaperUrl: String,
 )
 
 @Stable
