@@ -196,7 +196,6 @@ fun ShareBottomSheetContent(
         Spacer(Modifier.height(24.dp))
         HorizontalDivider(color = SheetBorder)
 
-        ActionRow(Icons.Outlined.Description, stringResource(R.string.share_as_text), enabled, onShareTextClick)
         ActionRow(Icons.Outlined.Download, stringResource(R.string.share_save_image), enabled, onSaveImageClick)
 
         if (statusMessage != null) {
@@ -239,7 +238,7 @@ private fun OptionTile(option: ShareOption, enabled: Boolean, onClick: () -> Uni
                 .clip(RoundedCornerShape(16.dp))
                 .background(option.background)
                 // No overlays or shadows in the design; alpha is the disabled signal.
-                .alpha(if (enabled) 1f else 0.4f)
+                //.alpha(if (enabled) 1f else 0.4f)
                 .clickable(enabled = enabled, onClick = onClick),
             contentAlignment = Alignment.Center,
         ) {
