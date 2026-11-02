@@ -14,7 +14,6 @@ import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
@@ -22,7 +21,6 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
@@ -52,7 +50,9 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -62,8 +62,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kg.museumly.presentation.R
 import com.kg.museumly.presentation.navigation.MainBottomBarHeight
-import com.kg.museumly.presentation.feature.scroll.presentation.components.CaptionSecondaryColor
-import com.kg.museumly.presentation.feature.scroll.presentation.components.CaptionTitleStyle
+import com.kg.museumly.presentation.feature.scroll.presentation.components.ArtworkActions
+import com.kg.museumly.presentation.feature.scroll.presentation.components.ArtworkCaption
 import com.kg.museumly.presentation.feature.scroll.presentation.components.ReelsGutter
 import com.kg.museumly.presentation.feature.scroll.presentation.components.ReelsTopBarHeight
 import com.kg.museumly.presentation.feature.scroll.presentation.components.museumName
@@ -201,13 +201,8 @@ internal fun OnboardingContent(
                             .windowInsetsPadding(
                                 WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom)
                             )
-                            // The feed's caption sits above the bottom bar, so add its height.
-                            .padding(
-                                start = ReelsGutter,
-                                end = ReelsGutter,
-                                top = 8.dp,
-                                bottom = 24.dp + MainBottomBarHeight,
-                            ),
+                            // The feed's caption sits above the bar; ArtworkCaption adds the rest.
+                            .padding(bottom = MainBottomBarHeight),
                         contentAlignment = Alignment.Center,
                     ) {
                         // Swipe hint: sits just above the caption without taking height from the
@@ -241,7 +236,8 @@ internal fun OnboardingContent(
 
                         // Promise
                         Column(
-                            modifier = Modifier.graphicsLayer {
+                            // The slot no longer pads, so the promise brings the gutter.
+                            modifier = Modifier.padding(horizontal = ReelsGutter).graphicsLayer {
                                 alpha = promiseAlpha()
                                 translationY = (1f - promiseAlpha()) * 8.dp.toPx()
                             },
@@ -264,43 +260,25 @@ internal fun OnboardingContent(
                             )
                         }
 
-                        // Handoff: the full museum label, as the feed shows it.
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .graphicsLayer { alpha = handoffAlpha() },
-                        ) {
-                            Text(
-                                text = stringResource(R.string.onboarding_work_title),
-                                color = Color.White,
-                                style = CaptionTitleStyle,
-                            )
-                            // The feed's maker line shares a row with the 48dp heart; keep the row height.
-                            Row(
-                                modifier = Modifier.heightIn(min = 48.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Text(
-                                    text = stringResource(R.string.onboarding_work_artist),
-                                    color = CaptionSecondaryColor,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    modifier = Modifier.weight(1f),
-                                )
-                            }
-                            Text(
-                                text = museumName("met").uppercase(),
-                                color = Color.White.copy(alpha = 0.5f),
-                                style = MaterialTheme.typography.labelSmall,
-                                letterSpacing = 1.5.sp,
-                                modifier = Modifier.padding(top = 8.dp),
-                            )
-                            Text(
-                                text = stringResource(R.string.onboarding_work_department).uppercase(),
-                                color = Color.White.copy(alpha = 0.5f),
-                                style = MaterialTheme.typography.labelSmall,
-                                letterSpacing = 1.5.sp,
-                            )
-                        }
+                        // Handoff: the feed's own caption.
+                        ArtworkCaption(
+                            title = stringResource(R.string.onboarding_work_title),
+                            makerLine = stringResource(R.string.onboarding_work_artist),
+                            museum = museumName("met"),
+                            department = stringResource(R.string.onboarding_work_department),
+                            // The feed's real actions, invisible: the row keeps exactly the feed's height.
+                            actions = {
+                                Box(modifier = Modifier.alpha(0f).clearAndSetSemantics {}) {
+                                    ArtworkActions(
+                                        isFavorite = false,
+                                        onFavoriteClick = {},
+                                        onShareClick = null,
+                                        verticalState = true,
+                                    )
+                                }
+                            },
+                            modifier = Modifier.graphicsLayer { alpha = handoffAlpha() },
+                        )
                     }
                 }
             } else {

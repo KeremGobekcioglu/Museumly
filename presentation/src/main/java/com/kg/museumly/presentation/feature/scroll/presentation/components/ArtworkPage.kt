@@ -118,9 +118,18 @@ internal fun ArtworkPageWithRestrainedBox(
         }
 
         ArtworkCaption(
-            artwork = artwork,
-            isFavorite = isFavorite,
-            onFavoriteClick = { setFavorite(artwork.id, !isFavorite) },
+            title = artwork.title,
+            makerLine = captionLine(artwork.artist, artwork.year),
+            museum = museumName(artwork.providerId),
+            department = artwork.department,
+            actions = {
+                ArtworkActions(
+                    isFavorite = isFavorite,
+                    onFavoriteClick = { setFavorite(artwork.id, !isFavorite) },
+                    onShareClick = null,
+                    verticalState = true,
+                )
+            },
         )
     }
 }
@@ -131,10 +140,12 @@ internal fun ArtworkPageWithRestrainedBox(
  * collection credit as the quietest line.
  */
 @Composable
-private fun ArtworkCaption(
-    artwork: Artwork,
-    isFavorite: Boolean,
-    onFavoriteClick: () -> Unit,
+internal fun ArtworkCaption(
+    title: String,
+    makerLine: String?,
+    museum: String,
+    department: String?,
+    actions: @Composable () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -146,7 +157,7 @@ private fun ArtworkCaption(
             .padding(start = ReelsGutter, end = ReelsGutter, top = 8.dp, bottom = 24.dp),
     ) {
         Text(
-            text = artwork.title,
+            text = title,
             color = Color.White,
             style = CaptionTitleStyle,
         )
@@ -154,20 +165,15 @@ private fun ArtworkCaption(
         // there's no artist or year to show.
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                text = captionLine(artwork.artist, artwork.year).orEmpty(),
+                text = makerLine.orEmpty(),
                 color = CaptionSecondaryColor,
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.weight(1f),
             )
-            ArtworkActions(
-                isFavorite = isFavorite,
-                onFavoriteClick = onFavoriteClick,
-                onShareClick = null,
-                verticalState = true,
-            )
+            actions()
         }
         Text(
-            text = museumName(artwork.providerId).uppercase(),
+            text = museum.uppercase(),
             color = Color.White.copy(alpha = 0.5f),
             style = MaterialTheme.typography.labelSmall,
             letterSpacing = 1.5.sp,
@@ -176,9 +182,9 @@ private fun ArtworkCaption(
         // No maxLines anywhere in the caption: a cut-off title, artist,
         // museum or department reads as a bug. A long one wraps, and the
         // artwork box gives up the height.
-        artwork.department?.let { department ->
+        department?.let {
             Text(
-                text = department.uppercase(),
+                text = it.uppercase(),
                 color = Color.White.copy(alpha = 0.5f),
                 style = MaterialTheme.typography.labelSmall,
                 letterSpacing = 1.5.sp,
