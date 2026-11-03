@@ -22,12 +22,17 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.HourglassFull
 import androidx.compose.material.icons.filled.Museum
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.outlined.AccountCircle
+import androidx.compose.material.icons.outlined.Badge
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.HourglassEmpty
 import androidx.compose.material.icons.outlined.Museum
+import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
@@ -106,7 +111,8 @@ internal data class MainTab(
 internal val MainTabs: List<MainTab> = listOf(
     MainTab(ScrollPage, "Gallery", Icons.Outlined.Museum, Icons.Filled.Museum),
     MainTab(FavoritesPage, "Favorites", Icons.Outlined.FavoriteBorder, Icons.Filled.Favorite),
-    MainTab(ErasPage, label = "Eras", icon = Icons.Outlined.HourglassEmpty, selectedIcon = Icons.Filled.HourglassFull)
+    MainTab(ErasPage, label = "Eras", icon = Icons.Outlined.HourglassEmpty, selectedIcon = Icons.Filled.HourglassFull),
+    MainTab(ProfilePage, label = "Profile", icon = Icons.Outlined.Person, selectedIcon = Icons.Filled.Person)
 )
 
 /** The bar's minimum height. Onboarding adds it to its caption's bottom padding to match the feed. */

@@ -25,4 +25,6 @@ data object OnboardingPage
 object ErasPage
 
 @Serializable
+data object ProfilePage
+@Serializable
 data class EraPage(val eraId: String, val sectionId: String)
