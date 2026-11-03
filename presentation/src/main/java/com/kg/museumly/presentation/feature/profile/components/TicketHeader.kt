@@ -32,10 +32,11 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 
 @Composable
-internal fun TicketHeader(isSignedIn: Boolean, name: String?, photoUrl: String?,
-                          memberNumber: String? = null,
-                          memberSince: String? = null,
-                          onSignInClick: () -> Unit,
+internal fun TicketHeader(
+    isSignedIn: Boolean, name: String?, photoUrl: String?,
+    memberNumber: String? = null,
+    memberSince: String? = null,
+    onSignInClick: () -> Unit,
 )
 {
     val passKind: String
@@ -104,6 +105,9 @@ internal fun TicketHeader(isSignedIn: Boolean, name: String?, photoUrl: String?,
                 color = TicketBody,
             )
             Spacer(modifier = Modifier.height(12.dp))
+            /***
+             * we could use GoogleSignInButton from AuthActions.kt.
+             */
             Button(
                 onClick = onSignInClick,
                 modifier = Modifier

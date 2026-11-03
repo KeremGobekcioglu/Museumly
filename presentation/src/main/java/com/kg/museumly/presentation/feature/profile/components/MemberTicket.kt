@@ -66,17 +66,22 @@ internal val TicketSerif: FontFamily = FontFamily.Serif
 private val TicketCorner: Dp = 20.dp
 private val NotchRadius: Dp = 12.dp
 internal val PerforationHeight: Dp = 20.dp
-private val StubHeight: Dp = 148.dp
+val StubHeight: Dp = 148.dp
 private val StampSize: Dp = 112.dp
 @Composable
 fun MemberTicket(
     isSignedIn: Boolean,
+    hasGame: Boolean,
     onSignInClick: () -> Unit,
     modifier: Modifier = Modifier,
     name: String? = null,
     photoUrl: String? = null,
     memberNumber: String? = null,
     memberSince: String? = null,
+    visitDay: String? = null,
+    visitYear: String? = null,
+    scoreText: String? = null,
+    streakText: String? = null,
 ) {
     val shape: TicketShape = remember {
         TicketShape(
@@ -100,34 +105,56 @@ fun MemberTicket(
             onSignInClick = onSignInClick,
         )
         DashedLines()
-        Spacer(modifier = Modifier.height(StubHeight))    // stub, later
-    }
-}
-
-@Preview(name = "Signed in", showBackground = true, backgroundColor = 0xFF000000, widthDp = 390)
-@Composable
-private fun MemberTicketSignedInPreview() {
-    Box(modifier = Modifier.padding(24.dp)) {
-        MemberTicket(
-            isSignedIn = true,
-            onSignInClick = {},
-            name = "Kerem Göbekcioğlu",
-            memberNumber = "0412",
-            memberSince = "November 2026",
+        TicketStub(
+            isSignedIn = isSignedIn,
+            hasGame = hasGame,
+            visitDay = visitDay,
+            visitYear = visitYear,
+            scoreText = scoreText,
+            streakText = streakText,
         )
     }
 }
 
-@Preview(name = "Signed out", showBackground = true, backgroundColor = 0xFF000000, widthDp = 390)
+@Preview(name = "In · no game", showBackground = true, backgroundColor = 0xFF000000, widthDp = 390)
 @Composable
-private fun MemberTicketSignedOutPreview() {
+private fun TicketInNoGamePreview() {
     Box(modifier = Modifier.padding(24.dp)) {
         MemberTicket(
-            isSignedIn = false,
-            onSignInClick = {},
-//            name = "Kerem Göbekcioğlu",
-//            memberNumber = "0412",
-//            memberSince = "November 2026",
+            isSignedIn = true, hasGame = false, onSignInClick = {},
+            name = "Kerem Göbekcioğlu", memberNumber = "0412", memberSince = "November 2026",
+            visitDay = "4 Nov", visitYear = "2026",
         )
+    }
+}
+
+@Preview(name = "Out · no game", showBackground = true, backgroundColor = 0xFF000000, widthDp = 390)
+@Composable
+private fun TicketOutNoGamePreview() {
+    Box(modifier = Modifier.padding(24.dp)) {
+        MemberTicket(
+            isSignedIn = false, hasGame = false, onSignInClick = {},
+            visitDay = "4 Nov", visitYear = "2026",
+        )
+    }
+}
+
+@Preview(name = "In · game", showBackground = true, backgroundColor = 0xFF000000, widthDp = 390)
+@Composable
+private fun TicketInGamePreview() {
+    Box(modifier = Modifier.padding(24.dp)) {
+        MemberTicket(
+            isSignedIn = true, hasGame = true, onSignInClick = {},
+            name = "Kerem Göbekcioğlu", memberNumber = "0412", memberSince = "November 2026",
+            scoreText = "1,240", streakText = "6-day streak",
+        )
+    }
+}
+
+@Preview(name = "Out · game", showBackground = true, backgroundColor = 0xFF000000, widthDp = 390)
+@Composable
+private fun TicketOutGamePreview() {
+    Box(modifier = Modifier.padding(24.dp)) {
+        MemberTicket(isSignedIn = false, hasGame = true, onSignInClick = {})
     }
 }

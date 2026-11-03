@@ -77,7 +77,7 @@ internal fun AuthActions(
 }
 
 @Composable
-private fun GoogleSignInButton(
+fun GoogleSignInButton(
     isLoading: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
