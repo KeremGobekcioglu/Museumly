@@ -75,7 +75,7 @@ private fun SettingsRow(
     modifier: Modifier = Modifier
 )
 {
-    val shape: RoundedCornerShape = RoundedCornerShape(20.dp)
+    val shape: RoundedCornerShape = RoundedCornerShape(16.dp)
     Row(
         modifier = modifier
             .fillMaxWidth()
