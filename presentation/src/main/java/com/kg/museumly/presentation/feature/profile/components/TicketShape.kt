@@ -104,7 +104,8 @@ internal fun DashedLines()
         val y: Float = size.height / 2f
         val dash: Float = 6.dp.toPx()
         val gap: Float = 5.dp.toPx()
-        val lineCount = 2
+        // increment it if want 2 lines.
+        val lineCount = 1
         val spacing: Float = 10.dp.toPx()
         val totalHeight: Float = spacing * (lineCount - 1)
         val startY: Float = (size.height - totalHeight) / 2f
