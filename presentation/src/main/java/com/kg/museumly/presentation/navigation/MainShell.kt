@@ -36,6 +36,7 @@ import com.kg.museumly.presentation.feature.favorites.FavoritesEffect
 import com.kg.museumly.presentation.feature.favorites.FavoritesScreen
 import com.kg.museumly.presentation.feature.favorites.FavoritesUIState
 import com.kg.museumly.presentation.feature.favorites.FavoritesViewModel
+import com.kg.museumly.presentation.feature.profile.ProfilePage
 import com.kg.museumly.presentation.feature.scroll.presentation.ArtworkReelsScreen
 import com.kg.museumly.presentation.feature.scroll.presentation.ScrollUiState
 import com.kg.museumly.presentation.feature.scroll.presentation.ScrollViewModel
@@ -148,6 +149,11 @@ fun MainShell(
                     state = state,
                     onIntent = viewmodel::onIntent,
                 )
+            }
+
+            composable<ProfilePage>
+            {
+                ProfilePage()
             }
         }
     }
