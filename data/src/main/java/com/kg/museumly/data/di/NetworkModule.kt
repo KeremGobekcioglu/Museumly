@@ -2,7 +2,7 @@ package com.kg.museumly.data.di
 
 import com.kg.museumly.data.BuildConfig
 import com.kg.museumly.data.remote.cleveland.ClevelandApi
-import com.kg.museumly.data.remote.met.MetApi
+import com.kg.museumly.data.remote.met.MetBackendApi
 import com.kg.museumly.data.remote.museumly.AuthInterceptor
 import com.kg.museumly.data.remote.museumly.MuseumlyApi
 import dagger.Module
@@ -75,23 +75,6 @@ object NetworkModule
             .addConverterFactory(json.asConverterFactory(contentType))
             .build()
     }
-    /**
-     * we ll have different retrofit instances for different apis due to base urls.
-     * it will change later on. for now, this is fine. after adding second api,
-     * it will change.
-     */
-    @Provides
-    @Singleton
-    fun provideMetApi(okHttpClient: OkHttpClient, json: Json) : MetApi
-    {
-        val retrofit: Retrofit = buildRetrofit(
-            "https://collectionapi.metmuseum.org/public/collection/",
-            okHttpClient,
-            json
-        )
-        return retrofit.create(MetApi::class.java)
-    }
-
     @Provides
     @Singleton
     fun provideClevelandApi(okHttpClient: OkHttpClient, json: Json): ClevelandApi {
@@ -113,4 +96,15 @@ object NetworkModule
         )
         return retrofit.create(MuseumlyApi::class.java)
     }
+
+
+    // The backend client: same token and 401 handling as every backend call.
+// /met ignores the token server-side, so carrying it is harmless.
+    @Provides @Singleton
+    fun provideMetBackendApi(
+        @MuseumlyHttpClient okHttpClient: OkHttpClient,
+        json: Json,
+    ): MetBackendApi =
+        buildRetrofit(BuildConfig.API_BASE_URL, okHttpClient, json)
+            .create(MetBackendApi::class.java)
 }
